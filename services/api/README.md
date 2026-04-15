@@ -39,7 +39,7 @@ services/api
 - `POST /sessions/{id}/event`
 - `POST /sessions/{id}/complete`
 
-認証はまだ開発用の簡易フローです。`/auth/register` で返る `user.user_id` を `X-User-ID` ヘッダに入れると `/me` や `/sessions/*` を叩けます。
+認証は email/password ベースです。`/auth/register` または `/auth/login` で返る `tokens.access_token` を `Authorization: Bearer <token>` として送ると `/me` や `/sessions/*` を叩けます。
 
 ## Design Notes
 
@@ -58,8 +58,16 @@ services/api
 - `context.Context` を repository / service に通している
 - Go 標準 `ServeMux` のパターンルーティングを使用している
 - `X-Request-ID` を自動付与してログとレスポンスに反映する
-- protected route は auth middleware で一元管理している
+- protected route は Bearer token middleware で一元管理している
 - `httptest` ベースの HTTP テストを追加している
+
+追加で入っているセキュリティ対策:
+
+- パスワードは PBKDF2-SHA256 でハッシュ化
+- access / refresh token は HMAC 署名付き
+- API 応答に基本的なセキュリティヘッダを付与
+- production ではデフォルトの token secret を禁止
+- パスワード長とハッシュ反復回数に下限を設けている
 
 ## Run
 
@@ -71,11 +79,15 @@ go run ./cmd/server
 
 - `API_HTTP_ADDR` 既定値 `:8080`
 - `APP_ENV` 既定値 `development`
+- `AUTH_TOKEN_SECRET` 本番では必須
+- `AUTH_ACCESS_TOKEN_TTL` 既定値 `15m`
+- `AUTH_REFRESH_TOKEN_TTL` 既定値 `168h`
+- `PASSWORD_HASH_ITERATIONS` 既定値 `120000`
 
 ## Example
 
 ```bash
 curl -X POST http://localhost:8080/auth/register \
   -H "Content-Type: application/json" \
-  -d "{\"email\":\"user@example.com\",\"password\":\"secret123\",\"display_name\":\"Aki\",\"agreed_to_terms\":true}"
+  -d "{\"email\":\"user@example.com\",\"password\":\"secret1234567\",\"display_name\":\"Aki\",\"agreed_to_terms\":true}"
 ```

@@ -3,13 +3,16 @@ package app
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"memory-safe-english/services/api/internal/authctx"
 	"memory-safe-english/services/api/internal/httpjson"
 	"memory-safe-english/services/api/internal/httpx"
+	"memory-safe-english/services/api/internal/security/token"
 )
 
 type statusRecorder struct {
@@ -34,6 +37,16 @@ func withRequestID(next http.Handler) http.Handler {
 	})
 }
 
+func withSecurityHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Referrer-Policy", "no-referrer")
+		w.Header().Set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'")
+		next.ServeHTTP(w, r)
+	})
+}
+
 func withLogging(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
@@ -51,15 +64,34 @@ func withLogging(next http.Handler) http.Handler {
 	})
 }
 
-func withAuthContext(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		userID := r.Header.Get("X-User-ID")
-		if userID == "" {
-			httpjson.Error(w, http.StatusUnauthorized, "unauthorized", "X-User-ID header is required")
-			return
-		}
-		next.ServeHTTP(w, r.WithContext(authctx.WithUserID(r.Context(), userID)))
-	})
+func authMiddleware(tokens token.Manager) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			header := r.Header.Get("Authorization")
+			if header == "" {
+				httpjson.Error(w, http.StatusUnauthorized, "unauthorized", "Authorization header is required")
+				return
+			}
+
+			tokenValue, ok := strings.CutPrefix(header, "Bearer ")
+			if !ok || tokenValue == "" {
+				httpjson.Error(w, http.StatusUnauthorized, "unauthorized", "Authorization header must use Bearer token")
+				return
+			}
+
+			claims, err := tokens.ParseAccessToken(tokenValue)
+			if err != nil {
+				if errors.Is(err, token.ErrExpiredToken) {
+					httpjson.Error(w, http.StatusUnauthorized, "token_expired", "access token expired")
+					return
+				}
+				httpjson.Error(w, http.StatusUnauthorized, "invalid_token", "invalid access token")
+				return
+			}
+
+			next.ServeHTTP(w, r.WithContext(authctx.WithUserID(r.Context(), claims.Subject)))
+		})
+	}
 }
 
 func recoverer(next http.Handler) http.Handler {
