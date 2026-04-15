@@ -24,23 +24,6 @@ func NewStore() *Store {
 	}
 }
 
-func (s *Store) CreateUser(email, displayName, authProvider string) domain.User {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	now := time.Now().UTC()
-	user := domain.User{
-		ID:                 newID("usr"),
-		Email:              email,
-		DisplayName:        displayName,
-		AuthProvider:       authProvider,
-		SubscriptionStatus: "free",
-		CreatedAt:          now,
-	}
-	s.users[user.ID] = user
-	return user
-}
-
 func (s *Store) CreateUser(email, displayName, authProvider string) (domain.User, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
