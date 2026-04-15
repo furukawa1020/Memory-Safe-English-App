@@ -8,8 +8,19 @@ import (
 )
 
 type UserRepository interface {
-	CreateUser(ctx context.Context, email, displayName, authProvider string) (domain.User, error)
 	GetUser(ctx context.Context, userID string) (domain.User, error)
+}
+
+type NewAuthUser struct {
+	Email        string
+	DisplayName  string
+	AuthProvider string
+	PasswordHash string
+}
+
+type AuthRepository interface {
+	CreateUserWithPassword(ctx context.Context, input NewAuthUser) (domain.User, error)
+	FindUserByEmail(ctx context.Context, email string) (domain.User, string, error)
 }
 
 type SessionRepository interface {
