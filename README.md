@@ -12,7 +12,7 @@
 │  └─ mobile/              # Flutter app
 ├─ services/
 │  ├─ api/                 # Go REST API
-│  └─ worker/              # Python NLP / speech workers
+│  └─ worker/              # Python NLP / speech worker
 ├─ infra/
 │  ├─ docker-compose.yml   # Local dev dependencies
 │  └─ postgres/init/       # Initial SQL
@@ -49,19 +49,30 @@
 ## Recommended Build Order
 
 1. `infra/` のローカル開発基盤を立てる
-2. `services/api/` に OpenAPI 駆動で認証・セッション API を実装する
+2. `services/api/` に OpenAPI 駆動で auth / sessions を実装する
 3. `infra/postgres/init/001_init.sql` を起点に DB を作る
-4. `apps/mobile/` に認証、ホーム、読む画面を先行実装する
-5. `services/worker/` にチャンク分割ロジックを実装する
-6. イベントログを API とアプリの両方に組み込む
+4. `services/worker/` に chunking / skeleton の HTTP interface を実装する
+5. `apps/mobile/` に認証、ホーム、読む画面を先行実装する
+6. API と worker の統合を進める
+
+## Current Status
+
+- Go API:
+  auth, token refresh, sessions, event logging の最小実装あり
+- Python worker:
+  `/health`, `/analyze/chunks` の最小実装あり
+- Infra:
+  PostgreSQL / Redis のローカル compose あり
+- Docs:
+  architecture / data model / roadmap / OpenAPI あり
 
 ## Next Concrete Tasks
 
+- Go API の PostgreSQL repository 実装
+- worker の skeleton extraction と speech 分析追加
 - Flutter アプリの雛形作成
-- Go API のエントリポイントと OpenAPI 雛形追加
-- Python worker の FastAPI もしくは job worker 雛形追加
-- 認証 API と `users` / `user_profiles` 実装
 - Chunk Reader 用コンテンツ取得 API 実装
+- API と worker の接続実装
 
 ## Documentation
 
@@ -69,3 +80,4 @@
 - [API Outline](docs/api-outline.md)
 - [Data Model](docs/data-model.md)
 - [MVP Roadmap](docs/mvp-roadmap.md)
+- [OpenAPI](services/api/openapi/openapi.yaml)
