@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"strings"
 
 	"memory-safe-english/services/api/internal/domain"
@@ -28,7 +29,7 @@ func NewAuthService(users repository.UserRepository) AuthService {
 	return AuthService{users: users}
 }
 
-func (s AuthService) Register(input RegisterInput) (AuthResult, error) {
+func (s AuthService) Register(ctx context.Context, input RegisterInput) (AuthResult, error) {
 	if strings.TrimSpace(input.Email) == "" || strings.TrimSpace(input.Password) == "" || strings.TrimSpace(input.DisplayName) == "" {
 		return AuthResult{}, domain.ErrInvalidInput
 	}
@@ -36,7 +37,7 @@ func (s AuthService) Register(input RegisterInput) (AuthResult, error) {
 		return AuthResult{}, domain.ErrInvalidInput
 	}
 
-	user, err := s.users.CreateUser(strings.TrimSpace(input.Email), strings.TrimSpace(input.DisplayName), "email")
+	user, err := s.users.CreateUser(ctx, strings.TrimSpace(input.Email), strings.TrimSpace(input.DisplayName), "email")
 	if err != nil {
 		return AuthResult{}, err
 	}
@@ -44,12 +45,12 @@ func (s AuthService) Register(input RegisterInput) (AuthResult, error) {
 	return newAuthResult(user), nil
 }
 
-func (s AuthService) Login(userID string) (AuthResult, error) {
+func (s AuthService) Login(ctx context.Context, userID string) (AuthResult, error) {
 	if strings.TrimSpace(userID) == "" {
 		return AuthResult{}, domain.ErrInvalidInput
 	}
 
-	user, err := s.users.GetUser(strings.TrimSpace(userID))
+	user, err := s.users.GetUser(ctx, strings.TrimSpace(userID))
 	if err != nil {
 		return AuthResult{}, err
 	}
