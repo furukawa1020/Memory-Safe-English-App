@@ -47,9 +47,19 @@ services/api
 - `internal/service`: ユースケースと入力検証
 - `internal/handlers`: HTTP 変換層
 - `internal/httpx`: リクエスト / レスポンスの共通処理
+- `internal/authctx`: 認証済みユーザーの request context 管理
+- `internal/app`: DI とミドルウェアとサーバ組み立て
 - `internal/store/memory`: 開発用インメモリ実装
 
 この構成にしているので、次に PostgreSQL 実装を足すときは handler をほぼ触らずに進められます。
+
+追加で入っている保守性向上ポイント:
+
+- `context.Context` を repository / service に通している
+- Go 標準 `ServeMux` のパターンルーティングを使用している
+- `X-Request-ID` を自動付与してログとレスポンスに反映する
+- protected route は auth middleware で一元管理している
+- `httptest` ベースの HTTP テストを追加している
 
 ## Run
 
