@@ -4,17 +4,19 @@ import (
 	"context"
 	"testing"
 
+	"memory-safe-english/services/api/internal/security/password"
+	"memory-safe-english/services/api/internal/security/token"
 	"memory-safe-english/services/api/internal/store/memory"
 )
 
 func TestSessionServiceStartAndComplete(t *testing.T) {
 	store := memory.NewStore()
-	auth := NewAuthService(store)
+	auth := NewAuthService(store, password.NewHasher(100000), token.NewManager("test-secret", 15, 30))
 	sessionSvc := NewSessionService(store, store)
 
 	authResult, err := auth.Register(context.Background(), RegisterInput{
 		Email:         "user@example.com",
-		Password:      "secret123",
+		Password:      "secret1234567",
 		DisplayName:   "Aki",
 		AgreedToTerms: true,
 	})
