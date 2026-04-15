@@ -9,13 +9,17 @@ import (
 )
 
 func NewServer(cfg config.Config) (*http.Server, error) {
+	if err := cfg.Validate(); err != nil {
+		return nil, err
+	}
+
 	application := NewApplication(cfg)
 	mux := http.NewServeMux()
-	handlers.RegisterRoutes(mux, application.Routes(), withAuthContext)
+	handlers.RegisterRoutes(mux, application.Routes(), authMiddleware(application.TokenManager))
 
 	return &http.Server{
 		Addr:              cfg.HTTPAddr,
-		Handler:           chain(mux, withRequestID, withLogging, recoverer),
+		Handler:           chain(mux, withRequestID, withSecurityHeaders, withLogging, recoverer),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      15 * time.Second,
