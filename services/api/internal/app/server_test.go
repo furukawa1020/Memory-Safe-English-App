@@ -11,17 +11,23 @@ import (
 )
 
 func TestServerRegisterAndMeFlow(t *testing.T) {
-	server, err := NewServer(config.Config{HTTPAddr: ":0", AppEnv: "test"})
+	server, err := NewServer(config.Config{
+		HTTPAddr:               ":0",
+		AppEnv:                 "test",
+		AuthTokenSecret:        "test-secret",
+		AccessTokenTTL:         15,
+		RefreshTokenTTL:        30,
+		PasswordHashIterations: 100000,
+	})
 	if err != nil {
 		t.Fatalf("NewServer() error = %v", err)
 	}
 
 	registerBody := map[string]any{
 		"email":           "user@example.com",
-		"password":        "secret123",
+		"password":        "secret1234567",
 		"display_name":    "Aki",
 		"agreed_to_terms": true,
-		"native_language": "ja",
 	}
 	bodyBytes, _ := json.Marshal(registerBody)
 
@@ -38,6 +44,9 @@ func TestServerRegisterAndMeFlow(t *testing.T) {
 		User struct {
 			UserID string `json:"user_id"`
 		} `json:"user"`
+		Tokens struct {
+			AccessToken string `json:"access_token"`
+		} `json:"tokens"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &registerResponse); err != nil {
 		t.Fatalf("unmarshal register response: %v", err)
@@ -45,9 +54,12 @@ func TestServerRegisterAndMeFlow(t *testing.T) {
 	if registerResponse.User.UserID == "" {
 		t.Fatalf("expected user_id in register response")
 	}
+	if registerResponse.Tokens.AccessToken == "" {
+		t.Fatalf("expected access token in register response")
+	}
 
 	meReq := httptest.NewRequest(http.MethodGet, "/me", nil)
-	meReq.Header.Set("X-User-ID", registerResponse.User.UserID)
+	meReq.Header.Set("Authorization", "Bearer "+registerResponse.Tokens.AccessToken)
 	meRec := httptest.NewRecorder()
 	server.Handler.ServeHTTP(meRec, meReq)
 
@@ -57,10 +69,20 @@ func TestServerRegisterAndMeFlow(t *testing.T) {
 	if got := meRec.Header().Get("X-Request-ID"); got == "" {
 		t.Fatalf("expected X-Request-ID header")
 	}
+	if got := meRec.Header().Get("X-Content-Type-Options"); got != "nosniff" {
+		t.Fatalf("expected security header, got %q", got)
+	}
 }
 
-func TestServerRejectsProtectedRouteWithoutUserHeader(t *testing.T) {
-	server, err := NewServer(config.Config{HTTPAddr: ":0", AppEnv: "test"})
+func TestServerRejectsProtectedRouteWithoutToken(t *testing.T) {
+	server, err := NewServer(config.Config{
+		HTTPAddr:               ":0",
+		AppEnv:                 "test",
+		AuthTokenSecret:        "test-secret",
+		AccessTokenTTL:         15,
+		RefreshTokenTTL:        30,
+		PasswordHashIterations: 100000,
+	})
 	if err != nil {
 		t.Fatalf("NewServer() error = %v", err)
 	}
