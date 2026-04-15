@@ -1,21 +1,20 @@
 package handlers
 
 import (
-	"encoding/json"
 	"net/http"
-	"strings"
 	"time"
 
+	"memory-safe-english/services/api/internal/httpx"
 	"memory-safe-english/services/api/internal/httpjson"
-	"memory-safe-english/services/api/internal/store/memory"
+	"memory-safe-english/services/api/internal/service"
 )
 
 type SessionHandler struct {
-	store *memory.Store
+	service service.SessionService
 }
 
-func NewSessionHandler(store *memory.Store) SessionHandler {
-	return SessionHandler{store: store}
+func NewSessionHandler(service service.SessionService) SessionHandler {
+	return SessionHandler{service: service}
 }
 
 func (h SessionHandler) Start(w http.ResponseWriter, r *http.Request) {
@@ -24,28 +23,22 @@ func (h SessionHandler) Start(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID := r.Header.Get("X-User-ID")
-	if userID == "" {
-		httpjson.Error(w, http.StatusUnauthorized, "missing_user", "X-User-ID header is required")
-		return
-	}
-
 	var req struct {
 		Mode      string `json:"mode"`
 		ContentID string `json:"content_id"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := httpx.DecodeJSON(r, &req); err != nil {
 		httpjson.Error(w, http.StatusBadRequest, "invalid_json", "request body must be valid JSON")
 		return
 	}
-	if req.Mode == "" {
-		httpjson.Error(w, http.StatusBadRequest, "invalid_request", "mode is required")
-		return
-	}
 
-	session, err := h.store.StartSession(userID, req.Mode, req.ContentID)
+	session, err := h.service.Start(service.StartSessionInput{
+		UserID:    httpx.UserIDFromHeader(r),
+		Mode:      req.Mode,
+		ContentID: req.ContentID,
+	})
 	if err != nil {
-		httpjson.Error(w, http.StatusNotFound, "user_not_found", "user not found")
+		httpx.WriteDomainError(w, err, "mode is required", "user not found")
 		return
 	}
 
@@ -58,15 +51,15 @@ func (h SessionHandler) Complete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sessionID, ok := sessionIDFromPath(r.URL.Path)
-	if !ok {
+	sessionID, action, ok := httpx.SessionAction(r.URL.Path)
+	if !ok || action != "complete" {
 		httpjson.Error(w, http.StatusNotFound, "not_found", "session route not found")
 		return
 	}
 
-	session, err := h.store.CompleteSession(sessionID)
+	session, err := h.service.Complete(sessionID)
 	if err != nil {
-		httpjson.Error(w, http.StatusNotFound, "session_not_found", "session not found")
+		httpx.WriteDomainError(w, err, "session_id is required", "session not found")
 		return
 	}
 
@@ -79,14 +72,8 @@ func (h SessionHandler) AddEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID := r.Header.Get("X-User-ID")
-	if userID == "" {
-		httpjson.Error(w, http.StatusUnauthorized, "missing_user", "X-User-ID header is required")
-		return
-	}
-
-	sessionID, ok := sessionIDFromPath(r.URL.Path)
-	if !ok {
+	sessionID, action, ok := httpx.SessionAction(r.URL.Path)
+	if !ok || action != "event" {
 		httpjson.Error(w, http.StatusNotFound, "not_found", "session route not found")
 		return
 	}
@@ -96,12 +83,8 @@ func (h SessionHandler) AddEvent(w http.ResponseWriter, r *http.Request) {
 		OccurredAt string         `json:"occurred_at"`
 		Payload    map[string]any `json:"payload"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := httpx.DecodeJSON(r, &req); err != nil {
 		httpjson.Error(w, http.StatusBadRequest, "invalid_json", "request body must be valid JSON")
-		return
-	}
-	if req.EventType == "" {
-		httpjson.Error(w, http.StatusBadRequest, "invalid_request", "event_type is required")
 		return
 	}
 
@@ -115,23 +98,17 @@ func (h SessionHandler) AddEvent(w http.ResponseWriter, r *http.Request) {
 		occurredAt = parsed
 	}
 
-	event, err := h.store.AddEvent(userID, sessionID, req.EventType, req.Payload, occurredAt)
+	event, err := h.service.AddEvent(service.AddEventInput{
+		UserID:     httpx.UserIDFromHeader(r),
+		SessionID:  sessionID,
+		EventType:  req.EventType,
+		Payload:    req.Payload,
+		OccurredAt: occurredAt,
+	})
 	if err != nil {
-		httpjson.Error(w, http.StatusNotFound, "session_not_found", "session not found for user")
+		httpx.WriteDomainError(w, err, "event_type is required", "session not found for user")
 		return
 	}
 
 	httpjson.Write(w, http.StatusCreated, event)
-}
-
-func sessionIDFromPath(path string) (string, bool) {
-	trimmed := strings.Trim(path, "/")
-	parts := strings.Split(trimmed, "/")
-	if len(parts) != 3 {
-		return "", false
-	}
-	if parts[0] != "sessions" {
-		return "", false
-	}
-	return parts[1], true
 }

@@ -27,7 +27,7 @@ services/api
 
 ## Current Bootstrap
 
-現時点では、標準ライブラリだけで起動できる最小 API 基盤を入れています。
+現時点では、標準ライブラリだけで起動できる最小 API 基盤を入れています。将来の PostgreSQL 実装へ差し替えやすいよう、`repository -> service -> handler` の責務分離を入れています。
 
 含まれるエンドポイント:
 
@@ -40,6 +40,16 @@ services/api
 - `POST /sessions/{id}/complete`
 
 認証はまだ開発用の簡易フローです。`/auth/register` で返る `user.user_id` を `X-User-ID` ヘッダに入れると `/me` や `/sessions/*` を叩けます。
+
+## Design Notes
+
+- `internal/repository`: 永続化のインターフェース
+- `internal/service`: ユースケースと入力検証
+- `internal/handlers`: HTTP 変換層
+- `internal/httpx`: リクエスト / レスポンスの共通処理
+- `internal/store/memory`: 開発用インメモリ実装
+
+この構成にしているので、次に PostgreSQL 実装を足すときは handler をほぼ触らずに進められます。
 
 ## Run
 

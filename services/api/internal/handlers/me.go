@@ -3,16 +3,17 @@ package handlers
 import (
 	"net/http"
 
+	"memory-safe-english/services/api/internal/httpx"
 	"memory-safe-english/services/api/internal/httpjson"
-	"memory-safe-english/services/api/internal/store/memory"
+	"memory-safe-english/services/api/internal/service"
 )
 
 type MeHandler struct {
-	store *memory.Store
+	service service.UserService
 }
 
-func NewMeHandler(store *memory.Store) MeHandler {
-	return MeHandler{store: store}
+func NewMeHandler(service service.UserService) MeHandler {
+	return MeHandler{service: service}
 }
 
 func (h MeHandler) Get(w http.ResponseWriter, r *http.Request) {
@@ -21,15 +22,9 @@ func (h MeHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID := r.Header.Get("X-User-ID")
-	if userID == "" {
-		httpjson.Error(w, http.StatusUnauthorized, "missing_user", "X-User-ID header is required")
-		return
-	}
-
-	user, err := h.store.GetUser(userID)
+	user, err := h.service.GetMe(httpx.UserIDFromHeader(r))
 	if err != nil {
-		httpjson.Error(w, http.StatusNotFound, "user_not_found", "user not found")
+		httpx.WriteDomainError(w, err, "invalid user", "user not found")
 		return
 	}
 

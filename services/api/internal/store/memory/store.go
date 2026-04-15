@@ -3,14 +3,11 @@ package memory
 import (
 	"crypto/rand"
 	"encoding/hex"
-	"errors"
 	"sync"
 	"time"
 
 	"memory-safe-english/services/api/internal/domain"
 )
-
-var ErrNotFound = errors.New("not found")
 
 type Store struct {
 	mu       sync.RWMutex
@@ -44,13 +41,30 @@ func (s *Store) CreateUser(email, displayName, authProvider string) domain.User 
 	return user
 }
 
+func (s *Store) CreateUser(email, displayName, authProvider string) (domain.User, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	now := time.Now().UTC()
+	user := domain.User{
+		ID:                 newID("usr"),
+		Email:              email,
+		DisplayName:        displayName,
+		AuthProvider:       authProvider,
+		SubscriptionStatus: "free",
+		CreatedAt:          now,
+	}
+	s.users[user.ID] = user
+	return user, nil
+}
+
 func (s *Store) GetUser(userID string) (domain.User, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	user, ok := s.users[userID]
 	if !ok {
-		return domain.User{}, ErrNotFound
+		return domain.User{}, domain.ErrNotFound
 	}
 	return user, nil
 }
@@ -60,7 +74,7 @@ func (s *Store) StartSession(userID, mode, contentID string) (domain.Session, er
 	defer s.mu.Unlock()
 
 	if _, ok := s.users[userID]; !ok {
-		return domain.Session{}, ErrNotFound
+		return domain.Session{}, domain.ErrNotFound
 	}
 
 	session := domain.Session{
@@ -81,7 +95,7 @@ func (s *Store) CompleteSession(sessionID string) (domain.Session, error) {
 
 	session, ok := s.sessions[sessionID]
 	if !ok {
-		return domain.Session{}, ErrNotFound
+		return domain.Session{}, domain.ErrNotFound
 	}
 
 	session.CompletedAt = time.Now().UTC()
@@ -96,7 +110,7 @@ func (s *Store) GetSession(sessionID string) (domain.Session, error) {
 
 	session, ok := s.sessions[sessionID]
 	if !ok {
-		return domain.Session{}, ErrNotFound
+		return domain.Session{}, domain.ErrNotFound
 	}
 	return session, nil
 }
@@ -107,10 +121,10 @@ func (s *Store) AddEvent(userID, sessionID, eventType string, payload map[string
 
 	session, ok := s.sessions[sessionID]
 	if !ok {
-		return domain.EventLog{}, ErrNotFound
+		return domain.EventLog{}, domain.ErrNotFound
 	}
 	if session.UserID != userID {
-		return domain.EventLog{}, ErrNotFound
+		return domain.EventLog{}, domain.ErrNotFound
 	}
 
 	event := domain.EventLog{

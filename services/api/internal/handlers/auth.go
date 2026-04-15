@@ -1,15 +1,15 @@
 package handlers
 
 import (
-	"encoding/json"
 	"net/http"
 
+	"memory-safe-english/services/api/internal/httpx"
 	"memory-safe-english/services/api/internal/httpjson"
-	"memory-safe-english/services/api/internal/store/memory"
+	"memory-safe-english/services/api/internal/service"
 )
 
 type AuthHandler struct {
-	store *memory.Store
+	service service.AuthService
 }
 
 type registerRequest struct {
@@ -20,8 +20,8 @@ type registerRequest struct {
 	NativeLanguage string `json:"native_language"`
 }
 
-func NewAuthHandler(store *memory.Store) AuthHandler {
-	return AuthHandler{store: store}
+func NewAuthHandler(service service.AuthService) AuthHandler {
+	return AuthHandler{service: service}
 }
 
 func (h AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
@@ -31,27 +31,23 @@ func (h AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req registerRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := httpx.DecodeJSON(r, &req); err != nil {
 		httpjson.Error(w, http.StatusBadRequest, "invalid_json", "request body must be valid JSON")
 		return
 	}
-	if req.Email == "" || req.DisplayName == "" || req.Password == "" {
-		httpjson.Error(w, http.StatusBadRequest, "invalid_request", "email, password, and display_name are required")
-		return
-	}
-	if !req.AgreedToTerms {
-		httpjson.Error(w, http.StatusBadRequest, "terms_required", "terms agreement is required")
+
+	result, err := h.service.Register(service.RegisterInput{
+		Email:         req.Email,
+		Password:      req.Password,
+		DisplayName:   req.DisplayName,
+		AgreedToTerms: req.AgreedToTerms,
+	})
+	if err != nil {
+		httpx.WriteDomainError(w, err, "email, password, display_name, and terms agreement are required", "user not found")
 		return
 	}
 
-	user := h.store.CreateUser(req.Email, req.DisplayName, "email")
-	httpjson.Write(w, http.StatusCreated, map[string]any{
-		"user": user,
-		"tokens": map[string]string{
-			"access_token":  "dev-access-" + user.ID,
-			"refresh_token": "dev-refresh-" + user.ID,
-		},
-	})
+	httpjson.Write(w, http.StatusCreated, result)
 }
 
 func (h AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
@@ -63,26 +59,16 @@ func (h AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		UserID string `json:"user_id"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := httpx.DecodeJSON(r, &req); err != nil {
 		httpjson.Error(w, http.StatusBadRequest, "invalid_json", "request body must be valid JSON")
 		return
 	}
-	if req.UserID == "" {
-		httpjson.Error(w, http.StatusBadRequest, "invalid_request", "user_id is required for the dev login flow")
-		return
-	}
 
-	user, err := h.store.GetUser(req.UserID)
+	result, err := h.service.Login(req.UserID)
 	if err != nil {
-		httpjson.Error(w, http.StatusNotFound, "user_not_found", "user not found")
+		httpx.WriteDomainError(w, err, "user_id is required for the dev login flow", "user not found")
 		return
 	}
 
-	httpjson.Write(w, http.StatusOK, map[string]any{
-		"user": user,
-		"tokens": map[string]string{
-			"access_token":  "dev-access-" + user.ID,
-			"refresh_token": "dev-refresh-" + user.ID,
-		},
-	})
+	httpjson.Write(w, http.StatusOK, result)
 }
