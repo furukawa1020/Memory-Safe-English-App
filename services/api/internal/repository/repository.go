@@ -1,19 +1,20 @@
 package repository
 
 import (
+	"context"
 	"time"
 
 	"memory-safe-english/services/api/internal/domain"
 )
 
 type UserRepository interface {
-	CreateUser(email, displayName, authProvider string) (domain.User, error)
-	GetUser(userID string) (domain.User, error)
+	CreateUser(ctx context.Context, email, displayName, authProvider string) (domain.User, error)
+	GetUser(ctx context.Context, userID string) (domain.User, error)
 }
 
 type SessionRepository interface {
-	StartSession(userID, mode, contentID string) (domain.Session, error)
-	CompleteSession(sessionID string) (domain.Session, error)
-	GetSession(sessionID string) (domain.Session, error)
-	AddEvent(userID, sessionID, eventType string, payload map[string]any, occurredAt time.Time) (domain.EventLog, error)
+	StartSession(ctx context.Context, userID, mode, contentID string) (domain.Session, error)
+	CompleteSession(ctx context.Context, sessionID string) (domain.Session, error)
+	GetSession(ctx context.Context, sessionID string) (domain.Session, error)
+	AddEvent(ctx context.Context, userID, sessionID, eventType string, payload map[string]any, occurredAt time.Time) (domain.EventLog, error)
 }

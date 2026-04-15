@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"testing"
 
 	"memory-safe-english/services/api/internal/store/memory"
@@ -10,7 +11,7 @@ func TestAuthServiceRegisterAndLogin(t *testing.T) {
 	store := memory.NewStore()
 	svc := NewAuthService(store)
 
-	result, err := svc.Register(RegisterInput{
+	result, err := svc.Register(context.Background(), RegisterInput{
 		Email:         "user@example.com",
 		Password:      "secret123",
 		DisplayName:   "Aki",
@@ -23,7 +24,7 @@ func TestAuthServiceRegisterAndLogin(t *testing.T) {
 		t.Fatalf("expected user id to be set")
 	}
 
-	loginResult, err := svc.Login(result.User.ID)
+	loginResult, err := svc.Login(context.Background(), result.User.ID)
 	if err != nil {
 		t.Fatalf("Login() error = %v", err)
 	}
@@ -36,7 +37,7 @@ func TestAuthServiceRegisterRejectsInvalidInput(t *testing.T) {
 	store := memory.NewStore()
 	svc := NewAuthService(store)
 
-	_, err := svc.Register(RegisterInput{})
+	_, err := svc.Register(context.Background(), RegisterInput{})
 	if err == nil {
 		t.Fatalf("expected validation error")
 	}
