@@ -17,11 +17,11 @@ func TestServerRegisterAndMeFlow(t *testing.T) {
 	}
 
 	registerBody := map[string]any{
-		"email":            "user@example.com",
-		"password":         "secret123",
-		"display_name":     "Aki",
-		"agreed_to_terms":  true,
-		"native_language":  "ja",
+		"email":           "user@example.com",
+		"password":        "secret123",
+		"display_name":    "Aki",
+		"agreed_to_terms": true,
+		"native_language": "ja",
 	}
 	bodyBytes, _ := json.Marshal(registerBody)
 
