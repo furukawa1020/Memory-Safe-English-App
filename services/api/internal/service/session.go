@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"strings"
 	"time"
 
@@ -34,27 +35,27 @@ func NewSessionService(users repository.UserRepository, sessions repository.Sess
 	}
 }
 
-func (s SessionService) Start(input StartSessionInput) (domain.Session, error) {
+func (s SessionService) Start(ctx context.Context, input StartSessionInput) (domain.Session, error) {
 	if strings.TrimSpace(input.UserID) == "" {
 		return domain.Session{}, domain.ErrUnauthorized
 	}
 	if strings.TrimSpace(input.Mode) == "" {
 		return domain.Session{}, domain.ErrInvalidInput
 	}
-	if _, err := s.users.GetUser(strings.TrimSpace(input.UserID)); err != nil {
+	if _, err := s.users.GetUser(ctx, strings.TrimSpace(input.UserID)); err != nil {
 		return domain.Session{}, err
 	}
-	return s.sessions.StartSession(strings.TrimSpace(input.UserID), strings.TrimSpace(input.Mode), strings.TrimSpace(input.ContentID))
+	return s.sessions.StartSession(ctx, strings.TrimSpace(input.UserID), strings.TrimSpace(input.Mode), strings.TrimSpace(input.ContentID))
 }
 
-func (s SessionService) Complete(sessionID string) (domain.Session, error) {
+func (s SessionService) Complete(ctx context.Context, sessionID string) (domain.Session, error) {
 	if strings.TrimSpace(sessionID) == "" {
 		return domain.Session{}, domain.ErrInvalidInput
 	}
-	return s.sessions.CompleteSession(strings.TrimSpace(sessionID))
+	return s.sessions.CompleteSession(ctx, strings.TrimSpace(sessionID))
 }
 
-func (s SessionService) AddEvent(input AddEventInput) (domain.EventLog, error) {
+func (s SessionService) AddEvent(ctx context.Context, input AddEventInput) (domain.EventLog, error) {
 	if strings.TrimSpace(input.UserID) == "" {
 		return domain.EventLog{}, domain.ErrUnauthorized
 	}
@@ -66,6 +67,7 @@ func (s SessionService) AddEvent(input AddEventInput) (domain.EventLog, error) {
 		occurredAt = time.Now().UTC()
 	}
 	return s.sessions.AddEvent(
+		ctx,
 		strings.TrimSpace(input.UserID),
 		strings.TrimSpace(input.SessionID),
 		strings.TrimSpace(input.EventType),

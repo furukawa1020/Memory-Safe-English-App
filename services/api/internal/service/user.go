@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"strings"
 
 	"memory-safe-english/services/api/internal/domain"
@@ -15,9 +16,9 @@ func NewUserService(users repository.UserRepository) UserService {
 	return UserService{users: users}
 }
 
-func (s UserService) GetMe(userID string) (domain.User, error) {
+func (s UserService) GetMe(ctx context.Context, userID string) (domain.User, error) {
 	if strings.TrimSpace(userID) == "" {
 		return domain.User{}, domain.ErrUnauthorized
 	}
-	return s.users.GetUser(strings.TrimSpace(userID))
+	return s.users.GetUser(ctx, strings.TrimSpace(userID))
 }

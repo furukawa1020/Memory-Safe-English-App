@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"testing"
 
 	"memory-safe-english/services/api/internal/store/memory"
@@ -11,7 +12,7 @@ func TestSessionServiceStartAndComplete(t *testing.T) {
 	auth := NewAuthService(store)
 	sessionSvc := NewSessionService(store, store)
 
-	authResult, err := auth.Register(RegisterInput{
+	authResult, err := auth.Register(context.Background(), RegisterInput{
 		Email:         "user@example.com",
 		Password:      "secret123",
 		DisplayName:   "Aki",
@@ -21,7 +22,7 @@ func TestSessionServiceStartAndComplete(t *testing.T) {
 		t.Fatalf("Register() error = %v", err)
 	}
 
-	session, err := sessionSvc.Start(StartSessionInput{
+	session, err := sessionSvc.Start(context.Background(), StartSessionInput{
 		UserID: authResult.User.ID,
 		Mode:   "reading",
 	})
@@ -32,7 +33,7 @@ func TestSessionServiceStartAndComplete(t *testing.T) {
 		t.Fatalf("expected session id to be set")
 	}
 
-	completed, err := sessionSvc.Complete(session.ID)
+	completed, err := sessionSvc.Complete(context.Background(), session.ID)
 	if err != nil {
 		t.Fatalf("Complete() error = %v", err)
 	}
