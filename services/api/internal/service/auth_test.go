@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"testing"
+	"time"
 
 	"memory-safe-english/services/api/internal/security/password"
 	"memory-safe-english/services/api/internal/security/token"
@@ -11,7 +12,7 @@ import (
 
 func TestAuthServiceRegisterAndLogin(t *testing.T) {
 	store := memory.NewStore()
-	svc := NewAuthService(store, password.NewHasher(100000), token.NewManager("test-secret", 15, 30))
+	svc := NewAuthService(store, password.NewHasher(100000), token.NewManager("test-secret", 15*time.Minute, 30*time.Minute))
 
 	result, err := svc.Register(context.Background(), RegisterInput{
 		Email:         "user@example.com",
@@ -40,7 +41,7 @@ func TestAuthServiceRegisterAndLogin(t *testing.T) {
 
 func TestAuthServiceRegisterRejectsInvalidInput(t *testing.T) {
 	store := memory.NewStore()
-	svc := NewAuthService(store, password.NewHasher(100000), token.NewManager("test-secret", 15, 30))
+	svc := NewAuthService(store, password.NewHasher(100000), token.NewManager("test-secret", 15*time.Minute, 30*time.Minute))
 
 	_, err := svc.Register(context.Background(), RegisterInput{})
 	if err == nil {

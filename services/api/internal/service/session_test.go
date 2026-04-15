@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"testing"
+	"time"
 
 	"memory-safe-english/services/api/internal/security/password"
 	"memory-safe-english/services/api/internal/security/token"
@@ -11,7 +12,7 @@ import (
 
 func TestSessionServiceStartAndComplete(t *testing.T) {
 	store := memory.NewStore()
-	auth := NewAuthService(store, password.NewHasher(100000), token.NewManager("test-secret", 15, 30))
+	auth := NewAuthService(store, password.NewHasher(100000), token.NewManager("test-secret", 15*time.Minute, 30*time.Minute))
 	sessionSvc := NewSessionService(store, store)
 
 	authResult, err := auth.Register(context.Background(), RegisterInput{

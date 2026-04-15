@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"memory-safe-english/services/api/internal/config"
 )
@@ -15,8 +16,8 @@ func TestServerRegisterAndMeFlow(t *testing.T) {
 		HTTPAddr:               ":0",
 		AppEnv:                 "test",
 		AuthTokenSecret:        "test-secret",
-		AccessTokenTTL:         15,
-		RefreshTokenTTL:        30,
+		AccessTokenTTL:         15 * time.Minute,
+		RefreshTokenTTL:        30 * time.Minute,
 		PasswordHashIterations: 100000,
 	})
 	if err != nil {
@@ -79,8 +80,8 @@ func TestServerRejectsProtectedRouteWithoutToken(t *testing.T) {
 		HTTPAddr:               ":0",
 		AppEnv:                 "test",
 		AuthTokenSecret:        "test-secret",
-		AccessTokenTTL:         15,
-		RefreshTokenTTL:        30,
+		AccessTokenTTL:         15 * time.Minute,
+		RefreshTokenTTL:        30 * time.Minute,
 		PasswordHashIterations: 100000,
 	})
 	if err != nil {
