@@ -34,12 +34,13 @@ services/api
 - `GET /health`
 - `POST /auth/register`
 - `POST /auth/login`
+- `POST /auth/refresh`
 - `GET /me`
 - `POST /sessions/start`
 - `POST /sessions/{id}/event`
 - `POST /sessions/{id}/complete`
 
-認証は email/password ベースです。`/auth/register` または `/auth/login` で返る `tokens.access_token` を `Authorization: Bearer <token>` として送ると `/me` や `/sessions/*` を叩けます。
+認証は email/password ベースです。`/auth/register` または `/auth/login` で返る `tokens.access_token` を `Authorization: Bearer <token>` として送ると `/me` や `/sessions/*` を叩けます。`tokens.refresh_token` は `POST /auth/refresh` に送ると新しい token pair を再発行できます。
 
 ## Design Notes
 

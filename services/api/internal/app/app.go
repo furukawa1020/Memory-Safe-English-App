@@ -26,7 +26,7 @@ func NewApplication(cfg config.Config) *Application {
 }
 
 func (a *Application) Routes() handlers.RouteSet {
-	authService := service.NewAuthService(a.Store, a.PasswordHash, a.TokenManager)
+	authService := service.NewAuthService(a.Store, a.Store, a.PasswordHash, a.TokenManager)
 	userService := service.NewUserService(a.Store)
 	sessionService := service.NewSessionService(a.Store, a.Store)
 

@@ -12,7 +12,7 @@ import (
 
 func TestSessionServiceStartAndComplete(t *testing.T) {
 	store := memory.NewStore()
-	auth := NewAuthService(store, password.NewHasher(100000), token.NewManager("test-secret", 15*time.Minute, 30*time.Minute))
+	auth := NewAuthService(store, store, password.NewHasher(100000), token.NewManager("test-secret", 15*time.Minute, 30*time.Minute))
 	sessionSvc := NewSessionService(store, store)
 
 	authResult, err := auth.Register(context.Background(), RegisterInput{

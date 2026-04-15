@@ -93,6 +93,17 @@ func (m Manager) ParseAccessToken(token string) (Claims, error) {
 	return claims, nil
 }
 
+func (m Manager) ParseRefreshToken(token string) (Claims, error) {
+	claims, err := m.parse(token)
+	if err != nil {
+		return Claims{}, err
+	}
+	if claims.TokenUse != "refresh" {
+		return Claims{}, ErrInvalidToken
+	}
+	return claims, nil
+}
+
 func (m Manager) sign(claims Claims) (string, error) {
 	payload, err := json.Marshal(claims)
 	if err != nil {

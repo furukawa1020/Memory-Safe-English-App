@@ -62,3 +62,21 @@ func (h AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	httpjson.Write(w, http.StatusOK, result)
 }
+
+func (h AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		RefreshToken string `json:"refresh_token"`
+	}
+	if err := httpx.DecodeJSON(r, &req); err != nil {
+		httpjson.Error(w, http.StatusBadRequest, "invalid_json", "request body must be valid JSON")
+		return
+	}
+
+	result, err := h.service.Refresh(r.Context(), req.RefreshToken)
+	if err != nil {
+		httpx.WriteDomainError(w, err, "refresh_token is required", "user not found")
+		return
+	}
+
+	httpjson.Write(w, http.StatusOK, result)
+}

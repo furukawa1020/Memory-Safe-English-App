@@ -12,6 +12,7 @@ import (
 
 type AuthService struct {
 	auth   repository.AuthRepository
+	users  repository.UserRepository
 	hasher password.Hasher
 	tokens token.Manager
 }
@@ -29,9 +30,10 @@ type AuthResult struct {
 	NativeNotice string          `json:"native_notice,omitempty"`
 }
 
-func NewAuthService(auth repository.AuthRepository, hasher password.Hasher, tokens token.Manager) AuthService {
+func NewAuthService(auth repository.AuthRepository, users repository.UserRepository, hasher password.Hasher, tokens token.Manager) AuthService {
 	return AuthService{
 		auth:   auth,
+		users:  users,
 		hasher: hasher,
 		tokens: tokens,
 	}
@@ -81,6 +83,28 @@ func (s AuthService) Login(ctx context.Context, email, plainPassword string) (Au
 		return AuthResult{}, err
 	}
 	if !ok {
+		return AuthResult{}, domain.ErrUnauthorized
+	}
+
+	return s.newAuthResult(user)
+}
+
+func (s AuthService) Refresh(ctx context.Context, refreshToken string) (AuthResult, error) {
+	if strings.TrimSpace(refreshToken) == "" {
+		return AuthResult{}, domain.ErrInvalidInput
+	}
+
+	claims, err := s.tokens.ParseRefreshToken(strings.TrimSpace(refreshToken))
+	if err != nil {
+		return AuthResult{}, domain.ErrUnauthorized
+	}
+
+	user, err := s.users.GetUser(ctx, claims.Subject)
+	if err != nil {
+		return AuthResult{}, err
+	}
+
+	if claims.Email != "" && user.Email != claims.Email {
 		return AuthResult{}, domain.ErrUnauthorized
 	}
 
