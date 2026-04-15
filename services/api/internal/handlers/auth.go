@@ -13,11 +13,10 @@ type AuthHandler struct {
 }
 
 type registerRequest struct {
-	Email          string `json:"email"`
-	Password       string `json:"password"`
-	DisplayName    string `json:"display_name"`
-	AgreedToTerms  bool   `json:"agreed_to_terms"`
-	NativeLanguage string `json:"native_language"`
+	Email         string `json:"email"`
+	Password      string `json:"password"`
+	DisplayName   string `json:"display_name"`
+	AgreedToTerms bool   `json:"agreed_to_terms"`
 }
 
 func NewAuthHandler(service service.AuthService) AuthHandler {
@@ -47,16 +46,17 @@ func (h AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 
 func (h AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		UserID string `json:"user_id"`
+		Email    string `json:"email"`
+		Password string `json:"password"`
 	}
 	if err := httpx.DecodeJSON(r, &req); err != nil {
 		httpjson.Error(w, http.StatusBadRequest, "invalid_json", "request body must be valid JSON")
 		return
 	}
 
-	result, err := h.service.Login(r.Context(), req.UserID)
+	result, err := h.service.Login(r.Context(), req.Email, req.Password)
 	if err != nil {
-		httpx.WriteDomainError(w, err, "user_id is required for the dev login flow", "user not found")
+		httpx.WriteDomainError(w, err, "email and password are required", "user not found")
 		return
 	}
 
