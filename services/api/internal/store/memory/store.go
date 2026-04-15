@@ -1,6 +1,7 @@
 package memory
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"sync"
@@ -24,7 +25,7 @@ func NewStore() *Store {
 	}
 }
 
-func (s *Store) CreateUser(email, displayName, authProvider string) (domain.User, error) {
+func (s *Store) CreateUser(_ context.Context, email, displayName, authProvider string) (domain.User, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -41,7 +42,7 @@ func (s *Store) CreateUser(email, displayName, authProvider string) (domain.User
 	return user, nil
 }
 
-func (s *Store) GetUser(userID string) (domain.User, error) {
+func (s *Store) GetUser(_ context.Context, userID string) (domain.User, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -52,7 +53,7 @@ func (s *Store) GetUser(userID string) (domain.User, error) {
 	return user, nil
 }
 
-func (s *Store) StartSession(userID, mode, contentID string) (domain.Session, error) {
+func (s *Store) StartSession(_ context.Context, userID, mode, contentID string) (domain.Session, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -72,7 +73,7 @@ func (s *Store) StartSession(userID, mode, contentID string) (domain.Session, er
 	return session, nil
 }
 
-func (s *Store) CompleteSession(sessionID string) (domain.Session, error) {
+func (s *Store) CompleteSession(_ context.Context, sessionID string) (domain.Session, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -87,7 +88,7 @@ func (s *Store) CompleteSession(sessionID string) (domain.Session, error) {
 	return session, nil
 }
 
-func (s *Store) GetSession(sessionID string) (domain.Session, error) {
+func (s *Store) GetSession(_ context.Context, sessionID string) (domain.Session, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -98,7 +99,7 @@ func (s *Store) GetSession(sessionID string) (domain.Session, error) {
 	return session, nil
 }
 
-func (s *Store) AddEvent(userID, sessionID, eventType string, payload map[string]any, occurredAt time.Time) (domain.EventLog, error) {
+func (s *Store) AddEvent(_ context.Context, userID, sessionID, eventType string, payload map[string]any, occurredAt time.Time) (domain.EventLog, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

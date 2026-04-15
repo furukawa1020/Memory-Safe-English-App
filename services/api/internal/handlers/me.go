@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 
+	"memory-safe-english/services/api/internal/authctx"
 	"memory-safe-english/services/api/internal/httpjson"
 	"memory-safe-english/services/api/internal/httpx"
 	"memory-safe-english/services/api/internal/service"
@@ -17,12 +18,8 @@ func NewMeHandler(service service.UserService) MeHandler {
 }
 
 func (h MeHandler) Get(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		httpjson.Error(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed")
-		return
-	}
-
-	user, err := h.service.GetMe(httpx.UserIDFromHeader(r))
+	userID, _ := authctx.UserID(r.Context())
+	user, err := h.service.GetMe(r.Context(), userID)
 	if err != nil {
 		httpx.WriteDomainError(w, err, "invalid user", "user not found")
 		return
