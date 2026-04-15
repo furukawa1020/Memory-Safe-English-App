@@ -8,37 +8,48 @@ import (
 	"time"
 
 	"memory-safe-english/services/api/internal/domain"
+	"memory-safe-english/services/api/internal/repository"
 )
 
 type Store struct {
-	mu       sync.RWMutex
-	users    map[string]domain.User
-	sessions map[string]domain.Session
-	events   map[string][]domain.EventLog
+	mu             sync.RWMutex
+	users          map[string]domain.User
+	usersByEmail   map[string]string
+	passwordHashes map[string]string
+	sessions       map[string]domain.Session
+	events         map[string][]domain.EventLog
 }
 
 func NewStore() *Store {
 	return &Store{
-		users:    make(map[string]domain.User),
-		sessions: make(map[string]domain.Session),
-		events:   make(map[string][]domain.EventLog),
+		users:          make(map[string]domain.User),
+		usersByEmail:   make(map[string]string),
+		passwordHashes: make(map[string]string),
+		sessions:       make(map[string]domain.Session),
+		events:         make(map[string][]domain.EventLog),
 	}
 }
 
-func (s *Store) CreateUser(_ context.Context, email, displayName, authProvider string) (domain.User, error) {
+func (s *Store) CreateUserWithPassword(_ context.Context, input repository.NewAuthUser) (domain.User, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	if _, exists := s.usersByEmail[input.Email]; exists {
+		return domain.User{}, domain.ErrConflict
+	}
 
 	now := time.Now().UTC()
 	user := domain.User{
 		ID:                 newID("usr"),
-		Email:              email,
-		DisplayName:        displayName,
-		AuthProvider:       authProvider,
+		Email:              input.Email,
+		DisplayName:        input.DisplayName,
+		AuthProvider:       input.AuthProvider,
 		SubscriptionStatus: "free",
 		CreatedAt:          now,
 	}
 	s.users[user.ID] = user
+	s.usersByEmail[input.Email] = user.ID
+	s.passwordHashes[user.ID] = input.PasswordHash
 	return user, nil
 }
 
@@ -51,6 +62,28 @@ func (s *Store) GetUser(_ context.Context, userID string) (domain.User, error) {
 		return domain.User{}, domain.ErrNotFound
 	}
 	return user, nil
+}
+
+func (s *Store) FindUserByEmail(_ context.Context, email string) (domain.User, string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	userID, ok := s.usersByEmail[email]
+	if !ok {
+		return domain.User{}, "", domain.ErrNotFound
+	}
+
+	user, ok := s.users[userID]
+	if !ok {
+		return domain.User{}, "", domain.ErrNotFound
+	}
+
+	passwordHash, ok := s.passwordHashes[userID]
+	if !ok {
+		return domain.User{}, "", domain.ErrNotFound
+	}
+
+	return user, passwordHash, nil
 }
 
 func (s *Store) StartSession(_ context.Context, userID, mode, contentID string) (domain.Session, error) {
