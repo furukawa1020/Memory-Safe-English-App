@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"time"
 
+	"memory-safe-english/services/api/internal/authctx"
 	"memory-safe-english/services/api/internal/httpjson"
 	"memory-safe-english/services/api/internal/httpx"
 	"memory-safe-english/services/api/internal/service"
@@ -18,11 +19,6 @@ func NewSessionHandler(service service.SessionService) SessionHandler {
 }
 
 func (h SessionHandler) Start(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		httpjson.Error(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed")
-		return
-	}
-
 	var req struct {
 		Mode      string `json:"mode"`
 		ContentID string `json:"content_id"`
@@ -32,8 +28,9 @@ func (h SessionHandler) Start(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	session, err := h.service.Start(service.StartSessionInput{
-		UserID:    httpx.UserIDFromHeader(r),
+	userID, _ := authctx.UserID(r.Context())
+	session, err := h.service.Start(r.Context(), service.StartSessionInput{
+		UserID:    userID,
 		Mode:      req.Mode,
 		ContentID: req.ContentID,
 	})
@@ -46,18 +43,8 @@ func (h SessionHandler) Start(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h SessionHandler) Complete(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		httpjson.Error(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed")
-		return
-	}
-
-	sessionID, action, ok := httpx.SessionAction(r.URL.Path)
-	if !ok || action != "complete" {
-		httpjson.Error(w, http.StatusNotFound, "not_found", "session route not found")
-		return
-	}
-
-	session, err := h.service.Complete(sessionID)
+	sessionID := r.PathValue("sessionID")
+	session, err := h.service.Complete(r.Context(), sessionID)
 	if err != nil {
 		httpx.WriteDomainError(w, err, "session_id is required", "session not found")
 		return
@@ -67,17 +54,6 @@ func (h SessionHandler) Complete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h SessionHandler) AddEvent(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		httpjson.Error(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed")
-		return
-	}
-
-	sessionID, action, ok := httpx.SessionAction(r.URL.Path)
-	if !ok || action != "event" {
-		httpjson.Error(w, http.StatusNotFound, "not_found", "session route not found")
-		return
-	}
-
 	var req struct {
 		EventType  string         `json:"event_type"`
 		OccurredAt string         `json:"occurred_at"`
@@ -98,9 +74,10 @@ func (h SessionHandler) AddEvent(w http.ResponseWriter, r *http.Request) {
 		occurredAt = parsed
 	}
 
-	event, err := h.service.AddEvent(service.AddEventInput{
-		UserID:     httpx.UserIDFromHeader(r),
-		SessionID:  sessionID,
+	userID, _ := authctx.UserID(r.Context())
+	event, err := h.service.AddEvent(r.Context(), service.AddEventInput{
+		UserID:     userID,
+		SessionID:  r.PathValue("sessionID"),
 		EventType:  req.EventType,
 		Payload:    req.Payload,
 		OccurredAt: occurredAt,
