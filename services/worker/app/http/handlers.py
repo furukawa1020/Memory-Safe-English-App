@@ -57,7 +57,7 @@ def create_request_handler(app: "Application") -> type[BaseHTTPRequestHandler]:
                 self._write_json(HTTPStatus.NOT_FOUND, error_payload("not_found", "route not found"))
                 return
 
-             # Only accept authenticated JSON requests for analysis endpoints.
+            # Only accept authenticated JSON requests for analysis endpoints.
             auth_error = self._authenticate()
             if auth_error is not None:
                 self._write_json(*auth_error)
