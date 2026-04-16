@@ -14,6 +14,7 @@ class Application:
 
 def build_application(settings: Settings | None = None) -> Application:
     resolved_settings = settings or Settings.load()
+    resolved_settings.validate()
     return Application(
         settings=resolved_settings,
         chunking_service=ChunkingService(max_words_per_chunk=resolved_settings.max_words_per_chunk),
