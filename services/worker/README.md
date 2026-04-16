@@ -4,6 +4,8 @@ Python 製の NLP / 音声解析ワーカーです。
 
 初期実装では、依存導入で止まりにくいよう標準ライブラリ中心で組んでいます。今は `chunking` の最小価値に絞りつつ、あとから `skeleton` や `speech` を足しやすいように責務分離を入れています。
 
+先に進める前提として、worker には最低限のセキュリティ対策も入れています。
+
 ## Design
 
 - `app/config.py`: 環境変数と設定管理
@@ -23,6 +25,17 @@ Python 製の NLP / 音声解析ワーカーです。
 - HTTP worker endpoint
 - `Settings` ベースの構成管理
 - pytest でのユニット / HTTP テスト
+
+## Security
+
+- `X-Worker-Api-Key` による API key 認証
+- 認証必須を `WORKER_REQUIRE_API_KEY` で制御
+- `WORKER_MAX_BODY_BYTES` による body サイズ制限
+- `WORKER_MAX_TEXT_CHARS` による入力テキスト長制限
+- `application/json` 以外を拒否
+- 接続ソケットに request timeout を設定
+- `nosniff`, `DENY`, `no-referrer`, `CSP` の基本ヘッダを付与
+- 内部例外は汎用的な `internal_error` に丸めて返却
 
 ## Structure
 
@@ -53,6 +66,11 @@ python -m app.server
 - `WORKER_HOST` 既定値 `127.0.0.1`
 - `WORKER_PORT` 既定値 `8090`
 - `CHUNKING_MAX_WORDS` 既定値 `6`
+- `WORKER_REQUIRE_API_KEY` 既定値 `true`
+- `WORKER_API_KEYS` カンマ区切りの API key 一覧
+- `WORKER_MAX_BODY_BYTES` 既定値 `16384`
+- `WORKER_MAX_TEXT_CHARS` 既定値 `4000`
+- `WORKER_REQUEST_TIMEOUT_SECONDS` 既定値 `10`
 
 ## API
 
@@ -69,6 +87,13 @@ request:
   "text": "In this study, we propose a memory safe interface.",
   "language": "en"
 }
+```
+
+headers:
+
+```text
+Content-Type: application/json
+X-Worker-Api-Key: <shared-secret>
 ```
 
 response:
