@@ -18,8 +18,7 @@ def default_headers(body: bytes) -> list[tuple[str, str]]:
         ("Content-Type", "application/json"),
         ("Content-Length", str(len(body))),
         ("X-Content-Type-Options", "nosniff"),
+        ("X-Frame-Options", "DENY"),
+        ("Referrer-Policy", "no-referrer"),
+        ("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'"),
     ]
-
-
-def status_text(status: HTTPStatus) -> str:
-    return f"{status.value} {status.phrase}"
