@@ -45,12 +45,11 @@ class ChunkingService:
     max_words_per_chunk: int = 6
 
     def chunk_text(self, text: str, language: str = "en") -> ChunkingResult:
-        normalized = " ".join(text.split())
+        normalized = self._normalize_text(text)
         if not normalized:
             return ChunkingResult(language=language, chunks=[], summary="")
 
-        rough_parts = [part.strip(" ,;:") for part in _CLAUSE_BREAKS.split(normalized)]
-        segments = [part for part in rough_parts if part and part not in {",", ";", ":"}]
+        segments = self._segment_text(normalized)
 
         refined: list[str] = []
         for segment in segments:
@@ -75,6 +74,13 @@ class ChunkingService:
         ]
         summary = " / ".join(chunk.text for chunk in chunks[:2])
         return ChunkingResult(language=language, chunks=chunks, summary=summary)
+
+    def _normalize_text(self, text: str) -> str:
+        return " ".join(text.split())
+
+    def _segment_text(self, text: str) -> list[str]:
+        rough_parts = [part.strip(" ,;:") for part in _CLAUSE_BREAKS.split(text)]
+        return [part for part in rough_parts if part and part not in {",", ";", ":"}]
 
     def _infer_role(self, segment: str, index: int) -> str:
         lowered = segment.lower()
