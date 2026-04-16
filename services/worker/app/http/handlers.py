@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from dataclasses import dataclass
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler
 from typing import TYPE_CHECKING
 
 from app.http.json_response import default_headers, encode_json, error_payload
-from app.security import has_valid_api_key
+from app.observability import audit_log
+from app.security import has_valid_api_key, has_valid_signature
 
 if TYPE_CHECKING:
     from app.application import Application
@@ -50,6 +52,7 @@ def create_request_handler(app: "Application") -> type[BaseHTTPRequestHandler]:
                 return
 
             status, payload = transport.handle_health()
+            audit_log("health_checked", path=self.path, remote_ip=self.client_address[0], status=status.value)
             self._write_json(status, payload)
 
         def do_POST(self) -> None:  # noqa: N802
@@ -60,7 +63,14 @@ def create_request_handler(app: "Application") -> type[BaseHTTPRequestHandler]:
             # Only accept authenticated JSON requests for analysis endpoints.
             auth_error = self._authenticate()
             if auth_error is not None:
+                audit_log("auth_failed", path=self.path, remote_ip=self.client_address[0], reason=auth_error[1]["error"]["code"])
                 self._write_json(*auth_error)
+                return
+
+            rate_limit_key = f"{self.client_address[0]}:{self.headers.get('X-Worker-Api-Key', '')}"
+            if not app.rate_limiter.allow(rate_limit_key):
+                audit_log("rate_limited", path=self.path, remote_ip=self.client_address[0])
+                self._write_json(HTTPStatus.TOO_MANY_REQUESTS, error_payload("rate_limited", "too many requests"))
                 return
 
             content_type = self.headers.get("Content-Type", "")
@@ -85,7 +95,10 @@ def create_request_handler(app: "Application") -> type[BaseHTTPRequestHandler]:
                 status, payload = transport.handle_chunking(raw_body)
             except Exception:  # pragma: no cover - defensive fallback
                 LOGGER.exception("worker request failed")
+                audit_log("request_failed", path=self.path, remote_ip=self.client_address[0], status=HTTPStatus.INTERNAL_SERVER_ERROR.value)
                 status, payload = HTTPStatus.INTERNAL_SERVER_ERROR, error_payload("internal_error", "internal server error")
+            else:
+                audit_log("chunking_analyzed", path=self.path, remote_ip=self.client_address[0], status=status.value)
             self._write_json(status, payload)
 
         def log_message(self, format: str, *args: object) -> None:  # noqa: A003
@@ -93,12 +106,42 @@ def create_request_handler(app: "Application") -> type[BaseHTTPRequestHandler]:
 
         def _authenticate(self) -> tuple[HTTPStatus, dict] | None:
             if not app.settings.require_api_key:
-                return None
+                api_key = ""
+            else:
+                api_key = self.headers.get("X-Worker-Api-Key", "")
+                if not has_valid_api_key(api_key, app.settings.api_keys):
+                    return HTTPStatus.UNAUTHORIZED, error_payload("unauthorized", "valid X-Worker-Api-Key header is required")
 
-            api_key = self.headers.get("X-Worker-Api-Key", "")
-            if not has_valid_api_key(api_key, app.settings.api_keys):
-                return HTTPStatus.UNAUTHORIZED, error_payload("unauthorized", "valid X-Worker-Api-Key header is required")
+            if app.settings.require_request_signature:
+                signature = self.headers.get("X-Worker-Signature", "")
+                timestamp = self.headers.get("X-Worker-Timestamp", "")
+                body = self._read_body_preview()
+                if not has_valid_signature(
+                    body=body,
+                    provided_signature=signature,
+                    timestamp=timestamp,
+                    allowed_keys=app.settings.signature_keys,
+                    max_age_seconds=app.settings.signature_max_age_seconds,
+                    now=int(time.time()),
+                ):
+                    return HTTPStatus.UNAUTHORIZED, error_payload(
+                        "invalid_signature", "valid X-Worker-Timestamp and X-Worker-Signature headers are required"
+                    )
             return None
+
+        def _read_body_preview(self) -> bytes:
+            content_length = self.headers.get("Content-Length", "0")
+            try:
+                length = int(content_length)
+            except ValueError:
+                return b""
+
+            if length <= 0 or length > app.settings.max_body_bytes:
+                return b""
+
+            raw_body = self.rfile.read(length)
+            self.rfile = _BufferedRFile(raw_body)
+            return raw_body
 
         def _write_json(self, status: HTTPStatus, payload: dict) -> None:
             body = encode_json(payload)
@@ -109,3 +152,17 @@ def create_request_handler(app: "Application") -> type[BaseHTTPRequestHandler]:
             self.wfile.write(body)
 
     return RequestHandler
+
+
+class _BufferedRFile:
+    def __init__(self, body: bytes) -> None:
+        self._body = body
+        self._read = False
+
+    def read(self, size: int = -1) -> bytes:
+        if self._read:
+            return b""
+        self._read = True
+        if size < 0:
+            return self._body
+        return self._body[:size]

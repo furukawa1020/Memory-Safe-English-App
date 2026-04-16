@@ -6,6 +6,7 @@ from http.server import ThreadingHTTPServer
 from app.application import build_application
 from app.config import Settings
 from app.http.handlers import create_request_handler
+from app.observability import configure_logging
 
 
 class WorkerHTTPServer(ThreadingHTTPServer):
@@ -29,6 +30,7 @@ def create_server(settings: Settings | None = None) -> ThreadingHTTPServer:
 
 
 def run(settings: Settings | None = None) -> None:
+    configure_logging()
     server = create_server(settings)
     try:
         server.serve_forever()

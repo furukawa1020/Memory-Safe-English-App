@@ -30,12 +30,16 @@ Python 製の NLP / 音声解析ワーカーです。
 
 - `X-Worker-Api-Key` による API key 認証
 - 認証必須を `WORKER_REQUIRE_API_KEY` で制御
+- `X-Worker-Timestamp` と `X-Worker-Signature` による HMAC 署名検証
+- 署名時刻の許容幅を `WORKER_SIGNATURE_MAX_AGE_SECONDS` で制御
+- インメモリ sliding window rate limiting
 - `WORKER_MAX_BODY_BYTES` による body サイズ制限
 - `WORKER_MAX_TEXT_CHARS` による入力テキスト長制限
 - `application/json` 以外を拒否
 - 接続ソケットに request timeout を設定
 - `nosniff`, `DENY`, `no-referrer`, `CSP` の基本ヘッダを付与
 - 内部例外は汎用的な `internal_error` に丸めて返却
+- JSON ベースの監査ログ出力
 
 ## Structure
 
@@ -68,9 +72,14 @@ python -m app.server
 - `CHUNKING_MAX_WORDS` 既定値 `6`
 - `WORKER_REQUIRE_API_KEY` 既定値 `true`
 - `WORKER_API_KEYS` カンマ区切りの API key 一覧
+- `WORKER_REQUIRE_REQUEST_SIGNATURE` 既定値 `true`
+- `WORKER_SIGNATURE_KEYS` カンマ区切りの HMAC 署名鍵
+- `WORKER_SIGNATURE_MAX_AGE_SECONDS` 既定値 `300`
 - `WORKER_MAX_BODY_BYTES` 既定値 `16384`
 - `WORKER_MAX_TEXT_CHARS` 既定値 `4000`
 - `WORKER_REQUEST_TIMEOUT_SECONDS` 既定値 `10`
+- `WORKER_RATE_LIMIT_MAX_REQUESTS` 既定値 `30`
+- `WORKER_RATE_LIMIT_WINDOW_SECONDS` 既定値 `60`
 
 ## API
 
@@ -94,6 +103,8 @@ headers:
 ```text
 Content-Type: application/json
 X-Worker-Api-Key: <shared-secret>
+X-Worker-Timestamp: <unix-seconds>
+X-Worker-Signature: <hex-hmac-sha256(timestamp + "." + raw-body)>
 ```
 
 response:
