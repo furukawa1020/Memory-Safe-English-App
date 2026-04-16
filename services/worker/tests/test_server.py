@@ -52,7 +52,15 @@ def test_health_endpoint() -> None:
 
 def test_chunking_endpoint() -> None:
     server = create_server(
-        Settings(host="127.0.0.1", port=0, max_words_per_chunk=4, require_api_key=True, api_keys=("test-key",))
+        Settings(
+            host="127.0.0.1",
+            port=0,
+            max_words_per_chunk=4,
+            require_api_key=True,
+            api_keys=("test-key",),
+            require_request_signature=True,
+            signature_keys=("sign-key",),
+        )
     )
     thread = Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -78,7 +86,15 @@ def test_chunking_endpoint() -> None:
 
 def test_chunking_endpoint_rejects_empty_text() -> None:
     server = create_server(
-        Settings(host="127.0.0.1", port=0, max_words_per_chunk=6, require_api_key=True, api_keys=("test-key",))
+        Settings(
+            host="127.0.0.1",
+            port=0,
+            max_words_per_chunk=6,
+            require_api_key=True,
+            api_keys=("test-key",),
+            require_request_signature=True,
+            signature_keys=("sign-key",),
+        )
     )
     thread = Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -104,7 +120,15 @@ def test_chunking_endpoint_rejects_empty_text() -> None:
 
 def test_chunking_endpoint_requires_api_key() -> None:
     server = create_server(
-        Settings(host="127.0.0.1", port=0, max_words_per_chunk=6, require_api_key=True, api_keys=("test-key",))
+        Settings(
+            host="127.0.0.1",
+            port=0,
+            max_words_per_chunk=6,
+            require_api_key=True,
+            api_keys=("test-key",),
+            require_request_signature=True,
+            signature_keys=("sign-key",),
+        )
     )
     thread = Thread(target=server.serve_forever, daemon=True)
     thread.start()

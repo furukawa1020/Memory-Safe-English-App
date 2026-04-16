@@ -60,19 +60,6 @@ def create_request_handler(app: "Application") -> type[BaseHTTPRequestHandler]:
                 self._write_json(HTTPStatus.NOT_FOUND, error_payload("not_found", "route not found"))
                 return
 
-            # Only accept authenticated JSON requests for analysis endpoints.
-            auth_error = self._authenticate()
-            if auth_error is not None:
-                audit_log("auth_failed", path=self.path, remote_ip=self.client_address[0], reason=auth_error[1]["error"]["code"])
-                self._write_json(*auth_error)
-                return
-
-            rate_limit_key = f"{self.client_address[0]}:{self.headers.get('X-Worker-Api-Key', '')}"
-            if not app.rate_limiter.allow(rate_limit_key):
-                audit_log("rate_limited", path=self.path, remote_ip=self.client_address[0])
-                self._write_json(HTTPStatus.TOO_MANY_REQUESTS, error_payload("rate_limited", "too many requests"))
-                return
-
             content_type = self.headers.get("Content-Type", "")
             if "application/json" not in content_type.lower():
                 self._write_json(HTTPStatus.UNSUPPORTED_MEDIA_TYPE, error_payload("unsupported_media_type", "Content-Type must be application/json"))
@@ -91,6 +78,18 @@ def create_request_handler(app: "Application") -> type[BaseHTTPRequestHandler]:
                 return
 
             raw_body = self.rfile.read(content_length)
+            auth_error = self._authenticate(raw_body)
+            if auth_error is not None:
+                audit_log("auth_failed", path=self.path, remote_ip=self.client_address[0], reason=auth_error[1]["error"]["code"])
+                self._write_json(*auth_error)
+                return
+
+            rate_limit_key = f"{self.client_address[0]}:{self.headers.get('X-Worker-Api-Key', '')}"
+            if not app.rate_limiter.allow(rate_limit_key):
+                audit_log("rate_limited", path=self.path, remote_ip=self.client_address[0])
+                self._write_json(HTTPStatus.TOO_MANY_REQUESTS, error_payload("rate_limited", "too many requests"))
+                return
+
             try:
                 status, payload = transport.handle_chunking(raw_body)
             except Exception:  # pragma: no cover - defensive fallback
@@ -104,7 +103,7 @@ def create_request_handler(app: "Application") -> type[BaseHTTPRequestHandler]:
         def log_message(self, format: str, *args: object) -> None:  # noqa: A003
             LOGGER.info("%s - %s", self.address_string(), format % args)
 
-        def _authenticate(self) -> tuple[HTTPStatus, dict] | None:
+        def _authenticate(self, raw_body: bytes) -> tuple[HTTPStatus, dict] | None:
             if not app.settings.require_api_key:
                 api_key = ""
             else:
@@ -115,9 +114,8 @@ def create_request_handler(app: "Application") -> type[BaseHTTPRequestHandler]:
             if app.settings.require_request_signature:
                 signature = self.headers.get("X-Worker-Signature", "")
                 timestamp = self.headers.get("X-Worker-Timestamp", "")
-                body = self._read_body_preview()
                 if not has_valid_signature(
-                    body=body,
+                    body=raw_body,
                     provided_signature=signature,
                     timestamp=timestamp,
                     allowed_keys=app.settings.signature_keys,
@@ -129,20 +127,6 @@ def create_request_handler(app: "Application") -> type[BaseHTTPRequestHandler]:
                     )
             return None
 
-        def _read_body_preview(self) -> bytes:
-            content_length = self.headers.get("Content-Length", "0")
-            try:
-                length = int(content_length)
-            except ValueError:
-                return b""
-
-            if length <= 0 or length > app.settings.max_body_bytes:
-                return b""
-
-            raw_body = self.rfile.read(length)
-            self.rfile = _BufferedRFile(raw_body)
-            return raw_body
-
         def _write_json(self, status: HTTPStatus, payload: dict) -> None:
             body = encode_json(payload)
             self.send_response(status)
@@ -152,17 +136,3 @@ def create_request_handler(app: "Application") -> type[BaseHTTPRequestHandler]:
             self.wfile.write(body)
 
     return RequestHandler
-
-
-class _BufferedRFile:
-    def __init__(self, body: bytes) -> None:
-        self._body = body
-        self._read = False
-
-    def read(self, size: int = -1) -> bytes:
-        if self._read:
-            return b""
-        self._read = True
-        if size < 0:
-            return self._body
-        return self._body[:size]
