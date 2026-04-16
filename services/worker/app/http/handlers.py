@@ -1,15 +1,19 @@
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler
 from typing import TYPE_CHECKING
 
 from app.http.json_response import default_headers, encode_json, error_payload
+from app.security import has_valid_api_key
 
 if TYPE_CHECKING:
     from app.application import Application
+
+LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -29,6 +33,8 @@ class WorkerHTTPHandler:
         language = str(payload.get("language", "en")).strip() or "en"
         if not text:
             return HTTPStatus.BAD_REQUEST, error_payload("invalid_request", "text is required")
+        if len(text) > self.app.settings.max_text_chars:
+            return HTTPStatus.REQUEST_ENTITY_TOO_LARGE, error_payload("text_too_large", "text exceeds allowed length")
 
         result = self.app.chunking_service.chunk_text(text=text, language=language)
         return HTTPStatus.OK, result.to_dict()
@@ -51,13 +57,48 @@ def create_request_handler(app: "Application") -> type[BaseHTTPRequestHandler]:
                 self._write_json(HTTPStatus.NOT_FOUND, error_payload("not_found", "route not found"))
                 return
 
-            content_length = int(self.headers.get("Content-Length", "0"))
+             # Only accept authenticated JSON requests for analysis endpoints.
+            auth_error = self._authenticate()
+            if auth_error is not None:
+                self._write_json(*auth_error)
+                return
+
+            content_type = self.headers.get("Content-Type", "")
+            if "application/json" not in content_type.lower():
+                self._write_json(HTTPStatus.UNSUPPORTED_MEDIA_TYPE, error_payload("unsupported_media_type", "Content-Type must be application/json"))
+                return
+
+            try:
+                content_length = int(self.headers.get("Content-Length", "0"))
+            except ValueError:
+                self._write_json(HTTPStatus.BAD_REQUEST, error_payload("invalid_content_length", "Content-Length must be a valid integer"))
+                return
+            if content_length <= 0:
+                self._write_json(HTTPStatus.BAD_REQUEST, error_payload("invalid_request", "request body is required"))
+                return
+            if content_length > app.settings.max_body_bytes:
+                self._write_json(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, error_payload("body_too_large", "request body exceeds allowed size"))
+                return
+
             raw_body = self.rfile.read(content_length)
-            status, payload = transport.handle_chunking(raw_body)
+            try:
+                status, payload = transport.handle_chunking(raw_body)
+            except Exception:  # pragma: no cover - defensive fallback
+                LOGGER.exception("worker request failed")
+                status, payload = HTTPStatus.INTERNAL_SERVER_ERROR, error_payload("internal_error", "internal server error")
             self._write_json(status, payload)
 
         def log_message(self, format: str, *args: object) -> None:  # noqa: A003
-            return
+            LOGGER.info("%s - %s", self.address_string(), format % args)
+
+        def _authenticate(self) -> tuple[HTTPStatus, dict] | None:
+            if not app.settings.require_api_key:
+                return None
+
+            api_key = self.headers.get("X-Worker-Api-Key", "")
+            if not has_valid_api_key(api_key, app.settings.api_keys):
+                return HTTPStatus.UNAUTHORIZED, error_payload("unauthorized", "valid X-Worker-Api-Key header is required")
+            return None
 
         def _write_json(self, status: HTTPStatus, payload: dict) -> None:
             body = encode_json(payload)
