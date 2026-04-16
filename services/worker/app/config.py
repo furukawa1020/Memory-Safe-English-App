@@ -40,8 +40,8 @@ class Settings:
         return settings
 
     def validate(self) -> None:
-        if self.port <= 0:
-            raise ValueError("WORKER_PORT must be positive")
+        if self.port < 0:
+            raise ValueError("WORKER_PORT must be zero or positive")
         if self.max_words_per_chunk <= 0:
             raise ValueError("CHUNKING_MAX_WORDS must be positive")
         if self.max_body_bytes <= 0:
