@@ -24,7 +24,7 @@ def signed_headers(body: str, api_key: str = "test-key", signing_key: str = "sig
     }
 
 
-def test_settings(**overrides: object) -> Settings:
+def make_settings(**overrides: object) -> Settings:
     defaults: dict[str, object] = {
         "host": "127.0.0.1",
         "port": 0,
