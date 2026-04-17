@@ -11,8 +11,12 @@ Python 製の NLP / 音声解析ワーカーです。
 - `app/config.py`: 環境変数と設定管理
 - `app/application.py`: サービスの組み立て
 - `app/chunking/`: テキスト処理のユースケース
-- `app/http/`: HTTP 入出力とレスポンス整形
+- `app/http/request_parser.py`: HTTP request の基本検証
+- `app/http/guards.py`: 認証・署名・rate limit のガード
+- `app/http/audit.py`: 監査ログの共通化
+- `app/http/handlers.py`: HTTP transport の最終配線
 - `app/runtime.py`: サーバ生成と起動
+- `tests/conftest.py`: テストセットアップ共通化
 - `tests/`: chunking / runtime / HTTP のテスト
 
 この形にしているので、HTTP を差し替えても chunking ロジックを保てますし、逆に chunking を入れ替えても transport 層は大きく崩れません。
