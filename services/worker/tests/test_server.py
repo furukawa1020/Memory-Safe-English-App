@@ -4,11 +4,11 @@ import json
 from http import HTTPStatus
 from http.client import HTTPConnection
 
-from tests.conftest import post_json, running_server, signed_headers, test_settings
+from tests.conftest import make_settings, post_json, running_server, signed_headers
 
 
 def test_health_endpoint() -> None:
-    with running_server(test_settings()) as server:
+    with running_server(make_settings()) as server:
         conn = HTTPConnection("127.0.0.1", server.server_port)
         conn.request("GET", "/health")
         response = conn.getresponse()
@@ -20,7 +20,7 @@ def test_health_endpoint() -> None:
 
 
 def test_chunking_endpoint() -> None:
-    with running_server(test_settings(max_words_per_chunk=4)) as server:
+    with running_server(make_settings(max_words_per_chunk=4)) as server:
         body = {"text": "We propose a memory safe interface."}
         body_text = json.dumps(body)
         response, payload = post_json(server.server_port, "/analyze/chunks", body, signed_headers(body_text))
@@ -30,7 +30,7 @@ def test_chunking_endpoint() -> None:
 
 
 def test_chunking_endpoint_rejects_empty_text() -> None:
-    with running_server(test_settings()) as server:
+    with running_server(make_settings()) as server:
         body = {"text": ""}
         body_text = json.dumps(body)
         response, payload = post_json(server.server_port, "/analyze/chunks", body, signed_headers(body_text))
@@ -40,7 +40,7 @@ def test_chunking_endpoint_rejects_empty_text() -> None:
 
 
 def test_chunking_endpoint_requires_api_key() -> None:
-    with running_server(test_settings()) as server:
+    with running_server(make_settings()) as server:
         response, payload = post_json(
             server.server_port,
             "/analyze/chunks",
@@ -53,7 +53,7 @@ def test_chunking_endpoint_requires_api_key() -> None:
 
 
 def test_chunking_endpoint_enforces_body_limit() -> None:
-    with running_server(test_settings(max_body_bytes=16)) as server:
+    with running_server(make_settings(max_body_bytes=16)) as server:
         body = {"text": "This body is intentionally too large."}
         body_text = json.dumps(body)
         response, payload = post_json(server.server_port, "/analyze/chunks", body, signed_headers(body_text))
@@ -63,7 +63,7 @@ def test_chunking_endpoint_enforces_body_limit() -> None:
 
 
 def test_chunking_endpoint_requires_valid_signature() -> None:
-    with running_server(test_settings()) as server:
+    with running_server(make_settings()) as server:
         response, payload = post_json(
             server.server_port,
             "/analyze/chunks",
@@ -81,7 +81,7 @@ def test_chunking_endpoint_requires_valid_signature() -> None:
 
 
 def test_chunking_endpoint_rate_limits_burst_requests() -> None:
-    with running_server(test_settings(rate_limit_max_requests=1, rate_limit_window_seconds=60)) as server:
+    with running_server(make_settings(rate_limit_max_requests=1, rate_limit_window_seconds=60)) as server:
         body = {"text": "hello"}
         body_text = json.dumps(body)
         first_response, _ = post_json(server.server_port, "/analyze/chunks", body, signed_headers(body_text))
