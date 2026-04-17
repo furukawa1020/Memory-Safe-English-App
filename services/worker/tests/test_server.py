@@ -1,42 +1,14 @@
+from __future__ import annotations
+
 import json
-import hmac
-import hashlib
-import time
 from http import HTTPStatus
 from http.client import HTTPConnection
-from threading import Thread
 
-from app.config import Settings
-from app.runtime import create_server
-
-
-def _signed_headers(body: str, api_key: str = "test-key", signing_key: str = "sign-key") -> dict[str, str]:
-    timestamp = str(int(time.time()))
-    signature = hmac.new(signing_key.encode("utf-8"), timestamp.encode("utf-8") + b"." + body.encode("utf-8"), hashlib.sha256).hexdigest()
-    return {
-        "Content-Type": "application/json",
-        "X-Worker-Api-Key": api_key,
-        "X-Worker-Timestamp": timestamp,
-        "X-Worker-Signature": signature,
-    }
+from tests.conftest import post_json, running_server, signed_headers, test_settings
 
 
 def test_health_endpoint() -> None:
-    server = create_server(
-        Settings(
-            host="127.0.0.1",
-            port=0,
-            max_words_per_chunk=6,
-            require_api_key=True,
-            api_keys=("test-key",),
-            require_request_signature=True,
-            signature_keys=("sign-key",),
-        )
-    )
-    thread = Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-
-    try:
+    with running_server(test_settings()) as server:
         conn = HTTPConnection("127.0.0.1", server.server_port)
         conn.request("GET", "/health")
         response = conn.getresponse()
@@ -45,214 +17,76 @@ def test_health_endpoint() -> None:
         assert response.status == HTTPStatus.OK
         assert payload["status"] == "ok"
         assert response.getheader("X-Content-Type-Options") == "nosniff"
-    finally:
-        server.shutdown()
-        server.server_close()
 
 
 def test_chunking_endpoint() -> None:
-    server = create_server(
-        Settings(
-            host="127.0.0.1",
-            port=0,
-            max_words_per_chunk=4,
-            require_api_key=True,
-            api_keys=("test-key",),
-            require_request_signature=True,
-            signature_keys=("sign-key",),
-        )
-    )
-    thread = Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-
-    try:
-        conn = HTTPConnection("127.0.0.1", server.server_port)
-        body = json.dumps({"text": "We propose a memory safe interface."})
-        conn.request(
-            "POST",
-            "/analyze/chunks",
-            body=body,
-            headers=_signed_headers(body),
-        )
-        response = conn.getresponse()
-        payload = json.loads(response.read())
+    with running_server(test_settings(max_words_per_chunk=4)) as server:
+        body = {"text": "We propose a memory safe interface."}
+        body_text = json.dumps(body)
+        response, payload = post_json(server.server_port, "/analyze/chunks", body, signed_headers(body_text))
 
         assert response.status == HTTPStatus.OK
         assert payload["chunks"]
-    finally:
-        server.shutdown()
-        server.server_close()
 
 
 def test_chunking_endpoint_rejects_empty_text() -> None:
-    server = create_server(
-        Settings(
-            host="127.0.0.1",
-            port=0,
-            max_words_per_chunk=6,
-            require_api_key=True,
-            api_keys=("test-key",),
-            require_request_signature=True,
-            signature_keys=("sign-key",),
-        )
-    )
-    thread = Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-
-    try:
-        conn = HTTPConnection("127.0.0.1", server.server_port)
-        body = json.dumps({"text": ""})
-        conn.request(
-            "POST",
-            "/analyze/chunks",
-            body=body,
-            headers=_signed_headers(body),
-        )
-        response = conn.getresponse()
-        payload = json.loads(response.read())
+    with running_server(test_settings()) as server:
+        body = {"text": ""}
+        body_text = json.dumps(body)
+        response, payload = post_json(server.server_port, "/analyze/chunks", body, signed_headers(body_text))
 
         assert response.status == HTTPStatus.BAD_REQUEST
         assert payload["error"]["code"] == "invalid_request"
-    finally:
-        server.shutdown()
-        server.server_close()
 
 
 def test_chunking_endpoint_requires_api_key() -> None:
-    server = create_server(
-        Settings(
-            host="127.0.0.1",
-            port=0,
-            max_words_per_chunk=6,
-            require_api_key=True,
-            api_keys=("test-key",),
-            require_request_signature=True,
-            signature_keys=("sign-key",),
+    with running_server(test_settings()) as server:
+        response, payload = post_json(
+            server.server_port,
+            "/analyze/chunks",
+            {"text": "hello"},
+            {"Content-Type": "application/json"},
         )
-    )
-    thread = Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-
-    try:
-        conn = HTTPConnection("127.0.0.1", server.server_port)
-        body = json.dumps({"text": "hello"})
-        conn.request("POST", "/analyze/chunks", body=body, headers={"Content-Type": "application/json"})
-        response = conn.getresponse()
-        payload = json.loads(response.read())
 
         assert response.status == HTTPStatus.UNAUTHORIZED
         assert payload["error"]["code"] == "unauthorized"
-    finally:
-        server.shutdown()
-        server.server_close()
 
 
 def test_chunking_endpoint_enforces_body_limit() -> None:
-    server = create_server(
-        Settings(
-            host="127.0.0.1",
-            port=0,
-            max_words_per_chunk=6,
-            require_api_key=True,
-            api_keys=("test-key",),
-            require_request_signature=True,
-            signature_keys=("sign-key",),
-            max_body_bytes=16,
-        )
-    )
-    thread = Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-
-    try:
-        conn = HTTPConnection("127.0.0.1", server.server_port)
-        body = json.dumps({"text": "This body is intentionally too large."})
-        conn.request(
-            "POST",
-            "/analyze/chunks",
-            body=body,
-            headers=_signed_headers(body),
-        )
-        response = conn.getresponse()
-        payload = json.loads(response.read())
+    with running_server(test_settings(max_body_bytes=16)) as server:
+        body = {"text": "This body is intentionally too large."}
+        body_text = json.dumps(body)
+        response, payload = post_json(server.server_port, "/analyze/chunks", body, signed_headers(body_text))
 
         assert response.status == HTTPStatus.REQUEST_ENTITY_TOO_LARGE
         assert payload["error"]["code"] == "body_too_large"
-    finally:
-        server.shutdown()
-        server.server_close()
 
 
 def test_chunking_endpoint_requires_valid_signature() -> None:
-    server = create_server(
-        Settings(
-            host="127.0.0.1",
-            port=0,
-            max_words_per_chunk=6,
-            require_api_key=True,
-            api_keys=("test-key",),
-            require_request_signature=True,
-            signature_keys=("sign-key",),
-        )
-    )
-    thread = Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-
-    try:
-        conn = HTTPConnection("127.0.0.1", server.server_port)
-        body = json.dumps({"text": "hello"})
-        conn.request(
-            "POST",
+    with running_server(test_settings()) as server:
+        response, payload = post_json(
+            server.server_port,
             "/analyze/chunks",
-            body=body,
-            headers={
+            {"text": "hello"},
+            {
                 "Content-Type": "application/json",
                 "X-Worker-Api-Key": "test-key",
-                "X-Worker-Timestamp": str(int(time.time())),
+                "X-Worker-Timestamp": "1",
                 "X-Worker-Signature": "bad-signature",
             },
         )
-        response = conn.getresponse()
-        payload = json.loads(response.read())
 
         assert response.status == HTTPStatus.UNAUTHORIZED
         assert payload["error"]["code"] == "invalid_signature"
-    finally:
-        server.shutdown()
-        server.server_close()
 
 
 def test_chunking_endpoint_rate_limits_burst_requests() -> None:
-    server = create_server(
-        Settings(
-            host="127.0.0.1",
-            port=0,
-            max_words_per_chunk=6,
-            require_api_key=True,
-            api_keys=("test-key",),
-            require_request_signature=True,
-            signature_keys=("sign-key",),
-            rate_limit_max_requests=1,
-            rate_limit_window_seconds=60,
-        )
-    )
-    thread = Thread(target=server.serve_forever, daemon=True)
-    thread.start()
+    with running_server(test_settings(rate_limit_max_requests=1, rate_limit_window_seconds=60)) as server:
+        body = {"text": "hello"}
+        body_text = json.dumps(body)
+        first_response, _ = post_json(server.server_port, "/analyze/chunks", body, signed_headers(body_text))
+        assert first_response.status == HTTPStatus.OK
 
-    try:
-        conn = HTTPConnection("127.0.0.1", server.server_port)
-        body = json.dumps({"text": "hello"})
-        conn.request("POST", "/analyze/chunks", body=body, headers=_signed_headers(body))
-        first = conn.getresponse()
-        first.read()
-        assert first.status == HTTPStatus.OK
-
-        conn = HTTPConnection("127.0.0.1", server.server_port)
-        conn.request("POST", "/analyze/chunks", body=body, headers=_signed_headers(body))
-        second = conn.getresponse()
-        payload = json.loads(second.read())
-
-        assert second.status == HTTPStatus.TOO_MANY_REQUESTS
+        second_response, payload = post_json(server.server_port, "/analyze/chunks", body, signed_headers(body_text))
+        assert second_response.status == HTTPStatus.TOO_MANY_REQUESTS
         assert payload["error"]["code"] == "rate_limited"
-    finally:
-        server.shutdown()
-        server.server_close()
