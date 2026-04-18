@@ -36,6 +36,7 @@ services/api
 - `POST /auth/login`
 - `POST /auth/refresh`
 - `GET /me`
+- `POST /analysis/chunks`
 - `POST /sessions/start`
 - `POST /sessions/{id}/event`
 - `POST /sessions/{id}/complete`
@@ -61,6 +62,7 @@ services/api
 - `X-Request-ID` を自動付与してログとレスポンスに反映する
 - protected route は Bearer token middleware で一元管理している
 - `httptest` ベースの HTTP テストを追加している
+- worker 呼び出しは `internal/workerclient` に隔離している
 
 追加で入っているセキュリティ対策:
 
@@ -84,6 +86,10 @@ go run ./cmd/server
 - `AUTH_ACCESS_TOKEN_TTL` 既定値 `15m`
 - `AUTH_REFRESH_TOKEN_TTL` 既定値 `168h`
 - `PASSWORD_HASH_ITERATIONS` 既定値 `120000`
+- `WORKER_BASE_URL` 既定値 `http://127.0.0.1:8090`
+- `WORKER_API_KEY` 本番では必須
+- `WORKER_SIGNATURE_KEY` 本番では必須
+- `WORKER_TIMEOUT` 既定値 `5s`
 
 ## Example
 

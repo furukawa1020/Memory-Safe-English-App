@@ -10,6 +10,7 @@ tags:
   - name: Auth
   - name: User
   - name: Sessions
+  - name: Analysis
 paths:
   /health:
     get:
@@ -92,6 +93,25 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/User"
+  /analysis/chunks:
+    post:
+      tags: [Analysis]
+      summary: Analyze raw text into memory-safe chunks through the worker service
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnalyzeChunksRequest"
+      responses:
+        "200":
+          description: Chunking result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChunkingResult"
   /sessions/start:
     post:
       tags: [Sessions]
@@ -198,6 +218,14 @@ components:
           type: string
         content_id:
           type: string
+    AnalyzeChunksRequest:
+      type: object
+      required: [text]
+      properties:
+        text:
+          type: string
+        language:
+          type: string
     SessionEventRequest:
       type: object
       required: [event_type]
@@ -284,3 +312,25 @@ components:
         created_at:
           type: string
           format: date-time
+    Chunk:
+      type: object
+      properties:
+        order:
+          type: integer
+        text:
+          type: string
+        role:
+          type: string
+        skeleton_rank:
+          type: integer
+    ChunkingResult:
+      type: object
+      properties:
+        language:
+          type: string
+        chunks:
+          type: array
+          items:
+            $ref: "#/components/schemas/Chunk"
+        summary:
+          type: string
