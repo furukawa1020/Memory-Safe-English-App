@@ -5,10 +5,10 @@ import "net/http"
 type ProtectedMiddleware func(http.Handler) http.Handler
 
 type RouteSet struct {
-	Health  HealthHandler
-	Auth    AuthHandler
-	Me      MeHandler
-	Session SessionHandler
+	Health   HealthHandler
+	Auth     AuthHandler
+	Me       MeHandler
+	Session  SessionHandler
 	Analysis AnalysisHandler
 }
 
