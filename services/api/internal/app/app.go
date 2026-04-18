@@ -7,6 +7,7 @@ import (
 	"memory-safe-english/services/api/internal/security/token"
 	"memory-safe-english/services/api/internal/service"
 	"memory-safe-english/services/api/internal/store/memory"
+	"memory-safe-english/services/api/internal/workerclient"
 )
 
 type Application struct {
@@ -29,11 +30,18 @@ func (a *Application) Routes() handlers.RouteSet {
 	authService := service.NewAuthService(a.Store, a.Store, a.PasswordHash, a.TokenManager)
 	userService := service.NewUserService(a.Store)
 	sessionService := service.NewSessionService(a.Store, a.Store)
+	analysisService := service.NewAnalysisService(workerclient.New(
+		a.Config.WorkerBaseURL,
+		a.Config.WorkerAPIKey,
+		a.Config.WorkerSignatureKey,
+		a.Config.WorkerTimeout,
+	))
 
 	return handlers.RouteSet{
-		Health:  handlers.NewHealthHandler(),
-		Auth:    handlers.NewAuthHandler(authService),
-		Me:      handlers.NewMeHandler(userService),
-		Session: handlers.NewSessionHandler(sessionService),
+		Health:   handlers.NewHealthHandler(),
+		Auth:     handlers.NewAuthHandler(authService),
+		Me:       handlers.NewMeHandler(userService),
+		Session:  handlers.NewSessionHandler(sessionService),
+		Analysis: handlers.NewAnalysisHandler(analysisService),
 	}
 }
