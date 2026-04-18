@@ -3,10 +3,13 @@ package workerclient
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"memory-safe-english/services/api/internal/domain"
 )
 
 func TestClientAnalyzeChunks(t *testing.T) {
@@ -15,9 +18,9 @@ func TestClientAnalyzeChunks(t *testing.T) {
 		gotAPIKey = r.Header.Get("X-Worker-Api-Key")
 		gotTimestamp = r.Header.Get("X-Worker-Timestamp")
 		gotSignature = r.Header.Get("X-Worker-Signature")
-		_ = json.NewEncoder(w).Encode(ChunkingResult{
+		_ = json.NewEncoder(w).Encode(domain.ChunkingResult{
 			Language: "en",
-			Chunks: []Chunk{
+			Chunks: []domain.Chunk{
 				{Order: 1, Text: "we propose", Role: "core", SkeletonRank: 1},
 			},
 			Summary: "we propose",
@@ -43,5 +46,38 @@ func TestClientAnalyzeChunks(t *testing.T) {
 	}
 	if result.Language != "en" {
 		t.Fatalf("expected language en, got %q", result.Language)
+	}
+}
+
+func TestClientAnalyzeChunksReturnsUnavailableOnInvalidJSON(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("{"))
+	}))
+	defer server.Close()
+
+	client := New(server.URL, "api-key", "signature-key", 2*time.Second)
+	_, err := client.AnalyzeChunks(context.Background(), "hello", "en")
+	if err == nil {
+		t.Fatalf("expected error")
+	}
+	if !errors.Is(err, domain.ErrUnavailable) {
+		t.Fatalf("expected unavailable error, got %v", err)
+	}
+}
+
+func TestClientAnalyzeChunksReturnsUpstreamError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "bad worker request", http.StatusUnauthorized)
+	}))
+	defer server.Close()
+
+	client := New(server.URL, "api-key", "signature-key", 2*time.Second)
+	_, err := client.AnalyzeChunks(context.Background(), "hello", "en")
+	var upstreamErr UpstreamError
+	if !errors.As(err, &upstreamErr) {
+		t.Fatalf("expected upstream error, got %v", err)
+	}
+	if upstreamErr.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("expected status 401, got %d", upstreamErr.StatusCode)
 	}
 }
