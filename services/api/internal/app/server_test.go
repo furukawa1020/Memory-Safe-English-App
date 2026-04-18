@@ -19,6 +19,10 @@ func TestServerRegisterAndMeFlow(t *testing.T) {
 		AccessTokenTTL:         15 * time.Minute,
 		RefreshTokenTTL:        30 * time.Minute,
 		PasswordHashIterations: 100000,
+		WorkerBaseURL:          "http://127.0.0.1:8090",
+		WorkerAPIKey:           "worker-api-key",
+		WorkerSignatureKey:     "worker-signature-key",
+		WorkerTimeout:          2 * time.Second,
 	})
 	if err != nil {
 		t.Fatalf("NewServer() error = %v", err)
@@ -83,6 +87,10 @@ func TestServerRejectsProtectedRouteWithoutToken(t *testing.T) {
 		AccessTokenTTL:         15 * time.Minute,
 		RefreshTokenTTL:        30 * time.Minute,
 		PasswordHashIterations: 100000,
+		WorkerBaseURL:          "http://127.0.0.1:8090",
+		WorkerAPIKey:           "worker-api-key",
+		WorkerSignatureKey:     "worker-signature-key",
+		WorkerTimeout:          2 * time.Second,
 	})
 	if err != nil {
 		t.Fatalf("NewServer() error = %v", err)
@@ -105,6 +113,10 @@ func TestServerRefreshFlow(t *testing.T) {
 		AccessTokenTTL:         15 * time.Minute,
 		RefreshTokenTTL:        30 * time.Minute,
 		PasswordHashIterations: 100000,
+		WorkerBaseURL:          "http://127.0.0.1:8090",
+		WorkerAPIKey:           "worker-api-key",
+		WorkerSignatureKey:     "worker-signature-key",
+		WorkerTimeout:          2 * time.Second,
 	})
 	if err != nil {
 		t.Fatalf("NewServer() error = %v", err)
