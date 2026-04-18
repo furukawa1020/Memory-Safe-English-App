@@ -14,6 +14,10 @@ type Config struct {
 	AccessTokenTTL         time.Duration
 	RefreshTokenTTL        time.Duration
 	PasswordHashIterations int
+	WorkerBaseURL          string
+	WorkerAPIKey           string
+	WorkerSignatureKey     string
+	WorkerTimeout          time.Duration
 }
 
 func Load() Config {
@@ -24,6 +28,10 @@ func Load() Config {
 		AccessTokenTTL:         getEnvDuration("AUTH_ACCESS_TOKEN_TTL", 15*time.Minute),
 		RefreshTokenTTL:        getEnvDuration("AUTH_REFRESH_TOKEN_TTL", 7*24*time.Hour),
 		PasswordHashIterations: getEnvInt("PASSWORD_HASH_ITERATIONS", 120000),
+		WorkerBaseURL:          getEnv("WORKER_BASE_URL", "http://127.0.0.1:8090"),
+		WorkerAPIKey:           getEnv("WORKER_API_KEY", "dev-worker-api-key"),
+		WorkerSignatureKey:     getEnv("WORKER_SIGNATURE_KEY", "dev-worker-signature-key"),
+		WorkerTimeout:          getEnvDuration("WORKER_TIMEOUT", 5*time.Second),
 	}
 }
 
@@ -42,6 +50,21 @@ func (c Config) Validate() error {
 	}
 	if c.PasswordHashIterations < 100000 {
 		return fmt.Errorf("PASSWORD_HASH_ITERATIONS must be at least 100000")
+	}
+	if c.WorkerBaseURL == "" {
+		return fmt.Errorf("WORKER_BASE_URL must not be empty")
+	}
+	if c.WorkerAPIKey == "" {
+		return fmt.Errorf("WORKER_API_KEY must not be empty")
+	}
+	if c.WorkerSignatureKey == "" {
+		return fmt.Errorf("WORKER_SIGNATURE_KEY must not be empty")
+	}
+	if c.WorkerTimeout <= 0 {
+		return fmt.Errorf("WORKER_TIMEOUT must be positive")
+	}
+	if c.AppEnv == "production" && (c.WorkerAPIKey == "dev-worker-api-key" || c.WorkerSignatureKey == "dev-worker-signature-key") {
+		return fmt.Errorf("worker secrets must be overridden in production")
 	}
 	return nil
 }
