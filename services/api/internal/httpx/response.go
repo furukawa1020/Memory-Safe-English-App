@@ -18,6 +18,8 @@ func WriteDomainError(w http.ResponseWriter, err error, invalidMessage, notFound
 		httpjson.Error(w, http.StatusNotFound, "not_found", notFoundMessage)
 	case errors.Is(err, domain.ErrConflict):
 		httpjson.Error(w, http.StatusConflict, "conflict", "resource conflict")
+	case errors.Is(err, domain.ErrUnavailable):
+		httpjson.Error(w, http.StatusBadGateway, "upstream_unavailable", "dependent service unavailable")
 	default:
 		httpjson.Error(w, http.StatusInternalServerError, "internal_error", "internal server error")
 	}
