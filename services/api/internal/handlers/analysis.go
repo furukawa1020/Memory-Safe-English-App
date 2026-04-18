@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 
+	"memory-safe-english/services/api/internal/domain"
 	"memory-safe-english/services/api/internal/httpjson"
 	"memory-safe-english/services/api/internal/httpx"
 	"memory-safe-english/services/api/internal/service"
@@ -26,12 +27,12 @@ func (h AnalysisHandler) AnalyzeChunks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.service.AnalyzeChunks(r.Context(), service.AnalyzeChunksInput{
+	result, err := h.service.AnalyzeChunks(r.Context(), domain.AnalyzeChunksInput{
 		Text:     req.Text,
 		Language: req.Language,
 	})
 	if err != nil {
-		httpx.WriteDomainError(w, err, "text is required", "analysis resource not found")
+		httpx.WriteDomainError(w, err, "text is required and must be within allowed size", "analysis resource not found")
 		return
 	}
 
