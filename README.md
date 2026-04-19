@@ -41,6 +41,8 @@
 - `postgres` on `127.0.0.1:5432`
 - `redis` on `127.0.0.1:6379`
 
+`proxy`, `api`, `worker`, `postgres`, `redis` には healthcheck を設定済みです。`proxy` は `api` と `worker` の healthy を待ってから起動します。
+
 起動:
 
 ```bash
