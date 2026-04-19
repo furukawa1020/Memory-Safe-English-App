@@ -47,6 +47,12 @@
 docker compose -f infra/docker-compose.yml up --build
 ```
 
+簡易疎通確認:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test.ps1
+```
+
 ## Documentation
 
 - [Architecture](docs/architecture.md)
