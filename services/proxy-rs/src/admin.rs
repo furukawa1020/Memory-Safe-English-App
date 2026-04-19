@@ -5,6 +5,7 @@ use axum::{
     Json,
 };
 use serde::{Deserialize, Serialize};
+use subtle::ConstantTimeEq;
 
 use crate::{
     cache::{CachePurgeSelector, CacheStats},
@@ -91,7 +92,9 @@ fn is_authorized(state: &AppState, headers: &HeaderMap) -> bool {
         Some(expected) => headers
             .get(ADMIN_TOKEN_HEADER)
             .and_then(|value| value.to_str().ok())
-            .map(|value| value == expected)
+            .map(|value| {
+                value.as_bytes().ct_eq(expected.as_bytes()).into()
+            })
             .unwrap_or(false),
         None => false,
     }
