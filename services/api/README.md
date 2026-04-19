@@ -37,6 +37,9 @@ services/api
 - `POST /auth/refresh`
 - `GET /me`
 - `POST /analysis/chunks`
+- `GET /contents`
+- `GET /contents/{id}`
+- `GET /contents/{id}/chunks`
 - `POST /sessions/start`
 - `POST /sessions/{id}/event`
 - `POST /sessions/{id}/complete`
@@ -63,6 +66,7 @@ services/api
 - protected route は Bearer token middleware で一元管理している
 - `httptest` ベースの HTTP テストを追加している
 - worker 呼び出しは `internal/workerclient` に隔離している
+- seeded content と chunk cache をインメモリ実装で持てる
 
 追加で入っているセキュリティ対策:
 

@@ -11,6 +11,7 @@ tags:
   - name: User
   - name: Sessions
   - name: Analysis
+  - name: Contents
 paths:
   /health:
     get:
@@ -112,6 +113,67 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ChunkingResult"
+  /contents:
+    get:
+      tags: [Contents]
+      summary: List learning contents
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: type
+          in: query
+          schema: { type: string }
+        - name: level
+          in: query
+          schema: { type: string }
+        - name: topic
+          in: query
+          schema: { type: string }
+        - name: language
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Content list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Content"
+  /contents/{contentId}:
+    get:
+      tags: [Contents]
+      summary: Get one content item
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ContentId"
+      responses:
+        "200":
+          description: Content item
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Content"
+  /contents/{contentId}/chunks:
+    get:
+      tags: [Contents]
+      summary: Get chunk analysis for a content item
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ContentId"
+      responses:
+        "200":
+          description: Chunking result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChunkingResult"
   /sessions/start:
     post:
       tags: [Sessions]
@@ -176,6 +238,12 @@ components:
   parameters:
     SessionId:
       name: sessionId
+      in: path
+      required: true
+      schema:
+        type: string
+    ContentId:
+      name: contentId
       in: path
       required: true
       schema:
@@ -271,6 +339,31 @@ components:
         token_type:
           type: string
         expires_at:
+          type: string
+          format: date-time
+    Content:
+      type: object
+      properties:
+        content_id:
+          type: string
+        title:
+          type: string
+        content_type:
+          type: string
+        level:
+          type: string
+        topic:
+          type: string
+        language:
+          type: string
+        raw_text:
+          type: string
+        summary_text:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
           type: string
           format: date-time
     Session:
