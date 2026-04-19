@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../data/system_repository.dart';
 import '../model/backend_status.dart';
+import '../model/mobile_bootstrap.dart';
 
 class StartupController extends ChangeNotifier {
   StartupController(this._repository);
@@ -11,6 +12,7 @@ class StartupController extends ChangeNotifier {
   bool isLoading = false;
   String? errorText;
   BackendStatus? backendStatus;
+  MobileBootstrap? bootstrap;
 
   bool get isReady => backendStatus?.ready == true;
 
@@ -20,7 +22,8 @@ class StartupController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      backendStatus = await _repository.fetchBackendStatus();
+      bootstrap = await _repository.fetchMobileBootstrap();
+      backendStatus = bootstrap!.backendStatus;
     } catch (_) {
       errorText = 'Could not reach the backend yet.';
     } finally {

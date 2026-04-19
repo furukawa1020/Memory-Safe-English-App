@@ -1,26 +1,32 @@
 import '../../../core/api/api_client.dart';
 import '../../../core/api/api_exception.dart';
 import '../model/backend_status.dart';
+import '../model/mobile_bootstrap.dart';
 
 class SystemRepository {
   const SystemRepository(this._apiClient);
 
   final ApiClient _apiClient;
 
-  Future<BackendStatus> fetchBackendStatus() async {
+  Future<MobileBootstrap> fetchMobileBootstrap() async {
     final response = await _apiClient.getResponse(
-      '/ready',
+      '/bootstrap/mobile',
       authenticated: false,
     );
 
-    if (response.statusCode == 200 || response.statusCode == 503) {
-      return BackendStatus.fromJson(response.body);
+    if (response.statusCode == 200) {
+      return MobileBootstrap.fromJson(response.body);
     }
 
     throw ApiException(
       statusCode: response.statusCode,
-      code: 'backend_status_failed',
-      message: 'Could not read backend readiness.',
+      code: 'mobile_bootstrap_failed',
+      message: 'Could not read mobile bootstrap metadata.',
     );
+  }
+
+  Future<BackendStatus> fetchBackendStatus() async {
+    final bootstrap = await fetchMobileBootstrap();
+    return bootstrap.backendStatus;
   }
 }
