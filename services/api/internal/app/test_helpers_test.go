@@ -63,6 +63,11 @@ func authorizedJSONRequest(t *testing.T, server *http.Server, accessToken, metho
 
 func jsonRequest(t *testing.T, server *http.Server, method, path, accessToken string, body map[string]any) *httptest.ResponseRecorder {
 	t.Helper()
+	return jsonRequestWithHeaders(t, server, method, path, accessToken, body, nil)
+}
+
+func jsonRequestWithHeaders(t *testing.T, server *http.Server, method, path, accessToken string, body map[string]any, headers map[string]string) *httptest.ResponseRecorder {
+	t.Helper()
 
 	var reader *bytes.Reader
 	if body == nil {
@@ -79,6 +84,9 @@ func jsonRequest(t *testing.T, server *http.Server, method, path, accessToken st
 	req.Header.Set("Content-Type", "application/json")
 	if accessToken != "" {
 		req.Header.Set("Authorization", "Bearer "+accessToken)
+	}
+	for key, value := range headers {
+		req.Header.Set(key, value)
 	}
 	rec := httptest.NewRecorder()
 	server.Handler.ServeHTTP(rec, req)
