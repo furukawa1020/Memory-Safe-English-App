@@ -174,6 +174,9 @@ fn upstream_url(
 
     let base = match upstream {
         Upstream::Api => &state.config.api_base_url,
+        Upstream::ProxyRateLimited => {
+            unreachable!("proxy rate-limited responses are handled without upstream forwarding")
+        }
         Upstream::Worker => &state.config.worker_base_url,
     };
 
