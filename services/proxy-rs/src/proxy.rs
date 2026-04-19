@@ -211,7 +211,11 @@ fn sanitize_request_headers(
 ) -> reqwest::header::HeaderMap {
     let mut sanitized = reqwest::header::HeaderMap::new();
     for (name, value) in headers {
-        if should_skip_header(name.as_str()) || name.as_str().eq_ignore_ascii_case("host") {
+        if should_skip_header(name.as_str())
+            || name.as_str().eq_ignore_ascii_case("host")
+            || name.as_str().eq_ignore_ascii_case("x-forwarded-for")
+            || name.as_str().eq_ignore_ascii_case("x-real-ip")
+        {
             continue;
         }
         sanitized.insert(name.clone(), value.clone());
@@ -223,6 +227,11 @@ fn sanitize_request_headers(
     {
         if let Ok(value) = HeaderValue::from_str(client_ip) {
             sanitized.insert(HeaderName::from_static("x-forwarded-for"), value);
+        }
+    }
+    if !client_ip.is_empty() && client_ip != "unknown" {
+        if let Ok(value) = HeaderValue::from_str(client_ip) {
+            sanitized.insert(HeaderName::from_static("x-real-ip"), value);
         }
     }
     sanitized
