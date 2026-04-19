@@ -3,7 +3,7 @@ use std::net::SocketAddr;
 use axum::{
     body::Body,
     extract::{connect_info::ConnectInfo, State},
-    http::{HeaderMap, HeaderValue, Request, StatusCode},
+    http::{HeaderMap, HeaderValue, StatusCode},
     response::IntoResponse,
     Json,
 };
@@ -33,14 +33,8 @@ pub async fn cache_stats(
         &state.config.trusted_proxy_ips,
     );
 
-    if let Some(response) = guard_admin_request(
-        &state,
-        &headers,
-        &request_id,
-        &client_ip,
-        "/admin/cache",
-    )
-    .await
+    if let Some(response) =
+        guard_admin_request(&state, &headers, &request_id, &client_ip, "/admin/cache").await
     {
         return response;
     }
@@ -81,9 +75,7 @@ pub async fn purge_cache(
     let selector = match request.scope.as_deref() {
         Some("all") | None => CachePurgeSelector::All,
         Some("chunks") => CachePurgeSelector::Prefix("POST:/worker/analyze/chunks".to_string()),
-        Some("skeleton") => {
-            CachePurgeSelector::Prefix("POST:/worker/analyze/skeleton".to_string())
-        }
+        Some("skeleton") => CachePurgeSelector::Prefix("POST:/worker/analyze/skeleton".to_string()),
         Some(_) => {
             return with_standard_headers(
                 (
@@ -125,9 +117,7 @@ async fn guard_admin_request(
         return Some(with_standard_headers(
             (
                 StatusCode::FORBIDDEN,
-                Json(AdminErrorResponse {
-                    error: "forbidden",
-                }),
+                Json(AdminErrorResponse { error: "forbidden" }),
             )
                 .into_response(),
             request_id,
@@ -207,10 +197,9 @@ fn rate_limited_response(request_id: &HeaderValue) -> http::Response<Body> {
         request_id,
         "miss",
     );
-    response.headers_mut().insert(
-        http::header::RETRY_AFTER,
-        HeaderValue::from_static("1"),
-    );
+    response
+        .headers_mut()
+        .insert(http::header::RETRY_AFTER, HeaderValue::from_static("1"));
     response
 }
 
