@@ -60,10 +60,9 @@ mod tests {
             .header("x-forwarded-for", "203.0.113.10, 10.0.0.2")
             .body(Body::empty())
             .unwrap();
-        request.extensions_mut().insert(ConnectInfo(SocketAddr::from((
-            [127, 0, 0, 1],
-            3000,
-        ))));
+        request
+            .extensions_mut()
+            .insert(ConnectInfo(SocketAddr::from(([127, 0, 0, 1], 3000))));
 
         let trusted = vec!["127.0.0.1".parse::<IpAddr>().unwrap()];
         assert_eq!(resolve_client_ip(&request, &trusted), "203.0.113.10");
@@ -76,10 +75,9 @@ mod tests {
             .header("x-forwarded-for", "203.0.113.10, 10.0.0.2")
             .body(Body::empty())
             .unwrap();
-        request.extensions_mut().insert(ConnectInfo(SocketAddr::from((
-            [10, 0, 0, 8],
-            3000,
-        ))));
+        request
+            .extensions_mut()
+            .insert(ConnectInfo(SocketAddr::from(([10, 0, 0, 8], 3000))));
 
         let trusted = vec!["127.0.0.1".parse::<IpAddr>().unwrap()];
         assert_eq!(resolve_client_ip(&request, &trusted), "10.0.0.8");
@@ -88,9 +86,6 @@ mod tests {
     #[test]
     fn returns_unknown_without_peer_context() {
         let headers = HeaderMap::new();
-        assert_eq!(
-            resolve_client_ip_from_parts(&headers, None, &[]),
-            "unknown"
-        );
+        assert_eq!(resolve_client_ip_from_parts(&headers, None, &[]), "unknown");
     }
 }
