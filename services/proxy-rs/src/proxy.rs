@@ -9,7 +9,8 @@ use sha2::{Digest, Sha256};
 
 use crate::{
     cache::CachedResponse, request_id::resolve_request_id,
-    response_headers::apply_standard_headers, state::AppState,
+    response_headers::{apply_standard_headers, apply_upstream_header},
+    state::AppState,
 };
 
 static HOP_BY_HOP_HEADERS: &[&str] = &[
