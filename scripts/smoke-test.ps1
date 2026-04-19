@@ -39,7 +39,7 @@ function Get-AuthTokens {
     )
 
     try {
-        $registerResponse = Invoke-JsonRequest -Method "POST" -Url "$BaseUrl/api/auth/register" -Body @{
+        $registerResponse = Invoke-JsonRequest -Method "POST" -Url "$BaseUrl/auth/register" -Body @{
             email            = $EmailAddress
             password         = $PlaintextPassword
             display_name     = $Name
@@ -51,7 +51,7 @@ function Get-AuthTokens {
         Write-Host "Registration did not succeed. Falling back to login..."
     }
 
-    $loginResponse = Invoke-JsonRequest -Method "POST" -Url "$BaseUrl/api/auth/login" -Body @{
+    $loginResponse = Invoke-JsonRequest -Method "POST" -Url "$BaseUrl/auth/login" -Body @{
         email    = $EmailAddress
         password = $PlaintextPassword
     }
@@ -75,11 +75,11 @@ $authHeaders = @{
 }
 
 Write-Host "3. Fetching the current user..."
-$me = Invoke-JsonRequest -Method "GET" -Url "$ProxyBaseUrl/api/me" -Headers $authHeaders
+$me = Invoke-JsonRequest -Method "GET" -Url "$ProxyBaseUrl/me" -Headers $authHeaders
 $me | ConvertTo-Json -Depth 6 | Write-Host
 
 Write-Host "4. Listing seeded contents..."
-$contents = Invoke-JsonRequest -Method "GET" -Url "$ProxyBaseUrl/api/contents" -Headers $authHeaders
+$contents = Invoke-JsonRequest -Method "GET" -Url "$ProxyBaseUrl/contents" -Headers $authHeaders
 if (-not $contents.items -or $contents.items.Count -eq 0) {
     throw "Smoke test expected at least one seeded content item."
 }
@@ -87,11 +87,11 @@ $firstContentId = $contents.items[0].content_id
 $contents | ConvertTo-Json -Depth 8 | Write-Host
 
 Write-Host "5. Requesting chunk analysis for the first content..."
-$chunkResult = Invoke-JsonRequest -Method "GET" -Url "$ProxyBaseUrl/api/contents/$firstContentId/chunks" -Headers $authHeaders
+$chunkResult = Invoke-JsonRequest -Method "GET" -Url "$ProxyBaseUrl/contents/$firstContentId/chunks" -Headers $authHeaders
 $chunkResult | ConvertTo-Json -Depth 8 | Write-Host
 
 Write-Host "6. Requesting skeleton analysis for the first content..."
-$skeletonResult = Invoke-JsonRequest -Method "GET" -Url "$ProxyBaseUrl/api/contents/$firstContentId/skeleton" -Headers $authHeaders
+$skeletonResult = Invoke-JsonRequest -Method "GET" -Url "$ProxyBaseUrl/contents/$firstContentId/skeleton" -Headers $authHeaders
 $skeletonResult | ConvertTo-Json -Depth 8 | Write-Host
 
 Write-Host "7. Checking proxy cache stats..."

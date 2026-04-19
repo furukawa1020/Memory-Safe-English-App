@@ -19,6 +19,7 @@ class ApiClient {
 
   Future<JsonMap> get(String path, {bool authenticated = true}) async {
     final response = await getResponse(path, authenticated: authenticated);
+    _throwIfFailed(response);
     return response.body;
   }
 
@@ -32,6 +33,7 @@ class ApiClient {
       body: body,
       authenticated: authenticated,
     );
+    _throwIfFailed(response);
     return response.body;
   }
 
@@ -45,6 +47,7 @@ class ApiClient {
       body: body,
       authenticated: authenticated,
     );
+    _throwIfFailed(response);
     return response.body;
   }
 
@@ -123,11 +126,7 @@ class ApiClient {
       body: decodedBody,
     );
 
-    if (apiResponse.isSuccess) {
-      return apiResponse;
-    }
-
-    throw _buildApiException(apiResponse);
+    return apiResponse;
   }
 
   JsonMap _decodeBody(http.Response response) {
@@ -187,5 +186,11 @@ class ApiClient {
       code: 'request_failed',
       message: 'Request failed with status ${response.statusCode}.',
     );
+  }
+
+  void _throwIfFailed(ApiResponse response) {
+    if (!response.isSuccess) {
+      throw _buildApiException(response);
+    }
   }
 }
