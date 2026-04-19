@@ -7,7 +7,10 @@ use bytes::Bytes;
 use reqwest::Method;
 use sha2::{Digest, Sha256};
 
-use crate::{cache::CachedResponse, request_id::resolve_request_id, state::AppState};
+use crate::{
+    cache::CachedResponse, request_id::resolve_request_id,
+    response_headers::apply_standard_headers, state::AppState,
+};
 
 static HOP_BY_HOP_HEADERS: &[&str] = &[
     "connection",
@@ -228,30 +231,6 @@ fn error_response(
     response
 }
 
-fn apply_standard_headers(
-    headers: &mut HeaderMap,
-    request_id: &HeaderValue,
-    cache_state: &'static str,
-) {
-    headers.insert(HeaderName::from_static("x-request-id"), request_id.clone());
-    headers.insert(
-        HeaderName::from_static("x-proxy-cache"),
-        HeaderValue::from_static(cache_state),
-    );
-    headers.insert(
-        HeaderName::from_static("x-content-type-options"),
-        HeaderValue::from_static("nosniff"),
-    );
-    headers.insert(
-        HeaderName::from_static("x-frame-options"),
-        HeaderValue::from_static("DENY"),
-    );
-    headers.insert(
-        HeaderName::from_static("referrer-policy"),
-        HeaderValue::from_static("no-referrer"),
-    );
-}
-
 fn should_skip_header(header_name: &str) -> bool {
     HOP_BY_HOP_HEADERS
         .iter()
@@ -302,17 +281,5 @@ mod tests {
         )
         .is_none());
         assert!(cache_key(&Upstream::Api, &http::Method::POST, "/api/contents", &body).is_none());
-    }
-
-    #[test]
-    fn applies_standard_headers() {
-        let mut headers = HeaderMap::new();
-        let request_id = HeaderValue::from_static("request-123");
-
-        apply_standard_headers(&mut headers, &request_id, "miss");
-
-        assert_eq!(headers.get("x-request-id").unwrap(), "request-123");
-        assert_eq!(headers.get("x-proxy-cache").unwrap(), "miss");
-        assert_eq!(headers.get("x-content-type-options").unwrap(), "nosniff");
     }
 }
