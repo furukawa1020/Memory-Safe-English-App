@@ -4,6 +4,9 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+if (Test-Path variable:PSNativeCommandUseErrorActionPreference) {
+    $PSNativeCommandUseErrorActionPreference = $false
+}
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 $composePath = Resolve-Path (Join-Path $repoRoot $ComposeFile)
@@ -18,5 +21,8 @@ if ($RemoveVolumes) {
 }
 
 & docker @composeArgs
+if ($LASTEXITCODE -ne 0) {
+    throw "docker compose down failed."
+}
 
 Write-Host "Development stack stopped."

@@ -8,6 +8,9 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+if (Test-Path variable:PSNativeCommandUseErrorActionPreference) {
+    $PSNativeCommandUseErrorActionPreference = $false
+}
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 $composePath = Resolve-Path (Join-Path $repoRoot $ComposeFile)
@@ -88,6 +91,9 @@ if (-not $NoBuild) {
     $composeArgs += "--build"
 }
 & docker @composeArgs
+if ($LASTEXITCODE -ne 0) {
+    throw "docker compose up failed."
+}
 
 Wait-ForHealthyContainers -ContainerNames $targetContainers -TimeoutSeconds $StartupTimeoutSeconds
 
@@ -95,6 +101,9 @@ if (-not $SkipSmokeTest) {
     Write-Host ""
     Write-Host "Running smoke test..."
     & $smokeTestPath -ProxyBaseUrl $ProxyBaseUrl -AdminToken $AdminToken
+    if ($LASTEXITCODE -ne 0) {
+        throw "Smoke test failed."
+    }
 }
 
 Write-Host ""
