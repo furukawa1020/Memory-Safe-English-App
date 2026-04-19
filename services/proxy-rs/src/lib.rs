@@ -4,5 +4,6 @@ pub mod config;
 pub mod gc;
 pub mod proxy;
 pub mod request_id;
+pub mod response_headers;
 pub mod routes;
 pub mod state;
