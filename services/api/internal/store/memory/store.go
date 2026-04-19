@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"sort"
 	"sync"
 	"time"
 
@@ -191,6 +192,9 @@ func (s *Store) ListContents(_ context.Context, filter repository.ContentFilter)
 		}
 		result = append(result, content)
 	}
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].CreatedAt.Before(result[j].CreatedAt)
+	})
 	return result, nil
 }
 
@@ -202,6 +206,30 @@ func (s *Store) GetContent(_ context.Context, contentID string) (domain.Content,
 	if !ok {
 		return domain.Content{}, domain.ErrNotFound
 	}
+	return content, nil
+}
+
+func (s *Store) CreateContent(_ context.Context, content domain.Content) (domain.Content, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, exists := s.contents[content.ID]; exists {
+		return domain.Content{}, domain.ErrConflict
+	}
+	s.contents[content.ID] = content
+	return content, nil
+}
+
+func (s *Store) UpdateContent(_ context.Context, content domain.Content) (domain.Content, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	existing, exists := s.contents[content.ID]
+	if !exists {
+		return domain.Content{}, domain.ErrNotFound
+	}
+	content.CreatedAt = existing.CreatedAt
+	s.contents[content.ID] = content
 	return content, nil
 }
 
@@ -224,6 +252,14 @@ func (s *Store) SaveChunkingResult(_ context.Context, contentID string, result d
 		return domain.ErrNotFound
 	}
 	s.contentChunks[contentID] = result
+	return nil
+}
+
+func (s *Store) DeleteChunkingResult(_ context.Context, contentID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	delete(s.contentChunks, contentID)
 	return nil
 }
 
