@@ -30,7 +30,7 @@ class MemorySafeEnglishApp extends StatelessWidget {
     final authRepository = AuthRepository(apiClient);
     final contentRepository = ContentRepository(apiClient);
     final systemRepository = SystemRepository(apiClient);
-    final startupController = StartupController(systemRepository);
+    final startupController = StartupController(systemRepository, sessionController);
 
     return AppScope(
       config: config,

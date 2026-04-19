@@ -39,6 +39,7 @@ The implementation is separated as `repository -> service -> handler`.
 The PostgreSQL implementation is split by responsibility.
 
 - `postgres/users.go`: auth and user retrieval
+- `postgres/refresh_tokens.go`: refresh token families and rotation state
 - `postgres/sessions.go`: sessions and event logs
 - `postgres/contents.go`: content CRUD
 - `postgres/analysis_cache.go`: chunk and skeleton cache
@@ -67,6 +68,8 @@ The PostgreSQL implementation is split by responsibility.
 
 - password hashing uses `PBKDF2-SHA256`
 - access and refresh tokens use HMAC signatures
+- refresh tokens rotate on every successful `/auth/refresh`
+- replaying an older refresh token revokes the whole refresh-token family
 - protected routes use Bearer token middleware
 - auth routes use in-memory rate limiting for `login`, `register`, and `refresh`
 - `X-Request-ID` is propagated to responses and logs
