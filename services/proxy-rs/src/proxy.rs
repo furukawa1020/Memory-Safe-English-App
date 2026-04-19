@@ -7,7 +7,7 @@ use bytes::Bytes;
 use reqwest::Method;
 use sha2::{Digest, Sha256};
 
-use crate::{cache::CachedResponse, state::AppState};
+use crate::{cache::CachedResponse, request_id::resolve_request_id, state::AppState};
 
 static HOP_BY_HOP_HEADERS: &[&str] = &[
     "connection",
@@ -34,6 +34,7 @@ pub async fn proxy_to_worker(
 async fn forward(state: AppState, request: Request<Body>, upstream: Upstream) -> Response<Body> {
     let (parts, body) = request.into_parts();
     let method = parts.method.clone();
+    let request_id = resolve_request_id(&parts.headers);
     let path_and_query = parts
         .uri
         .path_and_query()
@@ -42,22 +43,34 @@ async fn forward(state: AppState, request: Request<Body>, upstream: Upstream) ->
 
     let body_bytes = match to_bytes(body, state.config.max_request_body_bytes).await {
         Ok(bytes) => bytes,
-        Err(_) => return error_response(StatusCode::PAYLOAD_TOO_LARGE, "request body too large"),
+        Err(_) => {
+            return error_response(
+                StatusCode::PAYLOAD_TOO_LARGE,
+                "request body too large",
+                &request_id,
+            )
+        }
     };
 
     let maybe_cache_key = cache_key(&upstream, &method, path_and_query, &body_bytes);
     if let Some(key) = maybe_cache_key.as_ref() {
         if let Some(cached) = state.cache.get(key).await {
-            return build_cached_response(cached);
+            return build_cached_response(cached, &request_id);
         }
     }
 
     let upstream_url = match upstream_url(&state, &upstream, path_and_query) {
         Ok(url) => url,
-        Err(_) => return error_response(StatusCode::BAD_REQUEST, "invalid upstream request path"),
+        Err(_) => {
+            return error_response(
+                StatusCode::BAD_REQUEST,
+                "invalid upstream request path",
+                &request_id,
+            )
+        }
     };
 
-    let request_headers = sanitize_request_headers(&parts.headers);
+    let request_headers = sanitize_request_headers(&parts.headers, &request_id);
     let reqwest_method = Method::from_bytes(method.as_str().as_bytes()).unwrap_or(Method::GET);
     let upstream_response = match state
         .http_client
@@ -68,16 +81,26 @@ async fn forward(state: AppState, request: Request<Body>, upstream: Upstream) ->
         .await
     {
         Ok(response) => response,
-        Err(_) => return error_response(StatusCode::BAD_GATEWAY, "upstream request failed"),
+        Err(_) => {
+            return error_response(
+                StatusCode::BAD_GATEWAY,
+                "upstream request failed",
+                &request_id,
+            )
+        }
     };
 
     let status = StatusCode::from_u16(upstream_response.status().as_u16())
         .unwrap_or(StatusCode::BAD_GATEWAY);
-    let headers = sanitize_response_headers(upstream_response.headers());
+    let headers = sanitize_response_headers(upstream_response.headers(), &request_id);
     let response_body = match upstream_response.bytes().await {
         Ok(bytes) => bytes,
         Err(_) => {
-            return error_response(StatusCode::BAD_GATEWAY, "failed to read upstream response")
+            return error_response(
+                StatusCode::BAD_GATEWAY,
+                "failed to read upstream response",
+                &request_id,
+            )
         }
     };
 
@@ -146,7 +169,10 @@ fn cache_key(
     Some(format!("{}:{normalized}:{digest}", method.as_str()))
 }
 
-fn sanitize_request_headers(headers: &HeaderMap) -> reqwest::header::HeaderMap {
+fn sanitize_request_headers(
+    headers: &HeaderMap,
+    request_id: &HeaderValue,
+) -> reqwest::header::HeaderMap {
     let mut sanitized = reqwest::header::HeaderMap::new();
     for (name, value) in headers {
         if should_skip_header(name.as_str()) || name.as_str().eq_ignore_ascii_case("host") {
@@ -154,10 +180,14 @@ fn sanitize_request_headers(headers: &HeaderMap) -> reqwest::header::HeaderMap {
         }
         sanitized.insert(name.clone(), value.clone());
     }
+    sanitized.insert(HeaderName::from_static("x-request-id"), request_id.clone());
     sanitized
 }
 
-fn sanitize_response_headers(headers: &reqwest::header::HeaderMap) -> HeaderMap {
+fn sanitize_response_headers(
+    headers: &reqwest::header::HeaderMap,
+    request_id: &HeaderValue,
+) -> HeaderMap {
     let mut sanitized = HeaderMap::new();
     for (name, value) in headers {
         if should_skip_header(name.as_str()) {
@@ -165,18 +195,12 @@ fn sanitize_response_headers(headers: &reqwest::header::HeaderMap) -> HeaderMap 
         }
         sanitized.insert(name.clone(), value.clone());
     }
-    sanitized.insert(
-        HeaderName::from_static("x-proxy-cache"),
-        HeaderValue::from_static("miss"),
-    );
+    apply_standard_headers(&mut sanitized, request_id, "miss");
     sanitized
 }
 
-fn build_cached_response(mut response: CachedResponse) -> Response<Body> {
-    response.headers.insert(
-        HeaderName::from_static("x-proxy-cache"),
-        HeaderValue::from_static("hit"),
-    );
+fn build_cached_response(mut response: CachedResponse, request_id: &HeaderValue) -> Response<Body> {
+    apply_standard_headers(&mut response.headers, request_id, "hit");
     build_response(response.status, response.headers, response.body)
 }
 
@@ -187,15 +211,45 @@ fn build_response(status: StatusCode, headers: HeaderMap, body: Bytes) -> Respon
     response
 }
 
-fn error_response(status: StatusCode, message: &'static str) -> Response<Body> {
+fn error_response(
+    status: StatusCode,
+    message: &'static str,
+    request_id: &HeaderValue,
+) -> Response<Body> {
     let payload = serde_json::json!({ "error": message }).to_string();
     let mut response = Response::new(Body::from(payload));
     *response.status_mut() = status;
-    response.headers_mut().insert(
+    let headers = response.headers_mut();
+    headers.insert(
         http::header::CONTENT_TYPE,
         HeaderValue::from_static("application/json"),
     );
+    apply_standard_headers(headers, request_id, "miss");
     response
+}
+
+fn apply_standard_headers(
+    headers: &mut HeaderMap,
+    request_id: &HeaderValue,
+    cache_state: &'static str,
+) {
+    headers.insert(HeaderName::from_static("x-request-id"), request_id.clone());
+    headers.insert(
+        HeaderName::from_static("x-proxy-cache"),
+        HeaderValue::from_static(cache_state),
+    );
+    headers.insert(
+        HeaderName::from_static("x-content-type-options"),
+        HeaderValue::from_static("nosniff"),
+    );
+    headers.insert(
+        HeaderName::from_static("x-frame-options"),
+        HeaderValue::from_static("DENY"),
+    );
+    headers.insert(
+        HeaderName::from_static("referrer-policy"),
+        HeaderValue::from_static("no-referrer"),
+    );
 }
 
 fn should_skip_header(header_name: &str) -> bool {
@@ -248,5 +302,17 @@ mod tests {
         )
         .is_none());
         assert!(cache_key(&Upstream::Api, &http::Method::POST, "/api/contents", &body).is_none());
+    }
+
+    #[test]
+    fn applies_standard_headers() {
+        let mut headers = HeaderMap::new();
+        let request_id = HeaderValue::from_static("request-123");
+
+        apply_standard_headers(&mut headers, &request_id, "miss");
+
+        assert_eq!(headers.get("x-request-id").unwrap(), "request-123");
+        assert_eq!(headers.get("x-proxy-cache").unwrap(), "miss");
+        assert_eq!(headers.get("x-content-type-options").unwrap(), "nosniff");
     }
 }
