@@ -11,16 +11,33 @@ import (
 )
 
 func TestServerContentFlow(t *testing.T) {
-	workerCalls := 0
+	chunkWorkerCalls := 0
+	skeletonWorkerCalls := 0
 	worker := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		workerCalls++
-		_ = json.NewEncoder(w).Encode(map[string]any{
-			"language": "en",
-			"chunks": []map[string]any{
-				{"order": 1, "text": "we propose", "role": "core", "skeleton_rank": 1},
-			},
-			"summary": "we propose",
-		})
+		switch r.URL.Path {
+		case "/analyze/chunks":
+			chunkWorkerCalls++
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"version":  "2026-04-19",
+				"language": "en",
+				"chunks": []map[string]any{
+					{"order": 1, "text": "we propose", "role": "core", "skeleton_rank": 1},
+				},
+				"summary": "we propose",
+			})
+		case "/analyze/skeleton":
+			skeletonWorkerCalls++
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"version":  "2026-04-19",
+				"language": "en",
+				"parts": []map[string]any{
+					{"order": 1, "text": "we propose", "role": "core", "emphasis": 2},
+				},
+				"summary": "we propose",
+			})
+		default:
+			http.NotFound(w, r)
+		}
 	}))
 	defer worker.Close()
 
@@ -90,6 +107,22 @@ func TestServerContentFlow(t *testing.T) {
 		t.Fatalf("get chunks second status = %d, body = %s", chunksRec2.Code, chunksRec2.Body.String())
 	}
 
+	skeletonReq := httptest.NewRequest(http.MethodGet, "/contents/cnt_research_001/skeleton", nil)
+	skeletonReq.Header.Set("Authorization", "Bearer "+accessToken)
+	skeletonRec := httptest.NewRecorder()
+	server.Handler.ServeHTTP(skeletonRec, skeletonReq)
+	if skeletonRec.Code != http.StatusOK {
+		t.Fatalf("get skeleton status = %d, body = %s", skeletonRec.Code, skeletonRec.Body.String())
+	}
+
+	skeletonReq2 := httptest.NewRequest(http.MethodGet, "/contents/cnt_research_001/skeleton", nil)
+	skeletonReq2.Header.Set("Authorization", "Bearer "+accessToken)
+	skeletonRec2 := httptest.NewRecorder()
+	server.Handler.ServeHTTP(skeletonRec2, skeletonReq2)
+	if skeletonRec2.Code != http.StatusOK {
+		t.Fatalf("get skeleton second status = %d, body = %s", skeletonRec2.Code, skeletonRec2.Body.String())
+	}
+
 	updateBody := map[string]any{
 		"title":        "Research Presentation Opening",
 		"content_type": "reading",
@@ -112,7 +145,18 @@ func TestServerContentFlow(t *testing.T) {
 		t.Fatalf("get chunks third status = %d, body = %s", chunksRec3.Code, chunksRec3.Body.String())
 	}
 
-	if workerCalls != 2 {
-		t.Fatalf("expected worker to be called twice after cache invalidation, got %d", workerCalls)
+	skeletonReq3 := httptest.NewRequest(http.MethodGet, "/contents/cnt_research_001/skeleton", nil)
+	skeletonReq3.Header.Set("Authorization", "Bearer "+accessToken)
+	skeletonRec3 := httptest.NewRecorder()
+	server.Handler.ServeHTTP(skeletonRec3, skeletonReq3)
+	if skeletonRec3.Code != http.StatusOK {
+		t.Fatalf("get skeleton third status = %d, body = %s", skeletonRec3.Code, skeletonRec3.Body.String())
+	}
+
+	if chunkWorkerCalls != 2 {
+		t.Fatalf("expected chunk worker to be called twice after cache invalidation, got %d", chunkWorkerCalls)
+	}
+	if skeletonWorkerCalls != 2 {
+		t.Fatalf("expected skeleton worker to be called twice after cache invalidation, got %d", skeletonWorkerCalls)
 	}
 }

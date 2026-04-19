@@ -10,16 +10,20 @@ import (
 
 func TestContentServiceListAndGet(t *testing.T) {
 	store := memory.NewStore()
-	svc := NewContentService(store, stubAnalyzer{
-		chunkResult: domain.ChunkingResult{
-			Version:  "2026-04-19",
-			Language: "en",
-			Chunks: []domain.Chunk{
-				{Order: 1, Text: "we propose", Role: "core", SkeletonRank: 1},
+	svc := NewContentService(
+		store,
+		stubAnalyzer{
+			chunkResult: domain.ChunkingResult{
+				Version:  "2026-04-19",
+				Language: "en",
+				Chunks: []domain.Chunk{
+					{Order: 1, Text: "we propose", Role: "core", SkeletonRank: 1},
+				},
+				Summary: "we propose",
 			},
-			Summary: "we propose",
 		},
-	})
+		stubAnalyzer{},
+	)
 
 	items, err := svc.List(context.Background(), ListContentsInput{ContentType: "reading"})
 	if err != nil {
@@ -41,16 +45,23 @@ func TestContentServiceListAndGet(t *testing.T) {
 func TestContentServiceGetChunksCachesResult(t *testing.T) {
 	store := memory.NewStore()
 	calls := 0
-	svc := NewContentService(store, analyzerFunc(func(ctx context.Context, text, language string) (domain.ChunkingResult, error) {
-		calls++
-		return domain.ChunkingResult{
-			Language: language,
-			Chunks: []domain.Chunk{
-				{Order: 1, Text: "we propose", Role: "core", SkeletonRank: 1},
-			},
-			Summary: "we propose",
-		}, nil
-	}))
+	svc := NewContentService(
+		store,
+		analyzerFunc(func(ctx context.Context, text, language string) (domain.ChunkingResult, error) {
+			calls++
+			return domain.ChunkingResult{
+				Version:  "2026-04-19",
+				Language: language,
+				Chunks: []domain.Chunk{
+					{Order: 1, Text: "we propose", Role: "core", SkeletonRank: 1},
+				},
+				Summary: "we propose",
+			}, nil
+		}),
+		skeletonAnalyzerFunc(func(ctx context.Context, text, language string) (domain.SkeletonResult, error) {
+			return domain.SkeletonResult{}, nil
+		}),
+	)
 
 	if _, err := svc.GetChunks(context.Background(), "cnt_research_001"); err != nil {
 		t.Fatalf("GetChunks() first call error = %v", err)
@@ -65,7 +76,7 @@ func TestContentServiceGetChunksCachesResult(t *testing.T) {
 
 func TestContentServiceCreateAndUpdate(t *testing.T) {
 	store := memory.NewStore()
-	svc := NewContentService(store, stubAnalyzer{})
+	svc := NewContentService(store, stubAnalyzer{}, stubAnalyzer{})
 
 	created, err := svc.Create(context.Background(), domain.ContentUpsertInput{
 		Title:       "Lab Introduction",
@@ -109,16 +120,30 @@ func TestContentServiceCreateAndUpdate(t *testing.T) {
 func TestContentServiceUpdateInvalidatesChunkCache(t *testing.T) {
 	store := memory.NewStore()
 	calls := 0
-	svc := NewContentService(store, analyzerFunc(func(ctx context.Context, text, language string) (domain.ChunkingResult, error) {
-		calls++
-		return domain.ChunkingResult{
-			Language: language,
-			Chunks: []domain.Chunk{
-				{Order: 1, Text: text, Role: "core", SkeletonRank: 1},
-			},
-			Summary: text,
-		}, nil
-	}))
+	svc := NewContentService(
+		store,
+		analyzerFunc(func(ctx context.Context, text, language string) (domain.ChunkingResult, error) {
+			calls++
+			return domain.ChunkingResult{
+				Version:  "2026-04-19",
+				Language: language,
+				Chunks: []domain.Chunk{
+					{Order: 1, Text: text, Role: "core", SkeletonRank: 1},
+				},
+				Summary: text,
+			}, nil
+		}),
+		skeletonAnalyzerFunc(func(ctx context.Context, text, language string) (domain.SkeletonResult, error) {
+			return domain.SkeletonResult{
+				Version:  "2026-04-19",
+				Language: language,
+				Parts: []domain.SkeletonPart{
+					{Order: 1, Text: text, Role: "core", Emphasis: 2},
+				},
+				Summary: text,
+			}, nil
+		}),
+	)
 
 	if _, err := svc.GetChunks(context.Background(), "cnt_research_001"); err != nil {
 		t.Fatalf("GetChunks() initial call error = %v", err)
@@ -146,8 +171,93 @@ func TestContentServiceUpdateInvalidatesChunkCache(t *testing.T) {
 	}
 }
 
+func TestContentServiceGetSkeletonCachesResult(t *testing.T) {
+	store := memory.NewStore()
+	calls := 0
+	svc := NewContentService(
+		store,
+		analyzerFunc(func(ctx context.Context, text, language string) (domain.ChunkingResult, error) {
+			return domain.ChunkingResult{}, nil
+		}),
+		skeletonAnalyzerFunc(func(ctx context.Context, text, language string) (domain.SkeletonResult, error) {
+			calls++
+			return domain.SkeletonResult{
+				Version:  "2026-04-19",
+				Language: language,
+				Parts: []domain.SkeletonPart{
+					{Order: 1, Text: "we propose", Role: "core", Emphasis: 2},
+				},
+				Summary: "we propose",
+			}, nil
+		}),
+	)
+
+	if _, err := svc.GetSkeleton(context.Background(), "cnt_research_001"); err != nil {
+		t.Fatalf("GetSkeleton() first call error = %v", err)
+	}
+	if _, err := svc.GetSkeleton(context.Background(), "cnt_research_001"); err != nil {
+		t.Fatalf("GetSkeleton() second call error = %v", err)
+	}
+	if calls != 1 {
+		t.Fatalf("expected skeleton analyzer to be called once, got %d", calls)
+	}
+}
+
+func TestContentServiceUpdateInvalidatesSkeletonCache(t *testing.T) {
+	store := memory.NewStore()
+	calls := 0
+	svc := NewContentService(
+		store,
+		analyzerFunc(func(ctx context.Context, text, language string) (domain.ChunkingResult, error) {
+			return domain.ChunkingResult{}, nil
+		}),
+		skeletonAnalyzerFunc(func(ctx context.Context, text, language string) (domain.SkeletonResult, error) {
+			calls++
+			return domain.SkeletonResult{
+				Version:  "2026-04-19",
+				Language: language,
+				Parts: []domain.SkeletonPart{
+					{Order: 1, Text: text, Role: "core", Emphasis: 2},
+				},
+				Summary: text,
+			}, nil
+		}),
+	)
+
+	if _, err := svc.GetSkeleton(context.Background(), "cnt_research_001"); err != nil {
+		t.Fatalf("GetSkeleton() initial call error = %v", err)
+	}
+
+	_, err := svc.Update(context.Background(), "cnt_research_001", domain.ContentUpsertInput{
+		Title:       "Research Presentation Opening",
+		ContentType: "reading",
+		Level:       "intermediate",
+		Topic:       "research",
+		Language:    "en",
+		RawText:     "We redesigned reading support to lower memory load during English processing.",
+		SummaryText: "Updated research opening",
+	})
+	if err != nil {
+		t.Fatalf("Update() error = %v", err)
+	}
+
+	if _, err := svc.GetSkeleton(context.Background(), "cnt_research_001"); err != nil {
+		t.Fatalf("GetSkeleton() after update error = %v", err)
+	}
+
+	if calls != 2 {
+		t.Fatalf("expected skeleton analyzer to be called twice after cache invalidation, got %d", calls)
+	}
+}
+
 type analyzerFunc func(ctx context.Context, text, language string) (domain.ChunkingResult, error)
 
 func (f analyzerFunc) AnalyzeChunks(ctx context.Context, text, language string) (domain.ChunkingResult, error) {
+	return f(ctx, text, language)
+}
+
+type skeletonAnalyzerFunc func(ctx context.Context, text, language string) (domain.SkeletonResult, error)
+
+func (f skeletonAnalyzerFunc) AnalyzeSkeleton(ctx context.Context, text, language string) (domain.SkeletonResult, error) {
 	return f(ctx, text, language)
 }
