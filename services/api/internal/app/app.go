@@ -7,9 +7,9 @@ import (
 	"memory-safe-english/services/api/internal/handlers"
 	"memory-safe-english/services/api/internal/security/password"
 	"memory-safe-english/services/api/internal/security/token"
-	"memory-safe-english/services/api/internal/store/postgres"
 	"memory-safe-english/services/api/internal/service"
 	"memory-safe-english/services/api/internal/store/memory"
+	"memory-safe-english/services/api/internal/store/postgres"
 	"memory-safe-english/services/api/internal/workerclient"
 )
 
