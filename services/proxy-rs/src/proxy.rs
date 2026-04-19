@@ -9,6 +9,8 @@ use sha2::{Digest, Sha256};
 
 use crate::{
     cache::CachedResponse,
+    client_ip::resolve_client_ip,
+    rate_limit,
     request_id::resolve_request_id,
     response_headers::{apply_standard_headers, apply_upstream_header},
     state::AppState,
@@ -37,14 +39,30 @@ pub async fn proxy_to_worker(
 }
 
 async fn forward(state: AppState, request: Request<Body>, upstream: Upstream) -> Response<Body> {
-    let (parts, body) = request.into_parts();
-    let method = parts.method.clone();
-    let request_id = resolve_request_id(&parts.headers);
-    let path_and_query = parts
-        .uri
+    let client_ip = resolve_client_ip(&request);
+    let method = request.method().clone();
+    let request_id = resolve_request_id(request.headers());
+    let path_and_query = request
+        .uri()
         .path_and_query()
         .map(|value| value.as_str())
         .unwrap_or("/");
+
+    if upstream == Upstream::Api && rate_limit::is_auth_path(&method, path_and_query) {
+        let decision = state
+            .auth_rate_limiter
+            .allow(&auth_rate_limit_key(path_and_query, &client_ip))
+            .await;
+        if !decision.allowed {
+            return rate_limited_response(
+                &request_id,
+                Upstream::ProxyRateLimited.header_value(),
+                decision.retry_after,
+            );
+        }
+    }
+
+    let (parts, body) = request.into_parts();
 
     let body_bytes = match to_bytes(body, state.config.max_request_body_bytes).await {
         Ok(bytes) => bytes,
@@ -77,7 +95,7 @@ async fn forward(state: AppState, request: Request<Body>, upstream: Upstream) ->
         }
     };
 
-    let request_headers = sanitize_request_headers(&parts.headers, &request_id);
+    let request_headers = sanitize_request_headers(&parts.headers, &request_id, &client_ip);
     let reqwest_method = Method::from_bytes(method.as_str().as_bytes()).unwrap_or(Method::GET);
     let upstream_response = match state
         .http_client
