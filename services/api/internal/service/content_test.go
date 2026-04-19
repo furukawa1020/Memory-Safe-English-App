@@ -11,7 +11,8 @@ import (
 func TestContentServiceListAndGet(t *testing.T) {
 	store := memory.NewStore()
 	svc := NewContentService(store, stubAnalyzer{
-		result: domain.ChunkingResult{
+		chunkResult: domain.ChunkingResult{
+			Version:  "2026-04-19",
 			Language: "en",
 			Chunks: []domain.Chunk{
 				{Order: 1, Text: "we propose", Role: "core", SkeletonRank: 1},
