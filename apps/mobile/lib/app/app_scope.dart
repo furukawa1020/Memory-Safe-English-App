@@ -4,6 +4,8 @@ import '../config/app_config.dart';
 import '../core/api/api_client.dart';
 import '../features/auth/data/auth_repository.dart';
 import '../features/content/data/content_repository.dart';
+import '../features/system/data/system_repository.dart';
+import '../features/system/presentation/startup_controller.dart';
 import 'session_controller.dart';
 
 class AppScope extends InheritedWidget {
@@ -14,6 +16,8 @@ class AppScope extends InheritedWidget {
     required this.apiClient,
     required this.authRepository,
     required this.contentRepository,
+    required this.systemRepository,
+    required this.startupController,
     required super.child,
   });
 
@@ -22,6 +26,8 @@ class AppScope extends InheritedWidget {
   final ApiClient apiClient;
   final AuthRepository authRepository;
   final ContentRepository contentRepository;
+  final SystemRepository systemRepository;
+  final StartupController startupController;
 
   static AppScope of(BuildContext context) {
     final scope = context.dependOnInheritedWidgetOfExactType<AppScope>();
@@ -35,6 +41,8 @@ class AppScope extends InheritedWidget {
         sessionController != oldWidget.sessionController ||
         apiClient != oldWidget.apiClient ||
         authRepository != oldWidget.authRepository ||
-        contentRepository != oldWidget.contentRepository;
+        contentRepository != oldWidget.contentRepository ||
+        systemRepository != oldWidget.systemRepository ||
+        startupController != oldWidget.startupController;
   }
 }
