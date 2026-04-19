@@ -284,3 +284,36 @@ class CollapsePatternResult:
             "dominant_pattern": self.dominant_pattern,
             "sites": [site.to_dict() for site in self.sites],
         }
+
+
+@dataclass(slots=True)
+class PracticeRecommendation:
+    area: str
+    title: str
+    reason: str
+    priority: int
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(slots=True)
+class AnalyticsSummaryResult:
+    version: str
+    language: str
+    target_context: str
+    next_focus: str
+    assessment: AssessmentProfileResult
+    collapse_patterns: CollapsePatternResult
+    recommendations: list[PracticeRecommendation]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "version": self.version,
+            "language": self.language,
+            "target_context": self.target_context,
+            "next_focus": self.next_focus,
+            "assessment": self.assessment.to_dict(),
+            "collapse_patterns": self.collapse_patterns.to_dict(),
+            "recommendations": [item.to_dict() for item in self.recommendations],
+        }
