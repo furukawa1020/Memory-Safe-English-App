@@ -17,6 +17,8 @@ type Store struct {
 	users           map[string]domain.User
 	usersByEmail    map[string]string
 	passwordHashes  map[string]string
+	refreshFamilies map[string]domain.RefreshTokenFamily
+	refreshSessions map[string]domain.RefreshSession
 	sessions        map[string]domain.Session
 	events          map[string][]domain.EventLog
 	contents        map[string]domain.Content
@@ -29,6 +31,8 @@ func NewStore() *Store {
 		users:           make(map[string]domain.User),
 		usersByEmail:    make(map[string]string),
 		passwordHashes:  make(map[string]string),
+		refreshFamilies: make(map[string]domain.RefreshTokenFamily),
+		refreshSessions: make(map[string]domain.RefreshSession),
 		sessions:        make(map[string]domain.Session),
 		events:          make(map[string][]domain.EventLog),
 		contents:        make(map[string]domain.Content),
@@ -93,6 +97,102 @@ func (s *Store) FindUserByEmail(_ context.Context, email string) (domain.User, s
 	}
 
 	return user, passwordHash, nil
+}
+
+func (s *Store) CreateRefreshSession(_ context.Context, family domain.RefreshTokenFamily, session domain.RefreshSession) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, exists := s.refreshFamilies[family.ID]; exists {
+		return domain.ErrConflict
+	}
+	if _, exists := s.refreshSessions[session.ID]; exists {
+		return domain.ErrConflict
+	}
+	s.refreshFamilies[family.ID] = family
+	s.refreshSessions[session.ID] = session
+	return nil
+}
+
+func (s *Store) GetRefreshSession(_ context.Context, tokenID string) (domain.RefreshSession, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	session, ok := s.refreshSessions[tokenID]
+	if !ok {
+		return domain.RefreshSession{}, domain.ErrNotFound
+	}
+	return session, nil
+}
+
+func (s *Store) GetRefreshFamily(_ context.Context, familyID string) (domain.RefreshTokenFamily, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	family, ok := s.refreshFamilies[familyID]
+	if !ok {
+		return domain.RefreshTokenFamily{}, domain.ErrNotFound
+	}
+	return family, nil
+}
+
+func (s *Store) RotateRefreshSession(_ context.Context, currentTokenID, currentTokenHash string, nextSession domain.RefreshSession) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	current, ok := s.refreshSessions[currentTokenID]
+	if !ok {
+		return domain.ErrNotFound
+	}
+	family, ok := s.refreshFamilies[current.FamilyID]
+	if !ok {
+		return domain.ErrNotFound
+	}
+	if family.RevokedAt != nil || current.RevokedAt != nil {
+		return domain.ErrConflict
+	}
+	if current.TokenHash != currentTokenHash {
+		return domain.ErrConflict
+	}
+	if time.Now().UTC().After(current.ExpiresAt) {
+		return domain.ErrExpired
+	}
+	if _, exists := s.refreshSessions[nextSession.ID]; exists {
+		return domain.ErrConflict
+	}
+
+	now := time.Now().UTC()
+	current.RevokedAt = &now
+	current.ReplacedByTokenID = nextSession.ID
+	s.refreshSessions[currentTokenID] = current
+	s.refreshSessions[nextSession.ID] = nextSession
+	return nil
+}
+
+func (s *Store) RevokeRefreshFamily(_ context.Context, familyID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	family, ok := s.refreshFamilies[familyID]
+	if !ok {
+		return domain.ErrNotFound
+	}
+	if family.RevokedAt != nil {
+		return nil
+	}
+
+	now := time.Now().UTC()
+	family.RevokedAt = &now
+	s.refreshFamilies[familyID] = family
+
+	for id, session := range s.refreshSessions {
+		if session.FamilyID != familyID || session.RevokedAt != nil {
+			continue
+		}
+		session.RevokedAt = &now
+		s.refreshSessions[id] = session
+	}
+	return nil
 }
 
 func (s *Store) StartSession(_ context.Context, userID, mode, contentID string) (domain.Session, error) {

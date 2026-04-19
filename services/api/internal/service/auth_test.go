@@ -73,4 +73,35 @@ func TestAuthServiceRefresh(t *testing.T) {
 	if refreshed.Tokens.AccessToken == "" {
 		t.Fatalf("expected new access token")
 	}
+	if refreshed.Tokens.RefreshToken == result.Tokens.RefreshToken {
+		t.Fatalf("expected rotated refresh token")
+	}
+}
+
+func TestAuthServiceRefreshRejectsReusedTokenFamily(t *testing.T) {
+	store := memory.NewStore()
+	svc := NewAuthService(store, store, password.NewHasher(100000), token.NewManager("test-secret", 15*time.Minute, 30*time.Minute))
+
+	result, err := svc.Register(context.Background(), RegisterInput{
+		Email:         "user@example.com",
+		Password:      "secret1234567",
+		DisplayName:   "Aki",
+		AgreedToTerms: true,
+	})
+	if err != nil {
+		t.Fatalf("Register() error = %v", err)
+	}
+
+	refreshed, err := svc.Refresh(context.Background(), result.Tokens.RefreshToken)
+	if err != nil {
+		t.Fatalf("first Refresh() error = %v", err)
+	}
+
+	if _, err := svc.Refresh(context.Background(), result.Tokens.RefreshToken); err == nil {
+		t.Fatalf("expected reused refresh token to be rejected")
+	}
+
+	if _, err := svc.Refresh(context.Background(), refreshed.Tokens.RefreshToken); err == nil {
+		t.Fatalf("expected latest refresh token to be rejected after family revoke")
+	}
 }

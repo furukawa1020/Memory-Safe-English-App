@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../config/app_config.dart';
 import '../core/api/api_client.dart';
 import '../features/auth/data/auth_repository.dart';
+import '../features/auth/data/auth_session_storage.dart';
 import '../features/auth/presentation/auth_screen.dart';
 import '../features/content/data/content_repository.dart';
 import '../features/content/presentation/home_screen.dart';
@@ -23,7 +24,8 @@ class MemorySafeEnglishApp extends StatelessWidget {
 
   static Widget bootstrap() {
     final config = AppConfig.fromEnvironment();
-    final sessionController = SessionController();
+    final sessionStorage = AuthSessionStorage();
+    final sessionController = SessionController(sessionStorage);
     final apiClient = ApiClient(baseUrl: config.apiBaseUrl, sessionController: sessionController);
     final authRepository = AuthRepository(apiClient);
     final contentRepository = ContentRepository(apiClient);
@@ -48,6 +50,17 @@ class MemorySafeEnglishApp extends StatelessWidget {
     return AnimatedBuilder(
       animation: sessionController,
       builder: (context, _) {
+        if (scope.sessionController.isRestoring) {
+          return MaterialApp(
+            title: 'Memory-Safe English',
+            debugShowCheckedModeBanner: false,
+            theme: buildAppTheme(),
+            home: const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            ),
+          );
+        }
+
         final startupGate = StartupGate(
           controller: scope.startupController,
           readyChild: scope.sessionController.isAuthenticated

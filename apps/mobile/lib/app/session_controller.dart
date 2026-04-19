@@ -1,11 +1,16 @@
 import 'package:flutter/foundation.dart';
 
 import '../features/auth/data/auth_repository.dart';
+import '../features/auth/data/auth_session_storage.dart';
 import '../features/auth/model/auth_session.dart';
 
 class SessionController extends ChangeNotifier {
+  SessionController(this._storage);
+
+  final AuthSessionStorage _storage;
   AuthSession? _session;
   bool _isBusy = false;
+  bool _isRestoring = false;
   Future<bool>? _refreshFuture;
 
   AuthSession? get session => _session;
@@ -13,6 +18,18 @@ class SessionController extends ChangeNotifier {
   String? get refreshToken => _session?.refreshToken;
   bool get isAuthenticated => _session != null;
   bool get isBusy => _isBusy;
+  bool get isRestoring => _isRestoring;
+
+  Future<void> restore() async {
+    _isRestoring = true;
+    notifyListeners();
+    try {
+      _session = await _storage.read();
+    } finally {
+      _isRestoring = false;
+      notifyListeners();
+    }
+  }
 
   Future<void> login({
     required AuthRepository repository,
@@ -21,7 +38,7 @@ class SessionController extends ChangeNotifier {
   }) async {
     _setBusy(true);
     try {
-      _session = await repository.login(email: email, password: password);
+      await _setSession(await repository.login(email: email, password: password));
     } finally {
       _setBusy(false);
     }
@@ -35,18 +52,21 @@ class SessionController extends ChangeNotifier {
   }) async {
     _setBusy(true);
     try {
-      _session = await repository.register(
-        email: email,
-        password: password,
-        displayName: displayName,
+      await _setSession(
+        await repository.register(
+          email: email,
+          password: password,
+          displayName: displayName,
+        ),
       );
     } finally {
       _setBusy(false);
     }
   }
 
-  void logout() {
+  Future<void> logout() async {
     _session = null;
+    await _storage.clear();
     notifyListeners();
   }
 
@@ -75,13 +95,18 @@ class SessionController extends ChangeNotifier {
   ) async {
     try {
       final payload = await loader(currentRefreshToken);
-      _session = AuthSession.fromJson(payload);
-      notifyListeners();
+      await _setSession(AuthSession.fromJson(payload));
       return _session?.accessToken.isNotEmpty == true;
     } catch (_) {
-      logout();
+      await logout();
       return false;
     }
+  }
+
+  Future<void> _setSession(AuthSession session) async {
+    _session = session;
+    await _storage.write(session);
+    notifyListeners();
   }
 
   void _setBusy(bool value) {

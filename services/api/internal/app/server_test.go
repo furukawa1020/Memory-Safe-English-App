@@ -110,7 +110,8 @@ func TestServerRefreshFlow(t *testing.T) {
 
 	var refreshResponse struct {
 		Tokens struct {
-			AccessToken string `json:"access_token"`
+			AccessToken  string `json:"access_token"`
+			RefreshToken string `json:"refresh_token"`
 		} `json:"tokens"`
 	}
 	if err := json.Unmarshal(refreshRec.Body.Bytes(), &refreshResponse); err != nil {
@@ -118,5 +119,25 @@ func TestServerRefreshFlow(t *testing.T) {
 	}
 	if refreshResponse.Tokens.AccessToken == "" {
 		t.Fatalf("expected access token in refresh response")
+	}
+	if refreshResponse.Tokens.RefreshToken == "" {
+		t.Fatalf("expected rotated refresh token in refresh response")
+	}
+	if refreshResponse.Tokens.RefreshToken == registerResponse.Tokens.RefreshToken {
+		t.Fatalf("expected refresh token rotation")
+	}
+
+	reusedRec := jsonRequest(t, server, http.MethodPost, "/auth/refresh", "", map[string]any{
+		"refresh_token": registerResponse.Tokens.RefreshToken,
+	})
+	if reusedRec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected reused refresh token to be rejected, got %d body=%s", reusedRec.Code, reusedRec.Body.String())
+	}
+
+	latestRec := jsonRequest(t, server, http.MethodPost, "/auth/refresh", "", map[string]any{
+		"refresh_token": refreshResponse.Tokens.RefreshToken,
+	})
+	if latestRec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected rotated family to be revoked after reuse, got %d body=%s", latestRec.Code, latestRec.Body.String())
 	}
 }

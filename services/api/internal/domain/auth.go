@@ -10,12 +10,12 @@ type RefreshTokenFamily struct {
 }
 
 type RefreshSession struct {
-	ID               string
-	FamilyID         string
-	UserID           string
-	TokenHash        string
-	ExpiresAt        time.Time
-	CreatedAt        time.Time
-	RevokedAt        *time.Time
+	ID                string
+	FamilyID          string
+	UserID            string
+	TokenHash         string
+	ExpiresAt         time.Time
+	CreatedAt         time.Time
+	RevokedAt         *time.Time
 	ReplacedByTokenID string
 }

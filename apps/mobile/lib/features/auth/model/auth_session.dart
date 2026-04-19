@@ -24,4 +24,24 @@ class AuthSession {
       refreshToken: tokens['refresh_token'] as String? ?? '',
     );
   }
+
+  factory AuthSession.fromStorageJson(Map<String, dynamic> json) {
+    return AuthSession(
+      userId: json['user_id'] as String? ?? '',
+      email: json['email'] as String? ?? '',
+      displayName: json['display_name'] as String? ?? '',
+      accessToken: json['access_token'] as String? ?? '',
+      refreshToken: json['refresh_token'] as String? ?? '',
+    );
+  }
+
+  Map<String, dynamic> toStorageJson() {
+    return <String, dynamic>{
+      'user_id': userId,
+      'email': email,
+      'display_name': displayName,
+      'access_token': accessToken,
+      'refresh_token': refreshToken,
+    };
+  }
 }
