@@ -1,35 +1,37 @@
 # API Service
 
-Go 製 REST API サービスの配置先です。
+Go ベースの REST API サービスです。認証、ユーザー取得、学習セッション、content 管理、worker 連携による chunk 解析を担当します。
 
-初期責務:
-
-- 認証認可
-- ユーザー / 設定
-- コンテンツ配信
-- セッション管理
-- イベントログ受付
-- 分析結果返却
-
-推奨ディレクトリ案:
+## Structure
 
 ```text
 services/api
-├─ cmd/server
-├─ internal/auth
-├─ internal/users
-├─ internal/contents
-├─ internal/sessions
-├─ internal/events
-├─ internal/analytics
-└─ openapi
+|- cmd/server
+|- internal/app
+|- internal/config
+|- internal/domain
+|- internal/handlers
+|- internal/httpjson
+|- internal/httpx
+|- internal/repository
+|- internal/security
+|- internal/service
+|- internal/store/memory
+|- internal/workerclient
+`- openapi
 ```
 
-## Current Bootstrap
+責務は `repository -> service -> handler` に分離しています。
 
-現時点では、標準ライブラリだけで起動できる最小 API 基盤を入れています。将来の PostgreSQL 実装へ差し替えやすいよう、`repository -> service -> handler` の責務分離を入れています。
+- `repository`: 永続化の境界
+- `service`: ユースケースと入力検証
+- `handlers`: HTTP 入出力
+- `workerclient`: Python worker との安全な通信
+- `app`: DI とサーバ組み立て
 
-含まれるエンドポイント:
+この構成にしてあるので、in-memory 実装から PostgreSQL 実装へ差し替えるときも HTTP 層を大きく崩さず進められます。
+
+## Current Endpoints
 
 - `GET /health`
 - `POST /auth/register`
@@ -38,43 +40,26 @@ services/api
 - `GET /me`
 - `POST /analysis/chunks`
 - `GET /contents`
+- `POST /contents`
 - `GET /contents/{id}`
+- `PATCH /contents/{id}`
 - `GET /contents/{id}/chunks`
 - `POST /sessions/start`
 - `POST /sessions/{id}/event`
 - `POST /sessions/{id}/complete`
 
-認証は email/password ベースです。`/auth/register` または `/auth/login` で返る `tokens.access_token` を `Authorization: Bearer <token>` として送ると `/me` や `/sessions/*` を叩けます。`tokens.refresh_token` は `POST /auth/refresh` に送ると新しい token pair を再発行できます。
+## Security Notes
 
-## Design Notes
+- パスワードは `PBKDF2-SHA256` でハッシュ化
+- access / refresh token は HMAC 署名
+- protected route は Bearer token middleware で集中管理
+- `X-Request-ID` をレスポンスへ付与
+- `X-Content-Type-Options: nosniff` など基本ヘッダを付与
+- worker 呼び出しは API key + timestamp + HMAC signature を使用
 
-- `internal/repository`: 永続化のインターフェース
-- `internal/service`: ユースケースと入力検証
-- `internal/handlers`: HTTP 変換層
-- `internal/httpx`: リクエスト / レスポンスの共通処理
-- `internal/authctx`: 認証済みユーザーの request context 管理
-- `internal/app`: DI とミドルウェアとサーバ組み立て
-- `internal/store/memory`: 開発用インメモリ実装
+## Content Flow
 
-この構成にしているので、次に PostgreSQL 実装を足すときは handler をほぼ触らずに進められます。
-
-追加で入っている保守性向上ポイント:
-
-- `context.Context` を repository / service に通している
-- Go 標準 `ServeMux` のパターンルーティングを使用している
-- `X-Request-ID` を自動付与してログとレスポンスに反映する
-- protected route は Bearer token middleware で一元管理している
-- `httptest` ベースの HTTP テストを追加している
-- worker 呼び出しは `internal/workerclient` に隔離している
-- seeded content と chunk cache をインメモリ実装で持てる
-
-追加で入っているセキュリティ対策:
-
-- パスワードは PBKDF2-SHA256 でハッシュ化
-- access / refresh token は HMAC 署名付き
-- API 応答に基本的なセキュリティヘッダを付与
-- production ではデフォルトの token secret を禁止
-- パスワード長とハッシュ反復回数に下限を設けている
+`/contents/{id}/chunks` は content の本文を worker に渡して chunk 解析を取得します。結果は API 側で cache し、同じ content への再アクセスでは worker を再実行しません。`PATCH /contents/{id}` で本文が更新された場合は cache を無効化します。
 
 ## Run
 
@@ -82,23 +67,23 @@ services/api
 go run ./cmd/server
 ```
 
-環境変数:
+主要な環境変数:
 
-- `API_HTTP_ADDR` 既定値 `:8080`
-- `APP_ENV` 既定値 `development`
-- `AUTH_TOKEN_SECRET` 本番では必須
-- `AUTH_ACCESS_TOKEN_TTL` 既定値 `15m`
-- `AUTH_REFRESH_TOKEN_TTL` 既定値 `168h`
-- `PASSWORD_HASH_ITERATIONS` 既定値 `120000`
-- `WORKER_BASE_URL` 既定値 `http://127.0.0.1:8090`
-- `WORKER_API_KEY` 本番では必須
-- `WORKER_SIGNATURE_KEY` 本番では必須
-- `WORKER_TIMEOUT` 既定値 `5s`
+- `API_HTTP_ADDR`: default `:8080`
+- `APP_ENV`: default `development`
+- `AUTH_TOKEN_SECRET`: production では必須
+- `AUTH_ACCESS_TOKEN_TTL`: default `15m`
+- `AUTH_REFRESH_TOKEN_TTL`: default `168h`
+- `PASSWORD_HASH_ITERATIONS`: default `120000`
+- `WORKER_BASE_URL`: default `http://127.0.0.1:8090`
+- `WORKER_API_KEY`: worker API key
+- `WORKER_SIGNATURE_KEY`: worker request signing key
+- `WORKER_TIMEOUT`: default `5s`
 
-## Example
+## Verify
 
 ```bash
-curl -X POST http://localhost:8080/auth/register \
-  -H "Content-Type: application/json" \
-  -d "{\"email\":\"user@example.com\",\"password\":\"secret1234567\",\"display_name\":\"Aki\",\"agreed_to_terms\":true}"
+go test ./...
 ```
+
+OpenAPI 契約は [openapi/openapi.yaml](./openapi/openapi.yaml) にあります。
