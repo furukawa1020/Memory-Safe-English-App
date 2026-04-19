@@ -9,7 +9,7 @@ use axum::{
 use serde::Serialize;
 
 use crate::{
-    admin, proxy, request_id::resolve_request_id, response_headers::apply_standard_headers,
+    admin, http_response::with_standard_headers, proxy, request_id::resolve_request_id,
     state::AppState,
 };
 
@@ -45,15 +45,6 @@ struct HealthResponse {
     ok: bool,
     api_base_url: String,
     worker_base_url: String,
-}
-
-fn with_standard_headers(
-    mut response: Response<Body>,
-    request_id: &HeaderValue,
-    cache_state: &'static str,
-) -> Response<Body> {
-    apply_standard_headers(response.headers_mut(), request_id, cache_state);
-    response
 }
 
 #[cfg(test)]
@@ -137,5 +128,79 @@ mod tests {
 
         assert!(response.headers().get("x-request-id").is_some());
         assert_eq!(response.headers().get("x-proxy-cache").unwrap(), "miss");
+    }
+
+    #[tokio::test]
+    async fn cache_admin_accepts_valid_token() {
+        let app = build_router(state());
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/admin/cache")
+                    .header("x-proxy-admin-token", "secret")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        assert!(response.headers().get("x-request-id").is_some());
+        let body = to_bytes(response.into_body(), 1024).await.unwrap();
+        let text = String::from_utf8(body.to_vec()).unwrap();
+        assert!(text.contains("\"entries\":0"));
+    }
+
+    #[tokio::test]
+    async fn cache_purge_removes_target_scope() {
+        let state = state();
+        state
+            .cache
+            .insert(
+                "POST:/worker/analyze/chunks:1".to_string(),
+                crate::cache::CachedResponse {
+                    status: StatusCode::OK,
+                    headers: http::HeaderMap::new(),
+                    body: bytes::Bytes::from_static(br#"{"ok":true}"#),
+                },
+            )
+            .await;
+        state
+            .cache
+            .insert(
+                "POST:/worker/analyze/skeleton:2".to_string(),
+                crate::cache::CachedResponse {
+                    status: StatusCode::OK,
+                    headers: http::HeaderMap::new(),
+                    body: bytes::Bytes::from_static(br#"{"ok":true}"#),
+                },
+            )
+            .await;
+
+        let app = build_router(state.clone());
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/admin/cache/purge")
+                    .header("content-type", "application/json")
+                    .header("x-proxy-admin-token", "secret")
+                    .body(Body::from(r#"{"scope":"chunks"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        assert!(state
+            .cache
+            .get("POST:/worker/analyze/chunks:1")
+            .await
+            .is_none());
+        assert!(state
+            .cache
+            .get("POST:/worker/analyze/skeleton:2")
+            .await
+            .is_some());
     }
 }
