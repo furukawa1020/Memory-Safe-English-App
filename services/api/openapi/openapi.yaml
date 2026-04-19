@@ -144,6 +144,24 @@ paths:
                     type: array
                     items:
                       $ref: "#/components/schemas/Content"
+    post:
+      tags: [Contents]
+      summary: Create a learning content item
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContentUpsertRequest"
+      responses:
+        "201":
+          description: Content created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Content"
   /contents/{contentId}:
     get:
       tags: [Contents]
@@ -155,6 +173,26 @@ paths:
       responses:
         "200":
           description: Content item
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Content"
+    patch:
+      tags: [Contents]
+      summary: Update one content item
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ContentId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContentUpsertRequest"
+      responses:
+        "200":
+          description: Content updated
           content:
             application/json:
               schema:
@@ -293,6 +331,25 @@ components:
         text:
           type: string
         language:
+          type: string
+    ContentUpsertRequest:
+      type: object
+      required: [title, content_type, level, topic, language, raw_text]
+      properties:
+        title:
+          type: string
+        content_type:
+          type: string
+          enum: [reading, listening, speaking_template, rescue]
+        level:
+          type: string
+        topic:
+          type: string
+        language:
+          type: string
+        raw_text:
+          type: string
+        summary_text:
           type: string
     SessionEventRequest:
       type: object
