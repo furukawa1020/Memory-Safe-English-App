@@ -5,6 +5,7 @@ pub struct Config {
     pub http_addr: SocketAddr,
     pub api_base_url: String,
     pub worker_base_url: String,
+    pub admin_token: Option<String>,
     pub upstream_timeout: Duration,
     pub cache_ttl: Duration,
     pub gc_interval: Duration,
@@ -18,6 +19,7 @@ impl Config {
             http_addr: parse_env("PROXY_HTTP_ADDR", "127.0.0.1:8070")?,
             api_base_url: parse_url("PROXY_API_BASE_URL", "http://127.0.0.1:8080"),
             worker_base_url: parse_url("PROXY_WORKER_BASE_URL", "http://127.0.0.1:8090"),
+            admin_token: parse_optional("PROXY_ADMIN_TOKEN"),
             upstream_timeout: Duration::from_secs(parse_env(
                 "PROXY_UPSTREAM_TIMEOUT_SECONDS",
                 "10",
@@ -35,6 +37,13 @@ fn parse_url(key: &str, default_value: &str) -> String {
         .unwrap_or_else(|_| default_value.to_string())
         .trim_end_matches('/')
         .to_string()
+}
+
+fn parse_optional(key: &str) -> Option<String> {
+    env::var(key)
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
 }
 
 fn parse_env<T>(key: &str, default_value: &str) -> Result<T, ConfigError>
