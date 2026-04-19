@@ -29,8 +29,10 @@ This repository is a monorepo with four main parts:
 |  `- mvp-roadmap.md
 `- scripts/
    |- bootstrap-mobile.ps1
+   |- dev-doctor.ps1
    |- smoke-test.ps1
-   `- start-dev-stack.ps1
+   |- start-dev-stack.ps1
+   `- stop-dev-stack.ps1
 ```
 
 ## Services
@@ -55,6 +57,8 @@ All services include health checks. The proxy uses `/ready`, so it becomes healt
 ## Recommended Local Workflow
 
 ### 1. Start the stack
+
+Before starting, make sure Docker Desktop is running.
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\start-dev-stack.ps1
@@ -92,7 +96,21 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap-mobile.ps1
 
 The script creates missing platform scaffolding and runs `flutter pub get`.
 
-### 4. Run the app in an Android emulator
+### 4. Check local prerequisites
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\dev-doctor.ps1
+```
+
+The doctor script checks:
+
+- Docker CLI availability
+- Docker daemon availability
+- Flutter SDK availability
+- Android `adb` availability
+- proxy readiness
+
+### 5. Run the app in an Android emulator
 
 ```bash
 flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8070

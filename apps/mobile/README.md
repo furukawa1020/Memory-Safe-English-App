@@ -29,6 +29,12 @@ apps/mobile
 - Android Studio or another Android emulator setup
 - backend stack running locally through the Rust proxy on `http://127.0.0.1:8070`
 
+You can check these from the repository root with:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\dev-doctor.ps1
+```
+
 ## Bootstrap
 
 Run the bootstrap script from the repository root:
