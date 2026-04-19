@@ -70,7 +70,7 @@ fn unix_time_millis() -> u128 {
         .unwrap_or_default()
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct ReadinessReport {
     pub ready: bool,
     pub checked_at_unix_ms: u128,
@@ -78,7 +78,7 @@ pub struct ReadinessReport {
     pub worker: UpstreamStatus,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct UpstreamStatus {
     pub name: &'static str,
     pub ok: bool,
