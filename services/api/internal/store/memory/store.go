@@ -18,16 +18,22 @@ type Store struct {
 	passwordHashes map[string]string
 	sessions       map[string]domain.Session
 	events         map[string][]domain.EventLog
+	contents       map[string]domain.Content
+	contentChunks  map[string]domain.ChunkingResult
 }
 
 func NewStore() *Store {
-	return &Store{
+	store := &Store{
 		users:          make(map[string]domain.User),
 		usersByEmail:   make(map[string]string),
 		passwordHashes: make(map[string]string),
 		sessions:       make(map[string]domain.Session),
 		events:         make(map[string][]domain.EventLog),
+		contents:       make(map[string]domain.Content),
+		contentChunks:  make(map[string]domain.ChunkingResult),
 	}
+	store.seedContents()
+	return store
 }
 
 func (s *Store) CreateUserWithPassword(_ context.Context, input repository.NewAuthUser) (domain.User, error) {
@@ -163,4 +169,93 @@ func newID(prefix string) string {
 		return prefix + "_" + time.Now().UTC().Format("20060102150405")
 	}
 	return prefix + "_" + hex.EncodeToString(buf)
+}
+
+func (s *Store) ListContents(_ context.Context, filter repository.ContentFilter) ([]domain.Content, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	result := make([]domain.Content, 0, len(s.contents))
+	for _, content := range s.contents {
+		if filter.ContentType != "" && content.ContentType != filter.ContentType {
+			continue
+		}
+		if filter.Level != "" && content.Level != filter.Level {
+			continue
+		}
+		if filter.Topic != "" && content.Topic != filter.Topic {
+			continue
+		}
+		if filter.Language != "" && content.Language != filter.Language {
+			continue
+		}
+		result = append(result, content)
+	}
+	return result, nil
+}
+
+func (s *Store) GetContent(_ context.Context, contentID string) (domain.Content, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	content, ok := s.contents[contentID]
+	if !ok {
+		return domain.Content{}, domain.ErrNotFound
+	}
+	return content, nil
+}
+
+func (s *Store) GetChunkingResult(_ context.Context, contentID string) (domain.ChunkingResult, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	result, ok := s.contentChunks[contentID]
+	if !ok {
+		return domain.ChunkingResult{}, domain.ErrNotFound
+	}
+	return result, nil
+}
+
+func (s *Store) SaveChunkingResult(_ context.Context, contentID string, result domain.ChunkingResult) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, ok := s.contents[contentID]; !ok {
+		return domain.ErrNotFound
+	}
+	s.contentChunks[contentID] = result
+	return nil
+}
+
+func (s *Store) seedContents() {
+	now := time.Now().UTC()
+	items := []domain.Content{
+		{
+			ID:          "cnt_self_intro_001",
+			Title:       "Self Introduction",
+			ContentType: "reading",
+			Level:       "intro",
+			Topic:       "self_intro",
+			Language:    "en",
+			RawText:     "Hello, my name is Aki, and I study human computer interaction at university.",
+			SummaryText: "Simple self introduction",
+			CreatedAt:   now,
+			UpdatedAt:   now,
+		},
+		{
+			ID:          "cnt_research_001",
+			Title:       "Research Presentation Opening",
+			ContentType: "reading",
+			Level:       "intermediate",
+			Topic:       "research",
+			Language:    "en",
+			RawText:     "In this study, we propose a memory safe interface that reduces cognitive overload during English reading.",
+			SummaryText: "Research opening sentence",
+			CreatedAt:   now,
+			UpdatedAt:   now,
+		},
+	}
+	for _, item := range items {
+		s.contents[item.ID] = item
+	}
 }
