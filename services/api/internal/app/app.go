@@ -30,12 +30,14 @@ func (a *Application) Routes() handlers.RouteSet {
 	authService := service.NewAuthService(a.Store, a.Store, a.PasswordHash, a.TokenManager)
 	userService := service.NewUserService(a.Store)
 	sessionService := service.NewSessionService(a.Store, a.Store)
-	analysisService := service.NewAnalysisService(workerclient.New(
+	workerAnalyzer := workerclient.New(
 		a.Config.WorkerBaseURL,
 		a.Config.WorkerAPIKey,
 		a.Config.WorkerSignatureKey,
 		a.Config.WorkerTimeout,
-	))
+	)
+	analysisService := service.NewAnalysisService(workerAnalyzer)
+	contentService := service.NewContentService(a.Store, workerAnalyzer)
 
 	return handlers.RouteSet{
 		Health:   handlers.NewHealthHandler(),
@@ -43,5 +45,6 @@ func (a *Application) Routes() handlers.RouteSet {
 		Me:       handlers.NewMeHandler(userService),
 		Session:  handlers.NewSessionHandler(sessionService),
 		Analysis: handlers.NewAnalysisHandler(analysisService),
+		Content:  handlers.NewContentHandler(contentService),
 	}
 }
