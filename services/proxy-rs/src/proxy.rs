@@ -52,6 +52,7 @@ async fn forward(state: AppState, request: Request<Body>, upstream: Upstream) ->
                 StatusCode::PAYLOAD_TOO_LARGE,
                 "request body too large",
                 &request_id,
+                upstream.header_value(),
             )
         }
     };
@@ -59,7 +60,7 @@ async fn forward(state: AppState, request: Request<Body>, upstream: Upstream) ->
     let maybe_cache_key = cache_key(&upstream, &method, path_and_query, &body_bytes);
     if let Some(key) = maybe_cache_key.as_ref() {
         if let Some(cached) = state.cache.get(key).await {
-            return build_cached_response(cached, &request_id);
+            return build_cached_response(cached, &request_id, upstream.cache_header_value());
         }
     }
 
@@ -70,6 +71,7 @@ async fn forward(state: AppState, request: Request<Body>, upstream: Upstream) ->
                 StatusCode::BAD_REQUEST,
                 "invalid upstream request path",
                 &request_id,
+                upstream.header_value(),
             )
         }
     };
@@ -90,13 +92,15 @@ async fn forward(state: AppState, request: Request<Body>, upstream: Upstream) ->
                 StatusCode::BAD_GATEWAY,
                 "upstream request failed",
                 &request_id,
+                upstream.header_value(),
             )
         }
     };
 
     let status = StatusCode::from_u16(upstream_response.status().as_u16())
         .unwrap_or(StatusCode::BAD_GATEWAY);
-    let headers = sanitize_response_headers(upstream_response.headers(), &request_id);
+    let headers =
+        sanitize_response_headers(upstream_response.headers(), &request_id, upstream.header_value());
     let response_body = match upstream_response.bytes().await {
         Ok(bytes) => bytes,
         Err(_) => {
@@ -104,6 +108,7 @@ async fn forward(state: AppState, request: Request<Body>, upstream: Upstream) ->
                 StatusCode::BAD_GATEWAY,
                 "failed to read upstream response",
                 &request_id,
+                upstream.header_value(),
             )
         }
     };
