@@ -32,6 +32,7 @@ class _StartupGateState extends State<StartupGate> {
   @override
   Widget build(BuildContext context) {
     final apiBaseUrl = AppScope.of(context).config.apiBaseUrl;
+    final bootstrap = widget.controller.bootstrap;
 
     return AnimatedBuilder(
       animation: widget.controller,
@@ -84,6 +85,19 @@ class _StartupGateState extends State<StartupGate> {
                               healthy: widget.controller.backendStatus?.ready == true,
                             ),
                             const SizedBox(height: 12),
+                            if (bootstrap != null) ...[
+                              _InfoPanel(
+                                title: 'Recommended Android emulator URL',
+                                body: bootstrap.recommendedBaseUrls.androidEmulator,
+                              ),
+                              const SizedBox(height: 10),
+                              _InfoPanel(
+                                title: 'Frontend route map',
+                                body:
+                                    'login ${bootstrap.routes.login}\ncontents ${bootstrap.routes.contents}\nanalyze ${bootstrap.routes.chunkAnalysis}',
+                              ),
+                              const SizedBox(height: 12),
+                            ],
                             if (widget.controller.backendStatus != null) ...[
                               _UpstreamPanel(status: widget.controller.backendStatus!.api),
                               const SizedBox(height: 10),
@@ -129,6 +143,33 @@ class _StartupGateState extends State<StartupGate> {
           ),
         );
       },
+    );
+  }
+}
+
+class _InfoPanel extends StatelessWidget {
+  const _InfoPanel({
+    required this.title,
+    required this.body,
+  });
+
+  final String title;
+  final String body;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 6),
+            SelectableText(body),
+          ],
+        ),
+      ),
     );
   }
 }

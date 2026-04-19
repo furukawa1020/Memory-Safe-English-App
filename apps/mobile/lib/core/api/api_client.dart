@@ -89,7 +89,56 @@ class ApiClient {
     String path, {
     JsonMap? body,
     bool authenticated = true,
+    bool allowRefresh = true,
   }) async {
+    final response = await _sendHttpRequest(
+      method,
+      path,
+      body: body,
+      authenticated: authenticated,
+    );
+    final decodedBody = _decodeBody(response);
+    final apiResponse = ApiResponse(
+      statusCode: response.statusCode,
+      body: decodedBody,
+    );
+
+    if (apiResponse.statusCode == 401 &&
+        authenticated &&
+        allowRefresh &&
+        path != '/auth/refresh') {
+      final refreshed = await sessionController.refreshWith((refreshToken) async {
+        final refreshResponse = await _send(
+          'POST',
+          '/auth/refresh',
+          body: <String, dynamic>{'refresh_token': refreshToken},
+          authenticated: false,
+          allowRefresh: false,
+        );
+        _throwIfFailed(refreshResponse);
+        return refreshResponse.body;
+      });
+
+      if (refreshed) {
+        return _send(
+          method,
+          path,
+          body: body,
+          authenticated: authenticated,
+          allowRefresh: false,
+        );
+      }
+    }
+
+    return apiResponse;
+  }
+
+  Future<http.Response> _sendHttpRequest(
+    String method,
+    String path, {
+    JsonMap? body,
+    required bool authenticated,
+  }) {
     final uri = Uri.parse('$baseUrl$path');
     final headers = <String, String>{
       'Content-Type': 'application/json',
@@ -100,18 +149,17 @@ class ApiClient {
       headers['Authorization'] = 'Bearer $accessToken';
     }
 
-    late final http.Response response;
     switch (method) {
       case 'GET':
-        response = await _httpClient.get(uri, headers: headers);
+        return _httpClient.get(uri, headers: headers);
       case 'POST':
-        response = await _httpClient.post(
+        return _httpClient.post(
           uri,
           headers: headers,
           body: jsonEncode(body ?? <String, dynamic>{}),
         );
       case 'PATCH':
-        response = await _httpClient.patch(
+        return _httpClient.patch(
           uri,
           headers: headers,
           body: jsonEncode(body ?? <String, dynamic>{}),
@@ -119,14 +167,6 @@ class ApiClient {
       default:
         throw UnsupportedError('Unsupported method: $method');
     }
-
-    final decodedBody = _decodeBody(response);
-    final apiResponse = ApiResponse(
-      statusCode: response.statusCode,
-      body: decodedBody,
-    );
-
-    return apiResponse;
   }
 
   JsonMap _decodeBody(http.Response response) {
