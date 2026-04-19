@@ -78,6 +78,9 @@ mod tests {
                 worker_base_url: "http://127.0.0.1:8090".to_string(),
                 admin_token: Some("secret".to_string()),
                 trusted_proxy_ips: vec!["127.0.0.1".parse().unwrap()],
+                admin_allowed_ips: Vec::new(),
+                admin_rate_limit_max_requests: 30,
+                admin_rate_limit_window: Duration::from_secs(60),
                 auth_rate_limit_max_requests: 10,
                 auth_rate_limit_window: Duration::from_secs(60),
                 upstream_timeout: Duration::from_secs(5),
@@ -88,6 +91,7 @@ mod tests {
             },
             http_client: reqwest::Client::new(),
             cache: CacheStore::new(Duration::from_secs(60), 32),
+            admin_rate_limiter: RateLimiter::new(30, Duration::from_secs(60)),
             auth_rate_limiter: RateLimiter::new(10, Duration::from_secs(60)),
         }
     }
@@ -163,6 +167,61 @@ mod tests {
         let body = to_bytes(response.into_body(), 1024).await.unwrap();
         let text = String::from_utf8(body.to_vec()).unwrap();
         assert!(text.contains("\"entries\":0"));
+    }
+
+    #[tokio::test]
+    async fn cache_admin_rejects_disallowed_ip() {
+        let mut state = state();
+        state.config.admin_allowed_ips = vec!["127.0.0.1".parse().unwrap()];
+        let app = build_router(state);
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/admin/cache")
+                    .header("x-proxy-admin-token", "secret")
+                    .header("x-forwarded-for", "203.0.113.10")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    }
+
+    #[tokio::test]
+    async fn cache_admin_is_rate_limited() {
+        let mut state = state();
+        state.config.admin_rate_limit_max_requests = 1;
+        state.admin_rate_limiter = RateLimiter::new(1, Duration::from_secs(60));
+        let app = build_router(state);
+
+        let first = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/admin/cache")
+                    .header("x-proxy-admin-token", "secret")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(first.status(), StatusCode::OK);
+
+        let second = app
+            .oneshot(
+                Request::builder()
+                    .uri("/admin/cache")
+                    .header("x-proxy-admin-token", "secret")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(second.status(), StatusCode::TOO_MANY_REQUESTS);
+        assert!(second.headers().get("retry-after").is_some());
     }
 
     #[tokio::test]
@@ -380,6 +439,9 @@ mod tests {
                 worker_base_url,
                 admin_token: Some("secret".to_string()),
                 trusted_proxy_ips: vec!["127.0.0.1".parse().unwrap()],
+                admin_allowed_ips: Vec::new(),
+                admin_rate_limit_max_requests: 30,
+                admin_rate_limit_window: Duration::from_secs(60),
                 auth_rate_limit_max_requests,
                 auth_rate_limit_window: Duration::from_secs(60),
                 upstream_timeout: Duration::from_secs(5),
@@ -390,6 +452,7 @@ mod tests {
             },
             http_client: reqwest::Client::new(),
             cache: CacheStore::new(Duration::from_secs(60), 32),
+            admin_rate_limiter: RateLimiter::new(30, Duration::from_secs(60)),
             auth_rate_limiter: RateLimiter::new(
                 auth_rate_limit_max_requests,
                 Duration::from_secs(60),
