@@ -1,6 +1,6 @@
 use axum::{
     extract::State,
-    http::{HeaderMap, StatusCode},
+    http::{HeaderMap, HeaderValue, Response, StatusCode},
     response::IntoResponse,
     Json,
 };
@@ -8,24 +8,35 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     cache::{CachePurgeSelector, CacheStats},
+    request_id::resolve_request_id,
+    response_headers::apply_standard_headers,
     state::AppState,
 };
 
 const ADMIN_TOKEN_HEADER: &str = "x-proxy-admin-token";
 
 pub async fn cache_stats(State(state): State<AppState>, headers: HeaderMap) -> impl IntoResponse {
+    let request_id = resolve_request_id(&headers);
     if !is_authorized(&state, &headers) {
-        return (
+        return with_standard_headers(
+            (
             StatusCode::UNAUTHORIZED,
             Json(AdminErrorResponse {
                 error: "unauthorized",
             }),
-        )
-            .into_response();
+            )
+                .into_response(),
+            &request_id,
+            "miss",
+        );
     }
 
     let stats = state.cache.stats().await;
-    (StatusCode::OK, Json(CacheStatsResponse::from_stats(stats))).into_response()
+    with_standard_headers(
+        (StatusCode::OK, Json(CacheStatsResponse::from_stats(stats))).into_response(),
+        &request_id,
+        "miss",
+    )
 }
 
 pub async fn purge_cache(
@@ -33,14 +44,19 @@ pub async fn purge_cache(
     headers: HeaderMap,
     Json(request): Json<PurgeCacheRequest>,
 ) -> impl IntoResponse {
+    let request_id = resolve_request_id(&headers);
     if !is_authorized(&state, &headers) {
-        return (
+        return with_standard_headers(
+            (
             StatusCode::UNAUTHORIZED,
             Json(AdminErrorResponse {
                 error: "unauthorized",
             }),
-        )
-            .into_response();
+            )
+                .into_response(),
+            &request_id,
+            "miss",
+        );
     }
 
     let selector = match request.scope.as_deref() {
@@ -48,18 +64,26 @@ pub async fn purge_cache(
         Some("chunks") => CachePurgeSelector::Prefix("POST:/worker/analyze/chunks".to_string()),
         Some("skeleton") => CachePurgeSelector::Prefix("POST:/worker/analyze/skeleton".to_string()),
         Some(_) => {
-            return (
+            return with_standard_headers(
+                (
                 StatusCode::BAD_REQUEST,
                 Json(AdminErrorResponse {
                     error: "invalid purge scope",
                 }),
-            )
-                .into_response();
+                )
+                    .into_response(),
+                &request_id,
+                "miss",
+            );
         }
     };
 
     let removed = state.cache.purge(selector).await;
-    (StatusCode::OK, Json(PurgeCacheResponse { removed })).into_response()
+    with_standard_headers(
+        (StatusCode::OK, Json(PurgeCacheResponse { removed })).into_response(),
+        &request_id,
+        "miss",
+    )
 }
 
 fn is_authorized(state: &AppState, headers: &HeaderMap) -> bool {
@@ -107,4 +131,13 @@ struct PurgeCacheResponse {
 #[derive(Serialize)]
 struct AdminErrorResponse {
     error: &'static str,
+}
+
+fn with_standard_headers(
+    mut response: Response,
+    request_id: &HeaderValue,
+    cache_state: &'static str,
+) -> Response {
+    apply_standard_headers(response.headers_mut(), request_id, cache_state);
+    response
 }
