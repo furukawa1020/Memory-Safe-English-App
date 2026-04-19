@@ -1,0 +1,84 @@
+use axum::{
+    body::{to_bytes, Body},
+    extract::State,
+    http::{Request, StatusCode},
+    response::IntoResponse,
+    routing::{any, get},
+    Json, Router,
+};
+use serde::Serialize;
+
+use crate::{proxy, state::AppState};
+
+pub fn build_router(state: AppState) -> Router {
+    Router::new()
+        .route("/health", get(health))
+        .route("/api/*path", any(proxy::proxy_to_api))
+        .route("/worker/*path", any(proxy::proxy_to_worker))
+        .with_state(state)
+}
+
+async fn health(State(state): State<AppState>) -> impl IntoResponse {
+    (
+        StatusCode::OK,
+        Json(HealthResponse {
+            ok: true,
+            api_base_url: state.config.api_base_url,
+            worker_base_url: state.config.worker_base_url,
+        }),
+    )
+}
+
+#[derive(Serialize)]
+struct HealthResponse {
+    ok: bool,
+    api_base_url: String,
+    worker_base_url: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::{net::SocketAddr, time::Duration};
+
+    use axum::body::to_bytes;
+    use tower::ServiceExt;
+
+    use crate::{cache::CacheStore, config::Config, state::AppState};
+
+    fn state() -> AppState {
+        AppState {
+            config: Config {
+                http_addr: "127.0.0.1:8070".parse::<SocketAddr>().unwrap(),
+                api_base_url: "http://127.0.0.1:8080".to_string(),
+                worker_base_url: "http://127.0.0.1:8090".to_string(),
+                upstream_timeout: Duration::from_secs(5),
+                cache_ttl: Duration::from_secs(60),
+                gc_interval: Duration::from_secs(60),
+                cache_max_entries: 32,
+                max_request_body_bytes: 1024,
+            },
+            http_client: reqwest::Client::new(),
+            cache: CacheStore::new(Duration::from_secs(60), 32),
+        }
+    }
+
+    #[tokio::test]
+    async fn health_endpoint_returns_ok() {
+        let app = build_router(state());
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/health")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = to_bytes(response.into_body(), 1024).await.unwrap();
+        let text = String::from_utf8(body.to_vec()).unwrap();
+        assert!(text.contains("\"ok\":true"));
+    }
+}
