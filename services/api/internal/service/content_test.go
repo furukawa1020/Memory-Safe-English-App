@@ -62,6 +62,89 @@ func TestContentServiceGetChunksCachesResult(t *testing.T) {
 	}
 }
 
+func TestContentServiceCreateAndUpdate(t *testing.T) {
+	store := memory.NewStore()
+	svc := NewContentService(store, stubAnalyzer{})
+
+	created, err := svc.Create(context.Background(), domain.ContentUpsertInput{
+		Title:       "Lab Introduction",
+		ContentType: "reading",
+		Level:       "intermediate",
+		Topic:       "research",
+		Language:    "en",
+		RawText:     "Our lab studies accessible interfaces for language learning.",
+		SummaryText: "Lab overview",
+	})
+	if err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
+	if created.ID == "" {
+		t.Fatalf("expected content id")
+	}
+
+	updated, err := svc.Update(context.Background(), created.ID, domain.ContentUpsertInput{
+		Title:       "Updated Lab Introduction",
+		ContentType: "reading",
+		Level:       "intermediate",
+		Topic:       "research",
+		Language:    "en",
+		RawText:     "Our lab studies accessible interfaces and memory-safe reading support.",
+		SummaryText: "Updated lab overview",
+	})
+	if err != nil {
+		t.Fatalf("Update() error = %v", err)
+	}
+	if updated.Title != "Updated Lab Introduction" {
+		t.Fatalf("expected updated title, got %q", updated.Title)
+	}
+	if updated.CreatedAt.IsZero() || updated.UpdatedAt.IsZero() {
+		t.Fatalf("expected timestamps to be set")
+	}
+	if !updated.UpdatedAt.After(updated.CreatedAt) && !updated.UpdatedAt.Equal(updated.CreatedAt) {
+		t.Fatalf("expected updated timestamp to be on or after created timestamp")
+	}
+}
+
+func TestContentServiceUpdateInvalidatesChunkCache(t *testing.T) {
+	store := memory.NewStore()
+	calls := 0
+	svc := NewContentService(store, analyzerFunc(func(ctx context.Context, text, language string) (domain.ChunkingResult, error) {
+		calls++
+		return domain.ChunkingResult{
+			Language: language,
+			Chunks: []domain.Chunk{
+				{Order: 1, Text: text, Role: "core", SkeletonRank: 1},
+			},
+			Summary: text,
+		}, nil
+	}))
+
+	if _, err := svc.GetChunks(context.Background(), "cnt_research_001"); err != nil {
+		t.Fatalf("GetChunks() initial call error = %v", err)
+	}
+
+	_, err := svc.Update(context.Background(), "cnt_research_001", domain.ContentUpsertInput{
+		Title:       "Research Presentation Opening",
+		ContentType: "reading",
+		Level:       "intermediate",
+		Topic:       "research",
+		Language:    "en",
+		RawText:     "We designed a calmer interface for memory-safe English reading.",
+		SummaryText: "Updated research opening sentence",
+	})
+	if err != nil {
+		t.Fatalf("Update() error = %v", err)
+	}
+
+	if _, err := svc.GetChunks(context.Background(), "cnt_research_001"); err != nil {
+		t.Fatalf("GetChunks() after update error = %v", err)
+	}
+
+	if calls != 2 {
+		t.Fatalf("expected analyzer to be called twice after cache invalidation, got %d", calls)
+	}
+}
+
 type analyzerFunc func(ctx context.Context, text, language string) (domain.ChunkingResult, error)
 
 func (f analyzerFunc) AnalyzeChunks(ctx context.Context, text, language string) (domain.ChunkingResult, error) {
