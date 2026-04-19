@@ -289,6 +289,57 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn auth_route_is_rate_limited_before_reaching_api() {
+        let api = spawn_api_server().await;
+        let worker = spawn_health_server(StatusCode::OK).await;
+        let app = build_router(state_with_urls_and_auth_limit(
+            api.base_url(),
+            worker.base_url(),
+            1,
+        ));
+
+        let first = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/auth/login")
+                    .header("content-type", "application/json")
+                    .header("x-forwarded-for", "198.51.100.10")
+                    .body(Body::from(
+                        r#"{"email":"reader@example.com","password":"secret123456"}"#,
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(first.status(), StatusCode::OK);
+
+        let second = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/auth/login")
+                    .header("content-type", "application/json")
+                    .header("x-forwarded-for", "198.51.100.10")
+                    .body(Body::from(
+                        r#"{"email":"reader@example.com","password":"secret123456"}"#,
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(second.status(), StatusCode::TOO_MANY_REQUESTS);
+        assert_eq!(
+            second.headers().get("x-proxy-upstream").unwrap(),
+            "proxy-auth-rate-limit"
+        );
+        assert!(second.headers().get("retry-after").is_some());
+    }
+
+    #[tokio::test]
     async fn mobile_bootstrap_returns_frontend_ready_metadata() {
         let api = spawn_health_server(StatusCode::OK).await;
         let worker = spawn_health_server(StatusCode::OK).await;
@@ -313,13 +364,21 @@ mod tests {
     }
 
     fn state_with_urls(api_base_url: String, worker_base_url: String) -> AppState {
+        state_with_urls_and_auth_limit(api_base_url, worker_base_url, 10)
+    }
+
+    fn state_with_urls_and_auth_limit(
+        api_base_url: String,
+        worker_base_url: String,
+        auth_rate_limit_max_requests: usize,
+    ) -> AppState {
         AppState {
             config: Config {
                 http_addr: "127.0.0.1:8070".parse::<SocketAddr>().unwrap(),
                 api_base_url,
                 worker_base_url,
                 admin_token: Some("secret".to_string()),
-                auth_rate_limit_max_requests: 10,
+                auth_rate_limit_max_requests,
                 auth_rate_limit_window: Duration::from_secs(60),
                 upstream_timeout: Duration::from_secs(5),
                 cache_ttl: Duration::from_secs(60),
@@ -329,7 +388,10 @@ mod tests {
             },
             http_client: reqwest::Client::new(),
             cache: CacheStore::new(Duration::from_secs(60), 32),
-            auth_rate_limiter: RateLimiter::new(10, Duration::from_secs(60)),
+            auth_rate_limiter: RateLimiter::new(
+                auth_rate_limit_max_requests,
+                Duration::from_secs(60),
+            ),
         }
     }
 
