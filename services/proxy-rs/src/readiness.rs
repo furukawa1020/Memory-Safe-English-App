@@ -92,6 +92,9 @@ mod tests {
 
     #[test]
     fn health_url_appends_health_path() {
-        assert_eq!(health_url("http://127.0.0.1:8080"), "http://127.0.0.1:8080/health");
+        assert_eq!(
+            health_url("http://127.0.0.1:8080"),
+            "http://127.0.0.1:8080/health"
+        );
     }
 }
