@@ -34,7 +34,7 @@ $results.Add((Get-CheckResult -Name "docker_cli" -Passed $dockerInstalled -Detai
 
 $dockerDaemonReady = $false
 if ($dockerInstalled) {
-    & docker info *> $null
+    cmd /c "docker info >nul 2>nul"
     $dockerDaemonReady = ($LASTEXITCODE -eq 0)
 }
 $dockerDaemonDetails = if ($dockerDaemonReady) { "Docker daemon is reachable." } else { "Start Docker Desktop or the Docker service." }
