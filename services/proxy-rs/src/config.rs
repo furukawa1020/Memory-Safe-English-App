@@ -22,7 +22,7 @@ pub struct Config {
 
 impl Config {
     pub fn from_env() -> Result<Self, ConfigError> {
-        Ok(Self {
+        let config = Self {
             http_addr: parse_env("PROXY_HTTP_ADDR", "127.0.0.1:8070")?,
             api_base_url: parse_url("PROXY_API_BASE_URL", "http://127.0.0.1:8080"),
             worker_base_url: parse_url("PROXY_WORKER_BASE_URL", "http://127.0.0.1:8090"),
@@ -41,7 +41,63 @@ impl Config {
             gc_interval: Duration::from_secs(parse_env("PROXY_GC_INTERVAL_SECONDS", "60")?),
             cache_max_entries: parse_env("PROXY_CACHE_MAX_ENTRIES", "1024")?,
             max_request_body_bytes: parse_env("PROXY_MAX_REQUEST_BODY_BYTES", "262144")?,
-        })
+        };
+        config.validate()?;
+        Ok(config)
+    }
+
+    fn validate(&self) -> Result<(), ConfigError> {
+        if self.auth_rate_limit_max_requests == 0 {
+            return Err(ConfigError::InvalidValue(
+                "PROXY_AUTH_RATE_LIMIT_MAX_REQUESTS".to_string(),
+                self.auth_rate_limit_max_requests.to_string(),
+            ));
+        }
+        if self.auth_rate_limit_window <= Duration::ZERO {
+            return Err(ConfigError::InvalidValue(
+                "PROXY_AUTH_RATE_LIMIT_WINDOW_SECONDS".to_string(),
+                self.auth_rate_limit_window.as_secs().to_string(),
+            ));
+        }
+        if self.upstream_timeout <= Duration::ZERO {
+            return Err(ConfigError::InvalidValue(
+                "PROXY_UPSTREAM_TIMEOUT_SECONDS".to_string(),
+                self.upstream_timeout.as_secs().to_string(),
+            ));
+        }
+        if self.cache_ttl <= Duration::ZERO {
+            return Err(ConfigError::InvalidValue(
+                "PROXY_CACHE_TTL_SECONDS".to_string(),
+                self.cache_ttl.as_secs().to_string(),
+            ));
+        }
+        if self.gc_interval <= Duration::ZERO {
+            return Err(ConfigError::InvalidValue(
+                "PROXY_GC_INTERVAL_SECONDS".to_string(),
+                self.gc_interval.as_secs().to_string(),
+            ));
+        }
+        if self.cache_max_entries == 0 {
+            return Err(ConfigError::InvalidValue(
+                "PROXY_CACHE_MAX_ENTRIES".to_string(),
+                self.cache_max_entries.to_string(),
+            ));
+        }
+        if self.max_request_body_bytes == 0 {
+            return Err(ConfigError::InvalidValue(
+                "PROXY_MAX_REQUEST_BODY_BYTES".to_string(),
+                self.max_request_body_bytes.to_string(),
+            ));
+        }
+        if let Some(admin_token) = self.admin_token.as_ref() {
+            if admin_token.len() < 16 {
+                return Err(ConfigError::InvalidValue(
+                    "PROXY_ADMIN_TOKEN".to_string(),
+                    "too_short".to_string(),
+                ));
+            }
+        }
+        Ok(())
     }
 }
 
@@ -92,4 +148,32 @@ where
 pub enum ConfigError {
     #[error("invalid configuration value for {0}: {1}")]
     InvalidValue(String, String),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn validate_rejects_short_admin_token() {
+        let config = Config {
+            http_addr: "127.0.0.1:8070".parse().unwrap(),
+            api_base_url: "http://127.0.0.1:8080".to_string(),
+            worker_base_url: "http://127.0.0.1:8090".to_string(),
+            admin_token: Some("short".to_string()),
+            trusted_proxy_ips: Vec::new(),
+            auth_rate_limit_max_requests: 20,
+            auth_rate_limit_window: Duration::from_secs(60),
+            upstream_timeout: Duration::from_secs(10),
+            cache_ttl: Duration::from_secs(300),
+            gc_interval: Duration::from_secs(60),
+            cache_max_entries: 1024,
+            max_request_body_bytes: 262144,
+        };
+
+        assert!(matches!(
+            config.validate(),
+            Err(ConfigError::InvalidValue(key, _)) if key == "PROXY_ADMIN_TOKEN"
+        ));
+    }
 }
