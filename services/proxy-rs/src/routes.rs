@@ -306,6 +306,7 @@ mod tests {
         let text = String::from_utf8(body.to_vec()).unwrap();
         assert!(text.contains("\"android_emulator\":\"http://10.0.2.2:8070\""));
         assert!(text.contains("\"login\":\"/auth/login\""));
+        assert!(text.contains("\"refresh\":\"/auth/refresh\""));
     }
 
     fn state_with_urls(api_base_url: String, worker_base_url: String) -> AppState {
