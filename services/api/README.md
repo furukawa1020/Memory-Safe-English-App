@@ -71,6 +71,7 @@ go run ./cmd/server
 
 - `API_HTTP_ADDR`: default `:8080`
 - `APP_ENV`: default `development`
+- `DATABASE_URL`: set すると PostgreSQL repository を利用
 - `AUTH_TOKEN_SECRET`: production では必須
 - `AUTH_ACCESS_TOKEN_TTL`: default `15m`
 - `AUTH_REFRESH_TOKEN_TTL`: default `168h`
@@ -85,6 +86,8 @@ go run ./cmd/server
 ```bash
 docker build -t mse-api services/api
 ```
+
+compose 経由では `DATABASE_URL=postgres://mse:mse@postgres:5432/memory_safe_english?sslmode=disable` を使って PostgreSQL backend で起動します。
 
 ## Verify
 
