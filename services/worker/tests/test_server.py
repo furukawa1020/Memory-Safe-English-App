@@ -27,6 +27,7 @@ def test_chunking_endpoint() -> None:
 
         assert response.status == HTTPStatus.OK
         assert payload["chunks"]
+        assert payload["version"]
 
 
 def test_chunking_endpoint_rejects_empty_text() -> None:
@@ -113,3 +114,4 @@ def test_skeleton_endpoint() -> None:
         assert response.status == HTTPStatus.OK
         assert payload["parts"]
         assert payload["summary"]
+        assert payload["version"]
