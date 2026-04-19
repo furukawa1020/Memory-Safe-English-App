@@ -1,43 +1,9 @@
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 
 from app.models import Chunk, ChunkingResult
-
-
-_CLAUSE_BREAKS = re.compile(r"\s*(,|;|:|\band\b|\bbut\b|\bthat\b|\bwhich\b)\s*", re.IGNORECASE)
-_VERB_HINTS = {
-    "am",
-    "is",
-    "are",
-    "was",
-    "were",
-    "be",
-    "been",
-    "being",
-    "do",
-    "does",
-    "did",
-    "have",
-    "has",
-    "had",
-    "use",
-    "uses",
-    "used",
-    "need",
-    "needs",
-    "needed",
-    "make",
-    "makes",
-    "made",
-    "propose",
-    "proposes",
-    "proposed",
-    "show",
-    "shows",
-    "showed",
-}
+from app.text_analysis import infer_role, looks_core, normalize_text, segment_text
 
 
 @dataclass(slots=True)
@@ -45,11 +11,11 @@ class ChunkingService:
     max_words_per_chunk: int = 6
 
     def chunk_text(self, text: str, language: str = "en") -> ChunkingResult:
-        normalized = self._normalize_text(text)
+        normalized = normalize_text(text)
         if not normalized:
             return ChunkingResult(language=language, chunks=[], summary="")
 
-        segments = self._segment_text(normalized)
+        segments = segment_text(normalized)
 
         refined: list[str] = []
         for segment in segments:
@@ -67,30 +33,10 @@ class ChunkingService:
             Chunk(
                 order=index + 1,
                 text=segment,
-                role=self._infer_role(segment, index),
-                skeleton_rank=1 if self._looks_core(segment) else 2,
+                role=infer_role(segment, index),
+                skeleton_rank=1 if looks_core(segment) else 2,
             )
             for index, segment in enumerate(refined)
         ]
         summary = " / ".join(chunk.text for chunk in chunks[:2])
         return ChunkingResult(language=language, chunks=chunks, summary=summary)
-
-    def _normalize_text(self, text: str) -> str:
-        return " ".join(text.split())
-
-    def _segment_text(self, text: str) -> list[str]:
-        rough_parts = [part.strip(" ,;:") for part in _CLAUSE_BREAKS.split(text)]
-        return [part for part in rough_parts if part and part not in {",", ";", ":"}]
-
-    def _infer_role(self, segment: str, index: int) -> str:
-        lowered = segment.lower()
-        if index == 0 and not self._looks_core(segment):
-            return "modifier"
-        if lowered.startswith(("to ", "for ", "with ", "in ", "on ", "at ", "by ")):
-            return "modifier"
-        if self._looks_core(segment):
-            return "core"
-        return "support"
-
-    def _looks_core(self, segment: str) -> bool:
-        return any(word.lower().strip(".,!?") in _VERB_HINTS for word in segment.split())
