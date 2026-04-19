@@ -55,6 +55,7 @@ The local stack is defined in [infra/docker-compose.yml](./infra/docker-compose.
 All services include health checks. The proxy uses `/ready`, so it becomes healthy only after the API and worker are ready.
 The proxy also exposes mobile-friendly API routes such as `/auth/login`, `/auth/refresh`, `/contents`, and `/me`, so the Flutter app can point at the proxy root instead of handling `/api/...` prefixes itself. It now also applies a coarse auth rate limit before requests reach the API.
 If the proxy is deployed behind another trusted reverse proxy or load balancer, configure `PROXY_TRUSTED_PROXY_IPS` so forwarded client IP headers are only accepted from that trusted peer.
+Admin endpoints on the proxy can also be locked down with `PROXY_ADMIN_ALLOWED_IPS` and have their own independent rate limit window.
 
 ## Recommended Local Workflow
 
