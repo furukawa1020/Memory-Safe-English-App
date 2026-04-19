@@ -22,15 +22,18 @@ type Claims struct {
 	Subject   string    `json:"sub"`
 	Email     string    `json:"email"`
 	TokenUse  string    `json:"token_use"`
+	TokenID   string    `json:"jti,omitempty"`
+	FamilyID  string    `json:"fid,omitempty"`
 	IssuedAt  time.Time `json:"iat"`
 	ExpiresAt time.Time `json:"exp"`
 }
 
 type TokenPair struct {
-	AccessToken  string    `json:"access_token"`
-	RefreshToken string    `json:"refresh_token"`
-	TokenType    string    `json:"token_type"`
-	ExpiresAt    time.Time `json:"expires_at"`
+	AccessToken      string    `json:"access_token"`
+	RefreshToken     string    `json:"refresh_token"`
+	TokenType        string    `json:"token_type"`
+	ExpiresAt        time.Time `json:"expires_at"`
+	RefreshExpiresAt time.Time `json:"refresh_expires_at"`
 }
 
 type Manager struct {
@@ -47,7 +50,7 @@ func NewManager(secret string, accessTokenTTL, refreshTokenTTL time.Duration) Ma
 	}
 }
 
-func (m Manager) Issue(user domain.User) (TokenPair, error) {
+func (m Manager) Issue(user domain.User, refreshTokenID, refreshFamilyID string) (TokenPair, error) {
 	now := time.Now().UTC()
 
 	accessClaims := Claims{
@@ -61,6 +64,8 @@ func (m Manager) Issue(user domain.User) (TokenPair, error) {
 		Subject:   user.ID,
 		Email:     user.Email,
 		TokenUse:  "refresh",
+		TokenID:   refreshTokenID,
+		FamilyID:  refreshFamilyID,
 		IssuedAt:  now,
 		ExpiresAt: now.Add(m.refreshTokenTTL),
 	}
@@ -75,10 +80,11 @@ func (m Manager) Issue(user domain.User) (TokenPair, error) {
 	}
 
 	return TokenPair{
-		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
-		TokenType:    "Bearer",
-		ExpiresAt:    accessClaims.ExpiresAt,
+		AccessToken:      accessToken,
+		RefreshToken:     refreshToken,
+		TokenType:        "Bearer",
+		ExpiresAt:        accessClaims.ExpiresAt,
+		RefreshExpiresAt: refreshClaims.ExpiresAt,
 	}, nil
 }
 
@@ -101,7 +107,15 @@ func (m Manager) ParseRefreshToken(token string) (Claims, error) {
 	if claims.TokenUse != "refresh" {
 		return Claims{}, ErrInvalidToken
 	}
+	if claims.TokenID == "" || claims.FamilyID == "" {
+		return Claims{}, ErrInvalidToken
+	}
 	return claims, nil
+}
+
+func (m Manager) HashToken(token string) string {
+	sum := sha256.Sum256([]byte(token))
+	return base64.RawURLEncoding.EncodeToString(sum[:])
 }
 
 func (m Manager) sign(claims Claims) (string, error) {

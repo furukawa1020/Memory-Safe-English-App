@@ -21,6 +21,11 @@ type NewAuthUser struct {
 type AuthRepository interface {
 	CreateUserWithPassword(ctx context.Context, input NewAuthUser) (domain.User, error)
 	FindUserByEmail(ctx context.Context, email string) (domain.User, string, error)
+	CreateRefreshSession(ctx context.Context, family domain.RefreshTokenFamily, session domain.RefreshSession) error
+	GetRefreshSession(ctx context.Context, tokenID string) (domain.RefreshSession, error)
+	GetRefreshFamily(ctx context.Context, familyID string) (domain.RefreshTokenFamily, error)
+	RotateRefreshSession(ctx context.Context, currentTokenID, currentTokenHash string, nextSession domain.RefreshSession) error
+	RevokeRefreshFamily(ctx context.Context, familyID string) error
 }
 
 type SessionRepository interface {

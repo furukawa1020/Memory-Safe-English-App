@@ -2,7 +2,10 @@ package service
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"strings"
+	"time"
 
 	"memory-safe-english/services/api/internal/domain"
 	"memory-safe-english/services/api/internal/repository"
@@ -69,7 +72,7 @@ func (s AuthService) Register(ctx context.Context, input RegisterInput) (AuthRes
 		return AuthResult{}, err
 	}
 
-	return s.newAuthResult(user)
+	return s.newAuthResult(ctx, user)
 }
 
 func (s AuthService) Login(ctx context.Context, email, plainPassword string) (AuthResult, error) {
@@ -90,7 +93,7 @@ func (s AuthService) Login(ctx context.Context, email, plainPassword string) (Au
 		return AuthResult{}, domain.ErrUnauthorized
 	}
 
-	return s.newAuthResult(user)
+	return s.newAuthResult(ctx, user)
 }
 
 func (s AuthService) Refresh(ctx context.Context, refreshToken string) (AuthResult, error) {
@@ -98,7 +101,17 @@ func (s AuthService) Refresh(ctx context.Context, refreshToken string) (AuthResu
 		return AuthResult{}, domain.ErrInvalidInput
 	}
 
-	claims, err := s.tokens.ParseRefreshToken(strings.TrimSpace(refreshToken))
+	rawToken := strings.TrimSpace(refreshToken)
+	claims, err := s.tokens.ParseRefreshToken(rawToken)
+	if err != nil {
+		return AuthResult{}, domain.ErrUnauthorized
+	}
+
+	session, err := s.auth.GetRefreshSession(ctx, claims.TokenID)
+	if err != nil {
+		return AuthResult{}, domain.ErrUnauthorized
+	}
+	family, err := s.auth.GetRefreshFamily(ctx, claims.FamilyID)
 	if err != nil {
 		return AuthResult{}, domain.ErrUnauthorized
 	}
@@ -111,13 +124,53 @@ func (s AuthService) Refresh(ctx context.Context, refreshToken string) (AuthResu
 	if claims.Email != "" && user.Email != claims.Email {
 		return AuthResult{}, domain.ErrUnauthorized
 	}
+	if family.UserID != user.ID || session.UserID != user.ID || session.FamilyID != family.ID {
+		_ = s.auth.RevokeRefreshFamily(ctx, family.ID)
+		return AuthResult{}, domain.ErrUnauthorized
+	}
+	if family.RevokedAt != nil || session.RevokedAt != nil {
+		_ = s.auth.RevokeRefreshFamily(ctx, family.ID)
+		return AuthResult{}, domain.ErrUnauthorized
+	}
+	if time.Now().UTC().After(session.ExpiresAt) {
+		_ = s.auth.RevokeRefreshFamily(ctx, family.ID)
+		return AuthResult{}, domain.ErrUnauthorized
+	}
 
-	return s.newAuthResult(user)
+	currentHash := s.tokens.HashToken(rawToken)
+	if session.TokenHash != currentHash {
+		_ = s.auth.RevokeRefreshFamily(ctx, family.ID)
+		return AuthResult{}, domain.ErrUnauthorized
+	}
+
+	return s.rotateAuthResult(ctx, user, family.ID, session.ID, currentHash)
 }
 
-func (s AuthService) newAuthResult(user domain.User) (AuthResult, error) {
-	tokens, err := s.tokens.Issue(user)
+func (s AuthService) newAuthResult(ctx context.Context, user domain.User) (AuthResult, error) {
+	return s.issueNewFamilyAuthResult(ctx, user)
+}
+
+func (s AuthService) issueNewFamilyAuthResult(ctx context.Context, user domain.User) (AuthResult, error) {
+	familyID := newSecureID("rfm")
+	refreshTokenID := newSecureID("rft")
+
+	tokens, err := s.tokens.Issue(user, refreshTokenID, familyID)
 	if err != nil {
+		return AuthResult{}, err
+	}
+
+	if err := s.auth.CreateRefreshSession(ctx, domain.RefreshTokenFamily{
+		ID:        familyID,
+		UserID:    user.ID,
+		CreatedAt: time.Now().UTC(),
+	}, domain.RefreshSession{
+		ID:        refreshTokenID,
+		FamilyID:  familyID,
+		UserID:    user.ID,
+		TokenHash: s.tokens.HashToken(tokens.RefreshToken),
+		ExpiresAt: tokens.RefreshExpiresAt,
+		CreatedAt: time.Now().UTC(),
+	}); err != nil {
 		return AuthResult{}, err
 	}
 
@@ -125,4 +178,39 @@ func (s AuthService) newAuthResult(user domain.User) (AuthResult, error) {
 		User:   user,
 		Tokens: tokens,
 	}, nil
+}
+
+func (s AuthService) rotateAuthResult(ctx context.Context, user domain.User, familyID, currentTokenID, currentTokenHash string) (AuthResult, error) {
+	nextTokenID := newSecureID("rft")
+	tokens, err := s.tokens.Issue(user, nextTokenID, familyID)
+	if err != nil {
+		return AuthResult{}, err
+	}
+
+	if err := s.auth.RotateRefreshSession(ctx, currentTokenID, currentTokenHash, domain.RefreshSession{
+		ID:        nextTokenID,
+		FamilyID:  familyID,
+		UserID:    user.ID,
+		TokenHash: s.tokens.HashToken(tokens.RefreshToken),
+		ExpiresAt: tokens.RefreshExpiresAt,
+		CreatedAt: time.Now().UTC(),
+	}); err != nil {
+		if err == domain.ErrConflict || err == domain.ErrExpired {
+			return AuthResult{}, domain.ErrUnauthorized
+		}
+		return AuthResult{}, err
+	}
+
+	return AuthResult{
+		User:   user,
+		Tokens: tokens,
+	}, nil
+}
+
+func newSecureID(prefix string) string {
+	buf := make([]byte, 12)
+	if _, err := rand.Read(buf); err != nil {
+		return prefix + "_" + time.Now().UTC().Format("20060102150405.000000000")
+	}
+	return prefix + "_" + hex.EncodeToString(buf)
 }

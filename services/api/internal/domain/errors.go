@@ -8,4 +8,5 @@ var (
 	ErrInvalidInput = errors.New("invalid input")
 	ErrConflict     = errors.New("conflict")
 	ErrUnavailable  = errors.New("unavailable")
+	ErrExpired      = errors.New("expired")
 )
