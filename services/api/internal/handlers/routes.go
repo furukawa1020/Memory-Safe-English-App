@@ -20,6 +20,7 @@ func RegisterRoutes(mux *http.ServeMux, routes RouteSet, protected ProtectedMidd
 	mux.Handle("POST /auth/refresh", http.HandlerFunc(routes.Auth.Refresh))
 	mux.Handle("GET /me", protected(http.HandlerFunc(routes.Me.Get)))
 	mux.Handle("POST /analysis/chunks", protected(http.HandlerFunc(routes.Analysis.AnalyzeChunks)))
+	mux.Handle("POST /analysis/skeleton", protected(http.HandlerFunc(routes.Analysis.AnalyzeSkeleton)))
 	mux.Handle("GET /contents", protected(http.HandlerFunc(routes.Content.List)))
 	mux.Handle("POST /contents", protected(http.HandlerFunc(routes.Content.Create)))
 	mux.Handle("GET /contents/{contentID}", protected(http.HandlerFunc(routes.Content.Get)))

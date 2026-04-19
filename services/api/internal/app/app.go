@@ -36,7 +36,7 @@ func (a *Application) Routes() handlers.RouteSet {
 		a.Config.WorkerSignatureKey,
 		a.Config.WorkerTimeout,
 	)
-	analysisService := service.NewAnalysisService(workerAnalyzer)
+	analysisService := service.NewAnalysisService(workerAnalyzer, workerAnalyzer)
 	contentService := service.NewContentService(a.Store, workerAnalyzer)
 
 	return handlers.RouteSet{

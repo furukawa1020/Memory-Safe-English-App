@@ -38,3 +38,25 @@ func (h AnalysisHandler) AnalyzeChunks(w http.ResponseWriter, r *http.Request) {
 
 	httpjson.Write(w, http.StatusOK, result)
 }
+
+func (h AnalysisHandler) AnalyzeSkeleton(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Text     string `json:"text"`
+		Language string `json:"language"`
+	}
+	if err := httpx.DecodeJSON(r, &req); err != nil {
+		httpjson.Error(w, http.StatusBadRequest, "invalid_json", "request body must be valid JSON")
+		return
+	}
+
+	result, err := h.service.AnalyzeSkeleton(r.Context(), domain.AnalyzeSkeletonInput{
+		Text:     req.Text,
+		Language: req.Language,
+	})
+	if err != nil {
+		httpx.WriteDomainError(w, err, "text is required and must be within allowed size", "analysis resource not found")
+		return
+	}
+
+	httpjson.Write(w, http.StatusOK, result)
+}
