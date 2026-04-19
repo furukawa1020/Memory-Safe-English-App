@@ -39,7 +39,7 @@ pub async fn proxy_to_worker(
 }
 
 async fn forward(state: AppState, request: Request<Body>, upstream: Upstream) -> Response<Body> {
-    let client_ip = resolve_client_ip(&request);
+    let client_ip = resolve_client_ip(&request, &state.config.trusted_proxy_ips);
     let method = request.method().clone();
     let request_id = resolve_request_id(request.headers());
     let path_and_query = request
