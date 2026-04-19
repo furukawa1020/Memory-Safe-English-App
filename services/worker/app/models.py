@@ -128,3 +128,37 @@ class ReaderPlanResult:
             "collapsed_chunks": [chunk.to_dict() for chunk in self.collapsed_chunks],
             "hotspots": [hotspot.to_dict() for hotspot in self.hotspots],
         }
+
+
+@dataclass(slots=True)
+class ListeningPausePoint:
+    index: int
+    after_chunk_order: int
+    pause_reason: str
+    cue_en: str
+    cue_ja: str
+    preview_text: str
+    risk_level: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(slots=True)
+class ListeningPlanResult:
+    version: str
+    language: str
+    summary: str
+    recommended_speed: str
+    pause_points: list[ListeningPausePoint]
+    final_pass_strategy: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "version": self.version,
+            "language": self.language,
+            "summary": self.summary,
+            "recommended_speed": self.recommended_speed,
+            "pause_points": [pause_point.to_dict() for pause_point in self.pause_points],
+            "final_pass_strategy": self.final_pass_strategy,
+        }

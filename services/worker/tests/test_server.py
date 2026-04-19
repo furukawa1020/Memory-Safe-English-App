@@ -131,3 +131,16 @@ def test_reader_plan_endpoint() -> None:
         assert "presentation_hint" in payload["focus_steps"][0]
         assert "hotspots" in payload
         assert payload["version"]
+
+
+def test_listening_plan_endpoint() -> None:
+    with running_server(make_settings()) as server:
+        body = {"text": "In this study, we propose a memory safe interface that reduces overload during reading."}
+        body_text = json.dumps(body)
+        response, payload = post_json(server.server_port, "/analyze/listening-plan", body, signed_headers(body_text))
+
+        assert response.status == HTTPStatus.OK
+        assert payload["recommended_speed"]
+        assert payload["pause_points"]
+        assert payload["final_pass_strategy"]
+        assert payload["version"]

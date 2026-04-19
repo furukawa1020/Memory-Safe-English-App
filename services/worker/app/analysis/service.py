@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from app.analysis.models import AnalyzeTextInput
-from app.models import ChunkingResult, ReaderPlanResult, SkeletonResult
+from app.models import ChunkingResult, ListeningPlanResult, ReaderPlanResult, SkeletonResult
 
 
 class ChunkAnalyzer(Protocol):
@@ -19,6 +19,10 @@ class ReaderPlanAnalyzer(Protocol):
     def build(self, text: str, language: str = "en") -> ReaderPlanResult: ...
 
 
+class ListeningPlanAnalyzer(Protocol):
+    def build(self, text: str, language: str = "en") -> ListeningPlanResult: ...
+
+
 @dataclass(frozen=True, slots=True)
 class AnalysisRoute:
     path: str
@@ -31,14 +35,17 @@ class AnalysisService:
     chunk_analyzer: ChunkAnalyzer
     skeleton_analyzer: SkeletonAnalyzer
     reader_plan_analyzer: ReaderPlanAnalyzer
+    listening_plan_analyzer: ListeningPlanAnalyzer
 
-    def analyze(self, operation: str, request: AnalyzeTextInput) -> ChunkingResult | SkeletonResult | ReaderPlanResult:
+    def analyze(self, operation: str, request: AnalyzeTextInput) -> ChunkingResult | SkeletonResult | ReaderPlanResult | ListeningPlanResult:
         if operation == "chunking":
             return self.chunk_analyzer.chunk_text(text=request.text, language=request.language)
         if operation == "skeleton":
             return self.skeleton_analyzer.extract(text=request.text, language=request.language)
         if operation == "reader_plan":
             return self.reader_plan_analyzer.build(text=request.text, language=request.language)
+        if operation == "listening_plan":
+            return self.listening_plan_analyzer.build(text=request.text, language=request.language)
         raise ValueError(f"unsupported analysis operation: {operation}")
 
     @staticmethod
@@ -47,4 +54,5 @@ class AnalysisService:
             AnalysisRoute(path="/analyze/chunks", audit_name="chunking_analyzed", operation="chunking"),
             AnalysisRoute(path="/analyze/skeleton", audit_name="skeleton_analyzed", operation="skeleton"),
             AnalysisRoute(path="/analyze/reader-plan", audit_name="reader_plan_analyzed", operation="reader_plan"),
+            AnalysisRoute(path="/analyze/listening-plan", audit_name="listening_plan_analyzed", operation="listening_plan"),
         )

@@ -1,6 +1,6 @@
 # Worker Service
 
-`services/worker` is the Python analysis worker for chunking, skeleton extraction, and reader-plan generation.
+`services/worker` is the Python analysis worker for chunking, skeleton extraction, reader-plan generation, and listening pause planning.
 
 ## Structure
 
@@ -10,6 +10,7 @@ services/worker
 |  |- analysis/
 |  |- chunking/
 |  |- http/
+|  |- listening_plan/
 |  |- reader_plan/
 |  |- skeleton/
 |  |- application.py
@@ -31,6 +32,7 @@ services/worker
 - `app/chunking/`: chunking service
 - `app/skeleton/`: skeleton extraction service
 - `app/reader_plan/`: progressive reading plan generation for low-memory reading flows
+- `app/listening_plan/`: pause-plan generation for lower-load listening passes
 - `app/http/request_parser.py`: HTTP request parsing and validation
 - `app/http/routes.py`: endpoint to operation mapping
 - `app/http/handlers.py`: transport and security guards
@@ -42,8 +44,10 @@ services/worker
 - `POST /analyze/chunks`
 - `POST /analyze/skeleton`
 - `POST /analyze/reader-plan`
+- `POST /analyze/listening-plan`
 - versioned analysis responses
 - reader plans include focus steps, collapsed support chunks, overload hotspots, and display hints
+- listening plans include pause checkpoints, replay cues, and recommended playback speed
 - API key authentication
 - HMAC request signing
 - request body and text size limits
