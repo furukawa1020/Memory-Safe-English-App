@@ -18,3 +18,12 @@ def test_chunking_handles_empty_text() -> None:
 
     assert result.chunks == []
     assert result.summary == ""
+
+
+def test_chunking_prefers_soft_split_boundaries() -> None:
+    service = ChunkingService(max_words_per_chunk=5)
+
+    result = service.chunk_text("We propose a safer interface for English reading support in class.")
+
+    assert len(result.chunks) >= 2
+    assert any(chunk.text.startswith("for English") for chunk in result.chunks)
