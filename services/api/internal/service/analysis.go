@@ -10,12 +10,20 @@ type ChunkAnalyzer interface {
 	AnalyzeChunks(ctx context.Context, text, language string) (domain.ChunkingResult, error)
 }
 
-type AnalysisService struct {
-	analyzer ChunkAnalyzer
+type SkeletonAnalyzer interface {
+	AnalyzeSkeleton(ctx context.Context, text, language string) (domain.SkeletonResult, error)
 }
 
-func NewAnalysisService(analyzer ChunkAnalyzer) AnalysisService {
-	return AnalysisService{analyzer: analyzer}
+type AnalysisService struct {
+	chunkAnalyzer    ChunkAnalyzer
+	skeletonAnalyzer SkeletonAnalyzer
+}
+
+func NewAnalysisService(chunkAnalyzer ChunkAnalyzer, skeletonAnalyzer SkeletonAnalyzer) AnalysisService {
+	return AnalysisService{
+		chunkAnalyzer:    chunkAnalyzer,
+		skeletonAnalyzer: skeletonAnalyzer,
+	}
 }
 
 func (s AnalysisService) AnalyzeChunks(ctx context.Context, input domain.AnalyzeChunksInput) (domain.ChunkingResult, error) {
@@ -23,5 +31,13 @@ func (s AnalysisService) AnalyzeChunks(ctx context.Context, input domain.Analyze
 	if err := normalized.Validate(); err != nil {
 		return domain.ChunkingResult{}, err
 	}
-	return s.analyzer.AnalyzeChunks(ctx, normalized.Text, normalized.Language)
+	return s.chunkAnalyzer.AnalyzeChunks(ctx, normalized.Text, normalized.Language)
+}
+
+func (s AnalysisService) AnalyzeSkeleton(ctx context.Context, input domain.AnalyzeSkeletonInput) (domain.SkeletonResult, error) {
+	normalized := input.Normalize()
+	if err := normalized.Validate(); err != nil {
+		return domain.SkeletonResult{}, err
+	}
+	return s.skeletonAnalyzer.AnalyzeSkeleton(ctx, normalized.Text, normalized.Language)
 }
