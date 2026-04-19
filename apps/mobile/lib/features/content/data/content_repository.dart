@@ -23,6 +23,11 @@ class ContentRepository {
     return ChunkingResult.fromJson(response);
   }
 
+  Future<SkeletonResult> fetchSkeleton(String contentId) async {
+    final response = await _apiClient.get('/contents/$contentId/skeleton');
+    return SkeletonResult.fromJson(response);
+  }
+
   Future<ChunkingResult> analyzeText(String text) async {
     final response = await _apiClient.post(
       '/analysis/chunks',
