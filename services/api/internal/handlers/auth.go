@@ -3,6 +3,7 @@ package handlers
 import (
 	"math"
 	"net/http"
+	"strconv"
 
 	"memory-safe-english/services/api/internal/httpjson"
 	"memory-safe-english/services/api/internal/httpx"
@@ -118,7 +119,7 @@ func (h AuthHandler) allowAttempt(w http.ResponseWriter, r *http.Request, limite
 	if retryAfterSeconds < 1 {
 		retryAfterSeconds = 1
 	}
-	w.Header().Set("Retry-After", httpx.Itoa(retryAfterSeconds))
+	w.Header().Set("Retry-After", strconv.Itoa(retryAfterSeconds))
 	httpjson.Error(w, http.StatusTooManyRequests, "rate_limited", "too many authentication attempts")
 	return false
 }
