@@ -39,7 +39,7 @@ This repository is a monorepo with four main parts:
 
 - `services/api`: authentication, content delivery, sessions, and worker orchestration
 - `services/worker`: chunk and skeleton analysis with request signing
-- `services/proxy-rs`: reverse proxy, frontend-friendly API aliases, cache GC, admin endpoints, readiness checks
+- `services/proxy-rs`: reverse proxy, frontend-friendly API aliases, auth route rate limiting, cache GC, admin endpoints, readiness checks
 - `apps/mobile`: Flutter client for auth, content browsing, and reader flow
 
 ## Local Stack
@@ -53,7 +53,7 @@ The local stack is defined in [infra/docker-compose.yml](./infra/docker-compose.
 - `redis`: `127.0.0.1:6379`
 
 All services include health checks. The proxy uses `/ready`, so it becomes healthy only after the API and worker are ready.
-The proxy also exposes mobile-friendly API routes such as `/auth/login`, `/auth/refresh`, `/contents`, and `/me`, so the Flutter app can point at the proxy root instead of handling `/api/...` prefixes itself.
+The proxy also exposes mobile-friendly API routes such as `/auth/login`, `/auth/refresh`, `/contents`, and `/me`, so the Flutter app can point at the proxy root instead of handling `/api/...` prefixes itself. It now also applies a coarse auth rate limit before requests reach the API.
 
 ## Recommended Local Workflow
 
