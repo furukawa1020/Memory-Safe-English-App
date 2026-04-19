@@ -37,6 +37,7 @@ services/worker
 
 - `POST /analyze/chunks`
 - `POST /analyze/skeleton`
+- versioned analysis responses
 - API key 認証
 - HMAC request signing
 - body / text size 制限
