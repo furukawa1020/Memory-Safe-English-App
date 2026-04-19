@@ -6,7 +6,7 @@ import '../../analysis/presentation/analysis_controller.dart';
 import '../model/chunking_result.dart';
 import '../model/content_item.dart';
 import 'content_catalog_controller.dart';
-import 'content_detail_screen.dart';
+import 'reader_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -220,7 +220,7 @@ class _ContentTile extends StatelessWidget {
       onTap: () {
         Navigator.of(context).push(
           MaterialPageRoute<void>(
-            builder: (_) => ContentDetailScreen(contentId: item.contentId),
+            builder: (_) => ReaderScreen(contentId: item.contentId),
           ),
         );
       },
