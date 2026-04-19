@@ -10,6 +10,7 @@ import (
 type Config struct {
 	HTTPAddr               string
 	AppEnv                 string
+	DatabaseURL            string
 	AuthTokenSecret        string
 	AccessTokenTTL         time.Duration
 	RefreshTokenTTL        time.Duration
@@ -24,6 +25,7 @@ func Load() Config {
 	return Config{
 		HTTPAddr:               getEnv("API_HTTP_ADDR", ":8080"),
 		AppEnv:                 getEnv("APP_ENV", "development"),
+		DatabaseURL:            getEnv("DATABASE_URL", ""),
 		AuthTokenSecret:        getEnv("AUTH_TOKEN_SECRET", "dev-insecure-change-me"),
 		AccessTokenTTL:         getEnvDuration("AUTH_ACCESS_TOKEN_TTL", 15*time.Minute),
 		RefreshTokenTTL:        getEnvDuration("AUTH_REFRESH_TOKEN_TTL", 7*24*time.Hour),
@@ -38,6 +40,9 @@ func Load() Config {
 func (c Config) Validate() error {
 	if c.HTTPAddr == "" {
 		return fmt.Errorf("API_HTTP_ADDR must not be empty")
+	}
+	if c.DatabaseURL != "" && c.AppEnv == "production" && c.DatabaseURL == "" {
+		return fmt.Errorf("DATABASE_URL must not be empty in production")
 	}
 	if c.AuthTokenSecret == "" {
 		return fmt.Errorf("AUTH_TOKEN_SECRET must not be empty")
