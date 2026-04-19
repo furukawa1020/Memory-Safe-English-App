@@ -10,9 +10,13 @@ import (
 )
 
 type ContentService struct {
-	contents         repository.ContentRepository
+	contents         ContentStore
 	chunkAnalyzer    ChunkAnalyzer
 	skeletonAnalyzer SkeletonAnalyzer
+}
+
+type ContentStore interface {
+	repository.ContentRepository
 }
 
 type ListContentsInput struct {
@@ -22,7 +26,7 @@ type ListContentsInput struct {
 	Language    string
 }
 
-func NewContentService(contents repository.ContentRepository, chunkAnalyzer ChunkAnalyzer, skeletonAnalyzer SkeletonAnalyzer) ContentService {
+func NewContentService(contents ContentStore, chunkAnalyzer ChunkAnalyzer, skeletonAnalyzer SkeletonAnalyzer) ContentService {
 	return ContentService{
 		contents:         contents,
 		chunkAnalyzer:    chunkAnalyzer,
