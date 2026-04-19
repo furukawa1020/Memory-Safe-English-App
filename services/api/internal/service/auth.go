@@ -11,10 +11,14 @@ import (
 )
 
 type AuthService struct {
-	auth   repository.AuthRepository
-	users  repository.UserRepository
+	auth   AuthStore
+	users  UserReader
 	hasher password.Hasher
 	tokens token.Manager
+}
+
+type AuthStore interface {
+	repository.AuthRepository
 }
 
 type RegisterInput struct {
@@ -30,7 +34,7 @@ type AuthResult struct {
 	NativeNotice string          `json:"native_notice,omitempty"`
 }
 
-func NewAuthService(auth repository.AuthRepository, users repository.UserRepository, hasher password.Hasher, tokens token.Manager) AuthService {
+func NewAuthService(auth AuthStore, users UserReader, hasher password.Hasher, tokens token.Manager) AuthService {
 	return AuthService{
 		auth:   auth,
 		users:  users,
