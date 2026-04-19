@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from app.analysis import AnalyzeTextInput
+
 
 @dataclass(slots=True)
 class RequestMetadata:
@@ -15,3 +17,6 @@ class AnalysisRequest:
     metadata: RequestMetadata
     raw_body: bytes
     content_type: str
+    route_operation: str
+    audit_name: str
+    payload: AnalyzeTextInput
