@@ -9,8 +9,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     cache::{CachePurgeSelector, CacheStats},
+    http_response::with_standard_headers,
     request_id::resolve_request_id,
-    response_headers::apply_standard_headers,
     state::AppState,
 };
 
@@ -132,13 +132,4 @@ struct PurgeCacheResponse {
 #[derive(Serialize)]
 struct AdminErrorResponse {
     error: &'static str,
-}
-
-fn with_standard_headers(
-    mut response: Response<Body>,
-    request_id: &HeaderValue,
-    cache_state: &'static str,
-) -> Response<Body> {
-    apply_standard_headers(response.headers_mut(), request_id, cache_state);
-    response
 }
