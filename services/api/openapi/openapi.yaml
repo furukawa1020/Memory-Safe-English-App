@@ -231,6 +231,21 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ChunkingResult"
+  /contents/{contentId}/skeleton:
+    get:
+      tags: [Contents]
+      summary: Get skeleton analysis for a content item
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ContentId"
+      responses:
+        "200":
+          description: Skeleton result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SkeletonResult"
   /sessions/start:
     post:
       tags: [Sessions]

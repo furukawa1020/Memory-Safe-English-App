@@ -45,6 +45,7 @@ services/api
 - `GET /contents/{id}`
 - `PATCH /contents/{id}`
 - `GET /contents/{id}/chunks`
+- `GET /contents/{id}/skeleton`
 - `POST /sessions/start`
 - `POST /sessions/{id}/event`
 - `POST /sessions/{id}/complete`
@@ -60,7 +61,7 @@ services/api
 
 ## Content Flow
 
-`/contents/{id}/chunks` は content の本文を worker に渡して chunk 解析を取得します。結果は API 側で cache し、同じ content への再アクセスでは worker を再実行しません。`PATCH /contents/{id}` で本文が更新された場合は cache を無効化します。
+`/contents/{id}/chunks` と `/contents/{id}/skeleton` は content の本文を worker に渡して解析を取得します。結果は API 側で個別に cache し、同じ content への再アクセスでは worker を再実行しません。`PATCH /contents/{id}` で本文が更新された場合は両方の cache を無効化します。
 
 ## Run
 
