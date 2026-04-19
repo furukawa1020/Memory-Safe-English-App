@@ -1,6 +1,6 @@
 # Memory Safe English
 
-Memory Safe English is an English-learning product designed for users who struggle with working-memory load during reading, listening, and speaking.
+Memory Safe English is an English-learning product designed for users who struggle with working-memory load during reading, listening, and speaking！
 
 This repository is a monorepo with four main parts:
 
