@@ -196,6 +196,7 @@ fn sanitize_request_headers(
 fn sanitize_response_headers(
     headers: &reqwest::header::HeaderMap,
     request_id: &HeaderValue,
+    upstream_name: &'static str,
 ) -> HeaderMap {
     let mut sanitized = HeaderMap::new();
     for (name, value) in headers {
@@ -205,11 +206,17 @@ fn sanitize_response_headers(
         sanitized.insert(name.clone(), value.clone());
     }
     apply_standard_headers(&mut sanitized, request_id, "miss");
+    apply_upstream_header(&mut sanitized, upstream_name);
     sanitized
 }
 
-fn build_cached_response(mut response: CachedResponse, request_id: &HeaderValue) -> Response<Body> {
+fn build_cached_response(
+    mut response: CachedResponse,
+    request_id: &HeaderValue,
+    upstream_name: &'static str,
+) -> Response<Body> {
     apply_standard_headers(&mut response.headers, request_id, "hit");
+    apply_upstream_header(&mut response.headers, upstream_name);
     build_response(response.status, response.headers, response.body)
 }
 
@@ -224,6 +231,7 @@ fn error_response(
     status: StatusCode,
     message: &'static str,
     request_id: &HeaderValue,
+    upstream_name: &'static str,
 ) -> Response<Body> {
     let payload = serde_json::json!({ "error": message }).to_string();
     let mut response = Response::new(Body::from(payload));
@@ -234,6 +242,7 @@ fn error_response(
         HeaderValue::from_static("application/json"),
     );
     apply_standard_headers(headers, request_id, "miss");
+    apply_upstream_header(headers, upstream_name);
     response
 }
 
@@ -254,6 +263,20 @@ impl Upstream {
         match self {
             Self::Api => "/api",
             Self::Worker => "/worker",
+        }
+    }
+
+    fn header_value(&self) -> &'static str {
+        match self {
+            Self::Api => "api",
+            Self::Worker => "worker",
+        }
+    }
+
+    fn cache_header_value(&self) -> &'static str {
+        match self {
+            Self::Api => "api-cache",
+            Self::Worker => "worker-cache",
         }
     }
 }
