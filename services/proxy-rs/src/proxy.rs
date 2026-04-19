@@ -203,6 +203,7 @@ fn cache_key(
 fn sanitize_request_headers(
     headers: &HeaderMap,
     request_id: &HeaderValue,
+    client_ip: &str,
 ) -> reqwest::header::HeaderMap {
     let mut sanitized = reqwest::header::HeaderMap::new();
     for (name, value) in headers {
@@ -212,6 +213,14 @@ fn sanitize_request_headers(
         sanitized.insert(name.clone(), value.clone());
     }
     sanitized.insert(HeaderName::from_static("x-request-id"), request_id.clone());
+    if !client_ip.is_empty()
+        && client_ip != "unknown"
+        && !sanitized.contains_key(HeaderName::from_static("x-forwarded-for"))
+    {
+        if let Ok(value) = HeaderValue::from_str(client_ip) {
+            sanitized.insert(HeaderName::from_static("x-forwarded-for"), value);
+        }
+    }
     sanitized
 }
 
@@ -266,6 +275,31 @@ fn error_response(
     apply_standard_headers(headers, request_id, "miss");
     apply_upstream_header(headers, upstream_name);
     response
+}
+
+fn rate_limited_response(
+    request_id: &HeaderValue,
+    upstream_name: &'static str,
+    retry_after: std::time::Duration,
+) -> Response<Body> {
+    let mut response = error_response(
+        StatusCode::TOO_MANY_REQUESTS,
+        "too many authentication attempts",
+        request_id,
+        upstream_name,
+    );
+    let retry_after_seconds = retry_after.as_secs().max(1).to_string();
+    if let Ok(value) = HeaderValue::from_str(&retry_after_seconds) {
+        response
+            .headers_mut()
+            .insert(HeaderName::from_static("retry-after"), value);
+    }
+    response
+}
+
+fn auth_rate_limit_key(path_and_query: &str, client_ip: &str) -> String {
+    let normalized = path_and_query.split('?').next().unwrap_or(path_and_query);
+    format!("auth:{normalized}:{client_ip}")
 }
 
 fn should_skip_header(header_name: &str) -> bool {
