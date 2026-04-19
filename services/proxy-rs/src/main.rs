@@ -1,6 +1,8 @@
 use std::time::Duration;
 
-use mse_proxy::{cache::CacheStore, config::Config, gc, rate_limit::RateLimiter, routes, state::AppState};
+use mse_proxy::{
+    cache::CacheStore, config::Config, gc, rate_limit::RateLimiter, routes, state::AppState,
+};
 use reqwest::Client;
 use tokio::{net::TcpListener, signal};
 use tracing::info;
@@ -38,9 +40,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let listener = TcpListener::bind(config.http_addr).await?;
     info!(address = %config.http_addr, "proxy listening");
 
-    axum::serve(listener, app.into_make_service_with_connect_info::<std::net::SocketAddr>())
-        .with_graceful_shutdown(shutdown_signal())
-        .await?;
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+    )
+    .with_graceful_shutdown(shutdown_signal())
+    .await?;
 
     gc::shutdown_gc_task(gc_handle).await;
     Ok(())
