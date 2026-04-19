@@ -48,6 +48,40 @@ impl CacheStore {
         Self::enforce_capacity(&mut guard, self.max_entries);
     }
 
+    pub async fn purge(&self, selector: CachePurgeSelector) -> usize {
+        let mut guard = self.inner.write().await;
+        let before = guard.len();
+        match selector {
+            CachePurgeSelector::All => guard.clear(),
+            CachePurgeSelector::Prefix(prefix) => {
+                guard.retain(|key, _| !key.starts_with(&prefix));
+            }
+        }
+        before.saturating_sub(guard.len())
+    }
+
+    pub async fn stats(&self) -> CacheStats {
+        let guard = self.inner.read().await;
+        let mut expired_entries = 0;
+        let mut oldest_age_seconds = 0;
+
+        for entry in guard.values() {
+            let age_seconds = entry.created_at.elapsed().as_secs();
+            oldest_age_seconds = oldest_age_seconds.max(age_seconds);
+            if entry.is_expired(self.ttl) {
+                expired_entries += 1;
+            }
+        }
+
+        CacheStats {
+            entries: guard.len(),
+            expired_entries,
+            max_entries: self.max_entries,
+            ttl_seconds: self.ttl.as_secs(),
+            oldest_age_seconds,
+        }
+    }
+
     pub async fn sweep_expired(&self) -> SweepResult {
         let mut guard = self.inner.write().await;
         let before = guard.len();
@@ -105,6 +139,21 @@ pub struct SweepResult {
     pub remaining: usize,
 }
 
+#[derive(Clone, Debug)]
+pub enum CachePurgeSelector {
+    All,
+    Prefix(String),
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct CacheStats {
+    pub entries: usize,
+    pub expired_entries: usize,
+    pub max_entries: usize,
+    pub ttl_seconds: u64,
+    pub oldest_age_seconds: u64,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -139,5 +188,32 @@ mod tests {
 
         assert!(cache.get("a").await.is_none());
         assert!(cache.get("b").await.is_some());
+    }
+
+    #[tokio::test]
+    async fn purges_by_prefix() {
+        let cache = CacheStore::new(Duration::from_secs(60), 10);
+        cache
+            .insert(
+                "POST:/worker/analyze/chunks:1".to_string(),
+                sample_response(),
+            )
+            .await;
+        cache
+            .insert(
+                "POST:/worker/analyze/skeleton:2".to_string(),
+                sample_response(),
+            )
+            .await;
+
+        let removed = cache
+            .purge(CachePurgeSelector::Prefix(
+                "POST:/worker/analyze/chunks".to_string(),
+            ))
+            .await;
+
+        assert_eq!(removed, 1);
+        assert!(cache.get("POST:/worker/analyze/chunks:1").await.is_none());
+        assert!(cache.get("POST:/worker/analyze/skeleton:2").await.is_some());
     }
 }
