@@ -24,6 +24,13 @@ pub fn apply_standard_headers(
     );
 }
 
+pub fn apply_upstream_header(headers: &mut HeaderMap, upstream_name: &'static str) {
+    headers.insert(
+        HeaderName::from_static("x-proxy-upstream"),
+        HeaderValue::from_static(upstream_name),
+    );
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -39,5 +46,14 @@ mod tests {
         assert_eq!(headers.get("x-proxy-cache").unwrap(), "miss");
         assert_eq!(headers.get("x-content-type-options").unwrap(), "nosniff");
         assert_eq!(headers.get("x-frame-options").unwrap(), "DENY");
+    }
+
+    #[test]
+    fn applies_upstream_header() {
+        let mut headers = HeaderMap::new();
+
+        apply_upstream_header(&mut headers, "api");
+
+        assert_eq!(headers.get("x-proxy-upstream").unwrap(), "api");
     }
 }
