@@ -37,7 +37,7 @@ func (a *Application) Routes() handlers.RouteSet {
 		a.Config.WorkerTimeout,
 	)
 	analysisService := service.NewAnalysisService(workerAnalyzer, workerAnalyzer)
-	contentService := service.NewContentService(a.Store, workerAnalyzer)
+	contentService := service.NewContentService(a.Store, workerAnalyzer, workerAnalyzer)
 
 	return handlers.RouteSet{
 		Health:   handlers.NewHealthHandler(),
