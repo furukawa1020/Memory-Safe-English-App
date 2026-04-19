@@ -24,7 +24,10 @@ pub async fn proxy_to_api(State(state): State<AppState>, request: Request<Body>)
     forward(state, request, Upstream::Api).await
 }
 
-pub async fn proxy_to_worker(State(state): State<AppState>, request: Request<Body>) -> Response<Body> {
+pub async fn proxy_to_worker(
+    State(state): State<AppState>,
+    request: Request<Body>,
+) -> Response<Body> {
     forward(state, request, Upstream::Worker).await
 }
 
@@ -68,11 +71,14 @@ async fn forward(state: AppState, request: Request<Body>, upstream: Upstream) ->
         Err(_) => return error_response(StatusCode::BAD_GATEWAY, "upstream request failed"),
     };
 
-    let status = StatusCode::from_u16(upstream_response.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY);
+    let status = StatusCode::from_u16(upstream_response.status().as_u16())
+        .unwrap_or(StatusCode::BAD_GATEWAY);
     let headers = sanitize_response_headers(upstream_response.headers());
     let response_body = match upstream_response.bytes().await {
         Ok(bytes) => bytes,
-        Err(_) => return error_response(StatusCode::BAD_GATEWAY, "failed to read upstream response"),
+        Err(_) => {
+            return error_response(StatusCode::BAD_GATEWAY, "failed to read upstream response")
+        }
     };
 
     if let Some(key) = maybe_cache_key {
@@ -100,7 +106,10 @@ fn upstream_url(
     path_and_query: &str,
 ) -> Result<String, http::uri::InvalidUri> {
     let uri: Uri = path_and_query.parse()?;
-    let suffix = uri.path_and_query().map(|value| value.as_str()).unwrap_or("/");
+    let suffix = uri
+        .path_and_query()
+        .map(|value| value.as_str())
+        .unwrap_or("/");
     let without_prefix = suffix.trim_start_matches(upstream.route_prefix());
     let rewritten = if without_prefix.starts_with('/') {
         without_prefix.to_string()
@@ -217,9 +226,27 @@ mod tests {
     #[test]
     fn only_worker_analysis_posts_are_cacheable() {
         let body = Bytes::from_static(br#"{"text":"hello"}"#);
-        assert!(cache_key(&Upstream::Worker, &http::Method::POST, "/worker/analyze/chunks", &body).is_some());
-        assert!(cache_key(&Upstream::Worker, &http::Method::POST, "/worker/analyze/skeleton", &body).is_some());
-        assert!(cache_key(&Upstream::Worker, &http::Method::GET, "/worker/analyze/chunks", &body).is_none());
+        assert!(cache_key(
+            &Upstream::Worker,
+            &http::Method::POST,
+            "/worker/analyze/chunks",
+            &body
+        )
+        .is_some());
+        assert!(cache_key(
+            &Upstream::Worker,
+            &http::Method::POST,
+            "/worker/analyze/skeleton",
+            &body
+        )
+        .is_some());
+        assert!(cache_key(
+            &Upstream::Worker,
+            &http::Method::GET,
+            "/worker/analyze/chunks",
+            &body
+        )
+        .is_none());
         assert!(cache_key(&Upstream::Api, &http::Method::POST, "/api/contents", &body).is_none());
     }
 }
