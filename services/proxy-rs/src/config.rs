@@ -11,6 +11,9 @@ pub struct Config {
     pub worker_base_url: String,
     pub admin_token: Option<String>,
     pub trusted_proxy_ips: Vec<IpAddr>,
+    pub admin_allowed_ips: Vec<IpAddr>,
+    pub admin_rate_limit_max_requests: usize,
+    pub admin_rate_limit_window: Duration,
     pub auth_rate_limit_max_requests: usize,
     pub auth_rate_limit_window: Duration,
     pub upstream_timeout: Duration,
@@ -28,6 +31,12 @@ impl Config {
             worker_base_url: parse_url("PROXY_WORKER_BASE_URL", "http://127.0.0.1:8090"),
             admin_token: parse_optional("PROXY_ADMIN_TOKEN"),
             trusted_proxy_ips: parse_ip_list("PROXY_TRUSTED_PROXY_IPS")?,
+            admin_allowed_ips: parse_ip_list("PROXY_ADMIN_ALLOWED_IPS")?,
+            admin_rate_limit_max_requests: parse_env("PROXY_ADMIN_RATE_LIMIT_MAX_REQUESTS", "30")?,
+            admin_rate_limit_window: Duration::from_secs(parse_env(
+                "PROXY_ADMIN_RATE_LIMIT_WINDOW_SECONDS",
+                "60",
+            )?),
             auth_rate_limit_max_requests: parse_env("PROXY_AUTH_RATE_LIMIT_MAX_REQUESTS", "20")?,
             auth_rate_limit_window: Duration::from_secs(parse_env(
                 "PROXY_AUTH_RATE_LIMIT_WINDOW_SECONDS",
@@ -51,6 +60,18 @@ impl Config {
             return Err(ConfigError::InvalidValue(
                 "PROXY_AUTH_RATE_LIMIT_MAX_REQUESTS".to_string(),
                 self.auth_rate_limit_max_requests.to_string(),
+            ));
+        }
+        if self.admin_rate_limit_max_requests == 0 {
+            return Err(ConfigError::InvalidValue(
+                "PROXY_ADMIN_RATE_LIMIT_MAX_REQUESTS".to_string(),
+                self.admin_rate_limit_max_requests.to_string(),
+            ));
+        }
+        if self.admin_rate_limit_window <= Duration::ZERO {
+            return Err(ConfigError::InvalidValue(
+                "PROXY_ADMIN_RATE_LIMIT_WINDOW_SECONDS".to_string(),
+                self.admin_rate_limit_window.as_secs().to_string(),
             ));
         }
         if self.auth_rate_limit_window <= Duration::ZERO {
@@ -162,6 +183,9 @@ mod tests {
             worker_base_url: "http://127.0.0.1:8090".to_string(),
             admin_token: Some("short".to_string()),
             trusted_proxy_ips: Vec::new(),
+            admin_allowed_ips: Vec::new(),
+            admin_rate_limit_max_requests: 30,
+            admin_rate_limit_window: Duration::from_secs(60),
             auth_rate_limit_max_requests: 20,
             auth_rate_limit_window: Duration::from_secs(60),
             upstream_timeout: Duration::from_secs(10),
