@@ -32,7 +32,7 @@ function Assert-CommandAvailable {
 }
 
 function Assert-DockerDaemonAvailable {
-    & docker info *> $null
+    cmd /c "docker info >nul 2>nul"
     if ($LASTEXITCODE -ne 0) {
         throw "Docker daemon is not reachable. Start Docker Desktop or the Docker service, then retry."
     }
