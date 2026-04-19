@@ -9,6 +9,7 @@ def test_skeleton_extracts_core_parts() -> None:
     assert result.parts
     assert any(part.role == "core" for part in result.parts)
     assert result.summary
+    assert result.version
 
 
 def test_skeleton_falls_back_when_only_modifiers_exist() -> None:
