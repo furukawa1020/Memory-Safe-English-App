@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	"memory-safe-english/services/api/internal/domain"
 	"memory-safe-english/services/api/internal/repository"
@@ -61,4 +63,54 @@ func (s ContentService) GetChunks(ctx context.Context, contentID string) (domain
 		return domain.ChunkingResult{}, err
 	}
 	return result, nil
+}
+
+func (s ContentService) Create(ctx context.Context, input domain.ContentUpsertInput) (domain.Content, error) {
+	normalized := input.Normalize()
+	if err := normalized.Validate(); err != nil {
+		return domain.Content{}, err
+	}
+
+	now := time.Now().UTC()
+	contentID := fmt.Sprintf("cnt_%d", now.UnixNano())
+	content := domain.NewContentFromInput(contentID, normalized, now)
+	return s.contents.CreateContent(ctx, content)
+}
+
+func (s ContentService) Update(ctx context.Context, contentID string, input domain.ContentUpsertInput) (domain.Content, error) {
+	if contentID == "" {
+		return domain.Content{}, domain.ErrInvalidInput
+	}
+
+	normalized := input.Normalize()
+	if err := normalized.Validate(); err != nil {
+		return domain.Content{}, err
+	}
+
+	existing, err := s.contents.GetContent(ctx, contentID)
+	if err != nil {
+		return domain.Content{}, err
+	}
+
+	updated := domain.Content{
+		ID:          existing.ID,
+		Title:       normalized.Title,
+		ContentType: normalized.ContentType,
+		Level:       normalized.Level,
+		Topic:       normalized.Topic,
+		Language:    normalized.Language,
+		RawText:     normalized.RawText,
+		SummaryText: normalized.SummaryText,
+		CreatedAt:   existing.CreatedAt,
+		UpdatedAt:   time.Now().UTC(),
+	}
+
+	content, err := s.contents.UpdateContent(ctx, updated)
+	if err != nil {
+		return domain.Content{}, err
+	}
+	if err := s.contents.DeleteChunkingResult(ctx, contentID); err != nil {
+		return domain.Content{}, err
+	}
+	return content, nil
 }
