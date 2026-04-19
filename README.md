@@ -81,6 +81,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test.ps1
 The smoke test exercises:
 
 - proxy readiness
+- mobile bootstrap metadata
 - auth register or login
 - content listing
 - chunk analysis

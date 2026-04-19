@@ -8,7 +8,8 @@ use reqwest::Method;
 use sha2::{Digest, Sha256};
 
 use crate::{
-    cache::CachedResponse, request_id::resolve_request_id,
+    cache::CachedResponse,
+    request_id::resolve_request_id,
     response_headers::{apply_standard_headers, apply_upstream_header},
     state::AppState,
 };
@@ -99,8 +100,11 @@ async fn forward(state: AppState, request: Request<Body>, upstream: Upstream) ->
 
     let status = StatusCode::from_u16(upstream_response.status().as_u16())
         .unwrap_or(StatusCode::BAD_GATEWAY);
-    let headers =
-        sanitize_response_headers(upstream_response.headers(), &request_id, upstream.header_value());
+    let headers = sanitize_response_headers(
+        upstream_response.headers(),
+        &request_id,
+        upstream.header_value(),
+    );
     let response_body = match upstream_response.bytes().await {
         Ok(bytes) => bytes,
         Err(_) => {
