@@ -113,6 +113,25 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ChunkingResult"
+  /analysis/skeleton:
+    post:
+      tags: [Analysis]
+      summary: Extract memory-safe sentence skeleton through the worker service
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnalyzeChunksRequest"
+      responses:
+        "200":
+          description: Skeleton result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SkeletonResult"
   /contents:
     get:
       tags: [Contents]
@@ -476,11 +495,37 @@ components:
     ChunkingResult:
       type: object
       properties:
+        version:
+          type: string
         language:
           type: string
         chunks:
           type: array
           items:
             $ref: "#/components/schemas/Chunk"
+        summary:
+          type: string
+    SkeletonPart:
+      type: object
+      properties:
+        order:
+          type: integer
+        text:
+          type: string
+        role:
+          type: string
+        emphasis:
+          type: integer
+    SkeletonResult:
+      type: object
+      properties:
+        version:
+          type: string
+        language:
+          type: string
+        parts:
+          type: array
+          items:
+            $ref: "#/components/schemas/SkeletonPart"
         summary:
           type: string
