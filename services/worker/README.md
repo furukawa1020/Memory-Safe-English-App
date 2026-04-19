@@ -1,6 +1,6 @@
 # Worker Service
 
-`services/worker` is the Python analysis worker for chunking and skeleton extraction.
+`services/worker` is the Python analysis worker for chunking, skeleton extraction, and reader-plan generation.
 
 ## Structure
 
@@ -10,6 +10,7 @@ services/worker
 |  |- analysis/
 |  |- chunking/
 |  |- http/
+|  |- reader_plan/
 |  |- skeleton/
 |  |- application.py
 |  |- config.py
@@ -29,6 +30,7 @@ services/worker
 - `app/analysis/`: typed request models and operation dispatch
 - `app/chunking/`: chunking service
 - `app/skeleton/`: skeleton extraction service
+- `app/reader_plan/`: progressive reading plan generation for low-memory reading flows
 - `app/http/request_parser.py`: HTTP request parsing and validation
 - `app/http/routes.py`: endpoint to operation mapping
 - `app/http/handlers.py`: transport and security guards
@@ -39,6 +41,7 @@ services/worker
 - `GET /health`
 - `POST /analyze/chunks`
 - `POST /analyze/skeleton`
+- `POST /analyze/reader-plan`
 - versioned analysis responses
 - API key authentication
 - HMAC request signing
@@ -69,7 +72,7 @@ docker build -t mse-worker services/worker
 }
 ```
 
-The same request shape works for both analysis endpoints.
+The same request shape works for all analysis endpoints.
 
 ## Verify
 

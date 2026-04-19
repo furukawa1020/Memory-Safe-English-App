@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from app.analysis.models import AnalyzeTextInput
-from app.models import ChunkingResult, SkeletonResult
+from app.models import ChunkingResult, ReaderPlanResult, SkeletonResult
 
 
 class ChunkAnalyzer(Protocol):
@@ -13,6 +13,10 @@ class ChunkAnalyzer(Protocol):
 
 class SkeletonAnalyzer(Protocol):
     def extract(self, text: str, language: str = "en") -> SkeletonResult: ...
+
+
+class ReaderPlanAnalyzer(Protocol):
+    def build(self, text: str, language: str = "en") -> ReaderPlanResult: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -26,12 +30,15 @@ class AnalysisRoute:
 class AnalysisService:
     chunk_analyzer: ChunkAnalyzer
     skeleton_analyzer: SkeletonAnalyzer
+    reader_plan_analyzer: ReaderPlanAnalyzer
 
-    def analyze(self, operation: str, request: AnalyzeTextInput) -> ChunkingResult | SkeletonResult:
+    def analyze(self, operation: str, request: AnalyzeTextInput) -> ChunkingResult | SkeletonResult | ReaderPlanResult:
         if operation == "chunking":
             return self.chunk_analyzer.chunk_text(text=request.text, language=request.language)
         if operation == "skeleton":
             return self.skeleton_analyzer.extract(text=request.text, language=request.language)
+        if operation == "reader_plan":
+            return self.reader_plan_analyzer.build(text=request.text, language=request.language)
         raise ValueError(f"unsupported analysis operation: {operation}")
 
     @staticmethod
@@ -39,4 +46,5 @@ class AnalysisService:
         return (
             AnalysisRoute(path="/analyze/chunks", audit_name="chunking_analyzed", operation="chunking"),
             AnalysisRoute(path="/analyze/skeleton", audit_name="skeleton_analyzed", operation="skeleton"),
+            AnalysisRoute(path="/analyze/reader-plan", audit_name="reader_plan_analyzed", operation="reader_plan"),
         )

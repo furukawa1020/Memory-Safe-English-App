@@ -115,3 +115,15 @@ def test_skeleton_endpoint() -> None:
         assert payload["parts"]
         assert payload["summary"]
         assert payload["version"]
+
+
+def test_reader_plan_endpoint() -> None:
+    with running_server(make_settings()) as server:
+        body = {"text": "In this study, we propose a memory safe interface that reduces overload during reading."}
+        body_text = json.dumps(body)
+        response, payload = post_json(server.server_port, "/analyze/reader-plan", body, signed_headers(body_text))
+
+        assert response.status == HTTPStatus.OK
+        assert payload["recommended_mode"] == "progressive"
+        assert payload["focus_steps"]
+        assert payload["version"]

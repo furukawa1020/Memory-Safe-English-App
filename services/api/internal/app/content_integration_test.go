@@ -52,6 +52,7 @@ func TestServerContentFlow(t *testing.T) {
 		LoginMaxAttempts:       10,
 		RegisterMaxAttempts:    5,
 		RefreshMaxAttempts:     20,
+		RefreshCleanupInterval: time.Hour,
 		WorkerBaseURL:          worker.URL,
 		WorkerAPIKey:           "worker-api-key",
 		WorkerSignatureKey:     "worker-signature-key",

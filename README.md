@@ -57,6 +57,7 @@ The proxy also exposes mobile-friendly API routes such as `/auth/login`, `/auth/
 If the proxy is deployed behind another trusted reverse proxy or load balancer, configure `PROXY_TRUSTED_PROXY_IPS` so forwarded client IP headers are only accepted from that trusted peer.
 Admin endpoints on the proxy can also be locked down with `PROXY_ADMIN_ALLOWED_IPS` and have their own independent rate limit window.
 The Go API rotates refresh tokens on every refresh and revokes the full token family if an older refresh token is replayed.
+The Go API also writes auth audit logs and periodically removes expired refresh sessions.
 
 ## Recommended Local Workflow
 

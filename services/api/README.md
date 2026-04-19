@@ -72,6 +72,8 @@ The PostgreSQL implementation is split by responsibility.
 - replaying an older refresh token revokes the whole refresh-token family
 - protected routes use Bearer token middleware
 - auth routes use in-memory rate limiting for `login`, `register`, and `refresh`
+- auth success, failure, and rate-limit decisions are written as audit logs
+- expired refresh sessions are cleaned up on a background interval
 - `X-Request-ID` is propagated to responses and logs
 - `X-Content-Type-Options: nosniff` is set
 - worker calls use API key + timestamp + HMAC signature
@@ -99,6 +101,7 @@ Main environment variables:
 - `AUTH_RATE_LIMIT_LOGIN_MAX_ATTEMPTS`: default `10`
 - `AUTH_RATE_LIMIT_REGISTER_MAX_ATTEMPTS`: default `5`
 - `AUTH_RATE_LIMIT_REFRESH_MAX_ATTEMPTS`: default `20`
+- `AUTH_REFRESH_CLEANUP_INTERVAL`: default `1h`
 - `WORKER_BASE_URL`: default `http://127.0.0.1:8090`
 - `WORKER_API_KEY`: worker API key
 - `WORKER_SIGNATURE_KEY`: worker request signing key
