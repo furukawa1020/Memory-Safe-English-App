@@ -23,6 +23,16 @@ services/worker
 `- README.md
 ```
 
+## Design
+
+- `app/analysis/`: request schema と analysis dispatch
+- `app/chunking/`: chunk 分割ユースケース
+- `app/skeleton/`: skeleton 抽出ユースケース
+- `app/http/request_parser.py`: HTTP request から typed request への変換
+- `app/http/routes.py`: endpoint と operation の対応
+- `app/http/handlers.py`: HTTP transport と guard 適用
+- `app/text_analysis.py`: chunking / skeleton の共有ロジック
+
 ## Current Features
 
 - `POST /analyze/chunks`
@@ -30,6 +40,7 @@ services/worker
 - API key 認証
 - HMAC request signing
 - body / text size 制限
+- typed request validation
 - request timeout
 - rate limiting
 - structured audit logging
