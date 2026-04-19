@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import logging
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler
@@ -25,38 +24,11 @@ class WorkerHTTPHandler:
     def handle_health(self) -> tuple[HTTPStatus, dict]:
         return HTTPStatus.OK, {"status": "ok", "service": "worker"}
 
-    def handle_chunking(self, raw_body: bytes) -> tuple[HTTPStatus, dict]:
-        parsed, error = self._parse_text_payload(raw_body)
-        if error is not None:
-            return error
-        text, language = parsed
-        result = self.app.chunking_service.chunk_text(text=text, language=language)
+    def handle_analysis(self, request: AnalysisRequest) -> tuple[HTTPStatus, dict]:
+        if len(request.payload.text) > self.app.settings.max_text_chars:
+            return HTTPStatus.REQUEST_ENTITY_TOO_LARGE, error_payload("text_too_large", "text exceeds allowed length")
+        result = self.app.analysis_service.analyze(request.route_operation, request.payload)
         return HTTPStatus.OK, result.to_dict()
-
-    def handle_skeleton(self, raw_body: bytes) -> tuple[HTTPStatus, dict]:
-        parsed, error = self._parse_text_payload(raw_body)
-        if error is not None:
-            return error
-        text, language = parsed
-        result = self.app.skeleton_service.extract(text=text, language=language)
-        return HTTPStatus.OK, result.to_dict()
-
-    def _parse_text_payload(self, raw_body: bytes) -> tuple[tuple[str, str] | None, tuple[HTTPStatus, dict] | None]:
-        try:
-            payload = json.loads(raw_body or b"{}")
-        except json.JSONDecodeError:
-            return None, (HTTPStatus.BAD_REQUEST, error_payload("invalid_json", "request body must be valid JSON"))
-
-        text = str(payload.get("text", "")).strip()
-        language = str(payload.get("language", "en")).strip() or "en"
-        if not text:
-            return None, (HTTPStatus.BAD_REQUEST, error_payload("invalid_request", "text is required"))
-        if len(text) > self.app.settings.max_text_chars:
-            return None, (
-                HTTPStatus.REQUEST_ENTITY_TOO_LARGE,
-                error_payload("text_too_large", "text exceeds allowed length"),
-            )
-        return (text, language), None
 
 
 def create_request_handler(app: "Application") -> type[BaseHTTPRequestHandler]:
@@ -73,10 +45,6 @@ def create_request_handler(app: "Application") -> type[BaseHTTPRequestHandler]:
             self._write_json(status, payload)
 
         def do_POST(self) -> None:  # noqa: N802
-            if self.path not in {"/analyze/chunks", "/analyze/skeleton"}:
-                self._write_json(HTTPStatus.NOT_FOUND, error_payload("not_found", "route not found"))
-                return
-
             request, request_error = parse_analysis_request(self, max_body_bytes=app.settings.max_body_bytes)
             if request_error is not None:
                 self._write_json(*request_error)
@@ -88,18 +56,13 @@ def create_request_handler(app: "Application") -> type[BaseHTTPRequestHandler]:
                 return
 
             try:
-                if self.path == "/analyze/chunks":
-                    status, payload = transport.handle_chunking(request.raw_body)
-                    audit_name = "chunking_analyzed"
-                else:
-                    status, payload = transport.handle_skeleton(request.raw_body)
-                    audit_name = "skeleton_analyzed"
+                status, payload = transport.handle_analysis(request)
             except Exception:  # pragma: no cover - defensive fallback
                 LOGGER.exception("worker request failed")
                 audit_event("request_failed", request=request, status=HTTPStatus.INTERNAL_SERVER_ERROR)
                 status, payload = HTTPStatus.INTERNAL_SERVER_ERROR, error_payload("internal_error", "internal server error")
             else:
-                audit_event(audit_name, request=request, status=status)
+                audit_event(request.audit_name, request=request, status=status)
             self._write_json(status, payload)
 
         def log_message(self, format: str, *args: object) -> None:  # noqa: A003
