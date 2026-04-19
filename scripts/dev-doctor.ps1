@@ -29,28 +29,24 @@ function Get-CheckResult {
 $results = New-Object System.Collections.Generic.List[object]
 
 $dockerInstalled = Test-CommandAvailable -CommandName "docker"
-$results.Add((Get-CheckResult -Name "docker_cli" -Passed $dockerInstalled -Details (
-    if ($dockerInstalled) { "Docker CLI found in PATH." } else { "Install Docker Desktop or Docker CLI." }
-)))
+$dockerCliDetails = if ($dockerInstalled) { "Docker CLI found in PATH." } else { "Install Docker Desktop or Docker CLI." }
+$results.Add((Get-CheckResult -Name "docker_cli" -Passed $dockerInstalled -Details $dockerCliDetails))
 
 $dockerDaemonReady = $false
 if ($dockerInstalled) {
     & docker info *> $null
     $dockerDaemonReady = ($LASTEXITCODE -eq 0)
 }
-$results.Add((Get-CheckResult -Name "docker_daemon" -Passed $dockerDaemonReady -Details (
-    if ($dockerDaemonReady) { "Docker daemon is reachable." } else { "Start Docker Desktop or the Docker service." }
-)))
+$dockerDaemonDetails = if ($dockerDaemonReady) { "Docker daemon is reachable." } else { "Start Docker Desktop or the Docker service." }
+$results.Add((Get-CheckResult -Name "docker_daemon" -Passed $dockerDaemonReady -Details $dockerDaemonDetails))
 
 $flutterInstalled = Test-CommandAvailable -CommandName "flutter"
-$results.Add((Get-CheckResult -Name "flutter_sdk" -Passed $flutterInstalled -Details (
-    if ($flutterInstalled) { "Flutter SDK found in PATH." } else { "Install Flutter and add it to PATH." }
-)))
+$flutterDetails = if ($flutterInstalled) { "Flutter SDK found in PATH." } else { "Install Flutter and add it to PATH." }
+$results.Add((Get-CheckResult -Name "flutter_sdk" -Passed $flutterInstalled -Details $flutterDetails))
 
 $adbInstalled = Test-CommandAvailable -CommandName "adb"
-$results.Add((Get-CheckResult -Name "adb" -Passed $adbInstalled -Details (
-    if ($adbInstalled) { "Android Debug Bridge found in PATH." } else { "Install Android platform tools or Android Studio." }
-)))
+$adbDetails = if ($adbInstalled) { "Android Debug Bridge found in PATH." } else { "Install Android platform tools or Android Studio." }
+$results.Add((Get-CheckResult -Name "adb" -Passed $adbInstalled -Details $adbDetails))
 
 $proxyReady = $false
 try {
@@ -59,9 +55,8 @@ try {
 } catch {
     $proxyReady = $false
 }
-$results.Add((Get-CheckResult -Name "proxy_ready" -Passed $proxyReady -Details (
-    if ($proxyReady) { "Proxy is ready at $ProxyBaseUrl." } else { "Proxy is not ready. Start the stack with scripts/start-dev-stack.ps1." }
-)))
+$proxyDetails = if ($proxyReady) { "Proxy is ready at $ProxyBaseUrl." } else { "Proxy is not ready. Start the stack with scripts/start-dev-stack.ps1." }
+$results.Add((Get-CheckResult -Name "proxy_ready" -Passed $proxyReady -Details $proxyDetails))
 
 foreach ($result in $results) {
     $marker = if ($result.passed) { "[OK]" } else { "[WARN]" }
