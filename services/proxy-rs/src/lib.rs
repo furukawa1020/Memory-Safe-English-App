@@ -1,6 +1,7 @@
 pub mod admin;
 pub mod cache;
 pub mod config;
+pub mod frontend;
 pub mod gc;
 pub mod http_response;
 pub mod proxy;
