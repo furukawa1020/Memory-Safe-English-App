@@ -39,6 +39,18 @@ def test_chunking_endpoint_rejects_empty_text() -> None:
         assert payload["error"]["code"] == "invalid_request"
 
 
+def test_chunking_endpoint_rejects_non_object_payload() -> None:
+    with running_server(make_settings()) as server:
+        conn = HTTPConnection("127.0.0.1", server.server_port)
+        raw_body = json.dumps(["invalid"])
+        conn.request("POST", "/analyze/chunks", body=raw_body, headers=signed_headers(raw_body))
+        response = conn.getresponse()
+        payload = json.loads(response.read())
+
+        assert response.status == HTTPStatus.BAD_REQUEST
+        assert payload["error"]["code"] == "invalid_json"
+
+
 def test_chunking_endpoint_requires_api_key() -> None:
     with running_server(make_settings()) as server:
         response, payload = post_json(
