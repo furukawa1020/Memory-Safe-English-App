@@ -11,4 +11,5 @@ pub mod readiness;
 pub mod request_id;
 pub mod response_headers;
 pub mod routes;
+pub mod security_audit;
 pub mod state;
