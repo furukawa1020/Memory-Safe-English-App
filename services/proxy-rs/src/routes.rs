@@ -68,7 +68,7 @@ mod tests {
     use tokio::net::TcpListener;
     use tower::ServiceExt;
 
-    use crate::{cache::CacheStore, config::Config, state::AppState};
+    use crate::{cache::CacheStore, config::Config, rate_limit::RateLimiter, state::AppState};
 
     fn state() -> AppState {
         AppState {
@@ -77,6 +77,8 @@ mod tests {
                 api_base_url: "http://127.0.0.1:8080".to_string(),
                 worker_base_url: "http://127.0.0.1:8090".to_string(),
                 admin_token: Some("secret".to_string()),
+                auth_rate_limit_max_requests: 10,
+                auth_rate_limit_window: Duration::from_secs(60),
                 upstream_timeout: Duration::from_secs(5),
                 cache_ttl: Duration::from_secs(60),
                 gc_interval: Duration::from_secs(60),
@@ -85,6 +87,7 @@ mod tests {
             },
             http_client: reqwest::Client::new(),
             cache: CacheStore::new(Duration::from_secs(60), 32),
+            auth_rate_limiter: RateLimiter::new(10, Duration::from_secs(60)),
         }
     }
 
@@ -316,6 +319,8 @@ mod tests {
                 api_base_url,
                 worker_base_url,
                 admin_token: Some("secret".to_string()),
+                auth_rate_limit_max_requests: 10,
+                auth_rate_limit_window: Duration::from_secs(60),
                 upstream_timeout: Duration::from_secs(5),
                 cache_ttl: Duration::from_secs(60),
                 gc_interval: Duration::from_secs(60),
@@ -324,6 +329,7 @@ mod tests {
             },
             http_client: reqwest::Client::new(),
             cache: CacheStore::new(Duration::from_secs(60), 32),
+            auth_rate_limiter: RateLimiter::new(10, Duration::from_secs(60)),
         }
     }
 
