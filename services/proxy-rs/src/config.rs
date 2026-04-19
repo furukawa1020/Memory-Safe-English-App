@@ -1,4 +1,8 @@
-use std::{env, net::SocketAddr, time::Duration};
+use std::{
+    env,
+    net::{IpAddr, SocketAddr},
+    time::Duration,
+};
 
 #[derive(Clone, Debug)]
 pub struct Config {
@@ -6,6 +10,7 @@ pub struct Config {
     pub api_base_url: String,
     pub worker_base_url: String,
     pub admin_token: Option<String>,
+    pub trusted_proxy_ips: Vec<IpAddr>,
     pub auth_rate_limit_max_requests: usize,
     pub auth_rate_limit_window: Duration,
     pub upstream_timeout: Duration,
@@ -22,6 +27,7 @@ impl Config {
             api_base_url: parse_url("PROXY_API_BASE_URL", "http://127.0.0.1:8080"),
             worker_base_url: parse_url("PROXY_WORKER_BASE_URL", "http://127.0.0.1:8090"),
             admin_token: parse_optional("PROXY_ADMIN_TOKEN"),
+            trusted_proxy_ips: parse_ip_list("PROXY_TRUSTED_PROXY_IPS")?,
             auth_rate_limit_max_requests: parse_env("PROXY_AUTH_RATE_LIMIT_MAX_REQUESTS", "20")?,
             auth_rate_limit_window: Duration::from_secs(parse_env(
                 "PROXY_AUTH_RATE_LIMIT_WINDOW_SECONDS",
@@ -51,6 +57,26 @@ fn parse_optional(key: &str) -> Option<String> {
         .ok()
         .map(|value| value.trim().to_string())
         .filter(|value| !value.is_empty())
+}
+
+fn parse_ip_list(key: &str) -> Result<Vec<IpAddr>, ConfigError> {
+    let raw = match env::var(key) {
+        Ok(value) => value,
+        Err(_) => return Ok(Vec::new()),
+    };
+
+    let mut values = Vec::new();
+    for item in raw.split(',') {
+        let trimmed = item.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        let ip = trimmed
+            .parse::<IpAddr>()
+            .map_err(|_| ConfigError::InvalidValue(key.to_string(), trimmed.to_string()))?;
+        values.push(ip);
+    }
+    Ok(values)
 }
 
 fn parse_env<T>(key: &str, default_value: &str) -> Result<T, ConfigError>
