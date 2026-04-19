@@ -1,13 +1,16 @@
 use axum::{
     extract::State,
-    http::StatusCode,
+    http::{HeaderMap, HeaderValue, Response, StatusCode},
     response::IntoResponse,
     routing::{any, get, post},
     Json, Router,
 };
 use serde::Serialize;
 
-use crate::{admin, proxy, state::AppState};
+use crate::{
+    admin, proxy, request_id::resolve_request_id, response_headers::apply_standard_headers,
+    state::AppState,
+};
 
 pub fn build_router(state: AppState) -> Router {
     Router::new()
@@ -19,14 +22,20 @@ pub fn build_router(state: AppState) -> Router {
         .with_state(state)
 }
 
-async fn health(State(state): State<AppState>) -> impl IntoResponse {
-    (
-        StatusCode::OK,
-        Json(HealthResponse {
-            ok: true,
-            api_base_url: state.config.api_base_url,
-            worker_base_url: state.config.worker_base_url,
-        }),
+async fn health(State(state): State<AppState>, headers: HeaderMap) -> impl IntoResponse {
+    let request_id = resolve_request_id(&headers);
+    with_standard_headers(
+        (
+            StatusCode::OK,
+            Json(HealthResponse {
+                ok: true,
+                api_base_url: state.config.api_base_url,
+                worker_base_url: state.config.worker_base_url,
+            }),
+        )
+            .into_response(),
+        &request_id,
+        "miss",
     )
 }
 
@@ -35,6 +44,15 @@ struct HealthResponse {
     ok: bool,
     api_base_url: String,
     worker_base_url: String,
+}
+
+fn with_standard_headers(
+    mut response: Response,
+    request_id: &HeaderValue,
+    cache_state: &'static str,
+) -> Response {
+    apply_standard_headers(response.headers_mut(), request_id, cache_state);
+    response
 }
 
 #[cfg(test)]
@@ -101,5 +119,22 @@ mod tests {
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn health_endpoint_returns_request_id_header() {
+        let app = build_router(state());
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/health")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert!(response.headers().get("x-request-id").is_some());
+        assert_eq!(response.headers().get("x-proxy-cache").unwrap(), "miss");
     }
 }
