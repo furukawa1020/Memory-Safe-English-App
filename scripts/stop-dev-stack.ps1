@@ -14,6 +14,10 @@ $composePath = Resolve-Path (Join-Path $repoRoot $ComposeFile)
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
     throw "Docker was not found in PATH."
 }
+& docker info *> $null
+if ($LASTEXITCODE -ne 0) {
+    throw "Docker daemon is not reachable. Start Docker Desktop or the Docker service, then retry."
+}
 
 $composeArgs = @("compose", "-f", $composePath, "down")
 if ($RemoveVolumes) {

@@ -31,6 +31,13 @@ function Assert-CommandAvailable {
     }
 }
 
+function Assert-DockerDaemonAvailable {
+    & docker info *> $null
+    if ($LASTEXITCODE -ne 0) {
+        throw "Docker daemon is not reachable. Start Docker Desktop or the Docker service, then retry."
+    }
+}
+
 function Get-ContainerHealth {
     param([string]$ContainerName)
 
@@ -84,6 +91,7 @@ function Wait-ForHealthyContainers {
 }
 
 Assert-CommandAvailable -CommandName "docker"
+Assert-DockerDaemonAvailable
 
 Write-Host "Starting local development stack..."
 $composeArgs = @("compose", "-f", $composePath, "up", "-d")
