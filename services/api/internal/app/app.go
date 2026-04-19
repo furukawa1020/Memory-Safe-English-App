@@ -1,10 +1,13 @@
 package app
 
 import (
+	"context"
+
 	"memory-safe-english/services/api/internal/config"
 	"memory-safe-english/services/api/internal/handlers"
 	"memory-safe-english/services/api/internal/security/password"
 	"memory-safe-english/services/api/internal/security/token"
+	"memory-safe-english/services/api/internal/store/postgres"
 	"memory-safe-english/services/api/internal/service"
 	"memory-safe-english/services/api/internal/store/memory"
 	"memory-safe-english/services/api/internal/workerclient"
@@ -12,24 +15,55 @@ import (
 
 type Application struct {
 	Config       config.Config
-	Store        *memory.Store
+	Users        interface {
+		service.UserReader
+	}
+	Auth         interface {
+		service.AuthStore
+	}
+	Sessions     interface {
+		service.SessionStore
+	}
+	Contents     interface {
+		service.ContentStore
+	}
 	PasswordHash password.Hasher
 	TokenManager token.Manager
+	closeFn      func(context.Context) error
 }
 
-func NewApplication(cfg config.Config) *Application {
-	return &Application{
+func NewApplication(cfg config.Config) (*Application, error) {
+	app := &Application{
 		Config:       cfg,
-		Store:        memory.NewStore(),
 		PasswordHash: password.NewHasher(cfg.PasswordHashIterations),
 		TokenManager: token.NewManager(cfg.AuthTokenSecret, cfg.AccessTokenTTL, cfg.RefreshTokenTTL),
 	}
+
+	if cfg.DatabaseURL != "" {
+		store, err := postgres.NewStore(cfg.DatabaseURL)
+		if err != nil {
+			return nil, err
+		}
+		app.Users = store
+		app.Auth = store
+		app.Sessions = store
+		app.Contents = store
+		app.closeFn = store.Close
+		return app, nil
+	}
+
+	store := memory.NewStore()
+	app.Users = store
+	app.Auth = store
+	app.Sessions = store
+	app.Contents = store
+	return app, nil
 }
 
 func (a *Application) Routes() handlers.RouteSet {
-	authService := service.NewAuthService(a.Store, a.Store, a.PasswordHash, a.TokenManager)
-	userService := service.NewUserService(a.Store)
-	sessionService := service.NewSessionService(a.Store, a.Store)
+	authService := service.NewAuthService(a.Auth, a.Users, a.PasswordHash, a.TokenManager)
+	userService := service.NewUserService(a.Users)
+	sessionService := service.NewSessionService(a.Users, a.Sessions)
 	workerAnalyzer := workerclient.New(
 		a.Config.WorkerBaseURL,
 		a.Config.WorkerAPIKey,
@@ -37,7 +71,7 @@ func (a *Application) Routes() handlers.RouteSet {
 		a.Config.WorkerTimeout,
 	)
 	analysisService := service.NewAnalysisService(workerAnalyzer, workerAnalyzer)
-	contentService := service.NewContentService(a.Store, workerAnalyzer, workerAnalyzer)
+	contentService := service.NewContentService(a.Contents, workerAnalyzer, workerAnalyzer)
 
 	return handlers.RouteSet{
 		Health:   handlers.NewHealthHandler(),
@@ -47,4 +81,11 @@ func (a *Application) Routes() handlers.RouteSet {
 		Analysis: handlers.NewAnalysisHandler(analysisService),
 		Content:  handlers.NewContentHandler(contentService),
 	}
+}
+
+func (a *Application) Close(ctx context.Context) error {
+	if a.closeFn == nil {
+		return nil
+	}
+	return a.closeFn(ctx)
 }
