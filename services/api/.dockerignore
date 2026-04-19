@@ -1,0 +1,5 @@
+.git
+coverage.out
+bin/
+dist/
+**/*_test.go
