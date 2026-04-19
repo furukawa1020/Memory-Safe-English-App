@@ -6,6 +6,8 @@ pub struct Config {
     pub api_base_url: String,
     pub worker_base_url: String,
     pub admin_token: Option<String>,
+    pub auth_rate_limit_max_requests: usize,
+    pub auth_rate_limit_window: Duration,
     pub upstream_timeout: Duration,
     pub cache_ttl: Duration,
     pub gc_interval: Duration,
@@ -20,6 +22,11 @@ impl Config {
             api_base_url: parse_url("PROXY_API_BASE_URL", "http://127.0.0.1:8080"),
             worker_base_url: parse_url("PROXY_WORKER_BASE_URL", "http://127.0.0.1:8090"),
             admin_token: parse_optional("PROXY_ADMIN_TOKEN"),
+            auth_rate_limit_max_requests: parse_env("PROXY_AUTH_RATE_LIMIT_MAX_REQUESTS", "20")?,
+            auth_rate_limit_window: Duration::from_secs(parse_env(
+                "PROXY_AUTH_RATE_LIMIT_WINDOW_SECONDS",
+                "60",
+            )?),
             upstream_timeout: Duration::from_secs(parse_env(
                 "PROXY_UPSTREAM_TIMEOUT_SECONDS",
                 "10",
