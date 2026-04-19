@@ -9,10 +9,14 @@ import (
 )
 
 type UserService struct {
-	users repository.UserRepository
+	users UserReader
 }
 
-func NewUserService(users repository.UserRepository) UserService {
+type UserReader interface {
+	repository.UserRepository
+}
+
+func NewUserService(users UserReader) UserService {
 	return UserService{users: users}
 }
 
