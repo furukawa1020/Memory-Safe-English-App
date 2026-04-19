@@ -1,24 +1,62 @@
 .DS_Store
 .idea/
 .vscode/
+.history/
 
 # Flutter
 .dart_tool/
 .flutter-plugins
 .flutter-plugins-dependencies
+.fvm/
 .packages
 build/
+**/build/
+coverage/
+pubspec.lock
+android/.gradle/
+android/app/debug/
+android/app/profile/
+android/app/release/
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/Flutter/Generated.xcconfig
+ios/Flutter/app.flx
+ios/Flutter/app.so
+ios/Flutter/ephemeral/
+ios/Pods/
+macos/Flutter/ephemeral/
+linux/flutter/ephemeral/
+windows/flutter/ephemeral/
 
 # Go
 bin/
 dist/
 coverage.out
+*.test
+*.prof
+vendor/
 
 # Python
 __pycache__/
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+.tox/
+.nox/
 .venv/
 venv/
+env/
+pip-wheel-metadata/
+*.pyc
+*.pyo
+*.pyd
+.coverage
+.coverage.*
+htmlcov/
+
+# Rust
+target/
 
 # Env
 .env
@@ -27,6 +65,9 @@ venv/
 
 # Logs
 *.log
+logs/
+tmp/
+temp/
 
 # OS
 Thumbs.db
