@@ -252,3 +252,35 @@ class AssessmentProfileResult:
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+@dataclass(slots=True)
+class CollapseSite:
+    chunk_order: int
+    text: str
+    role: str
+    risk_level: str
+    stop_count: int
+    reasons: list[str]
+    recommendation: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(slots=True)
+class CollapsePatternResult:
+    version: str
+    language: str
+    summary: str
+    dominant_pattern: str
+    sites: list[CollapseSite]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "version": self.version,
+            "language": self.language,
+            "summary": self.summary,
+            "dominant_pattern": self.dominant_pattern,
+            "sites": [site.to_dict() for site in self.sites],
+        }

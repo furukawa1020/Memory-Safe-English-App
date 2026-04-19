@@ -16,6 +16,7 @@ class AnalyzeTextInput:
     target_context: str = _DEFAULT_TARGET_CONTEXT
     self_reported_difficulties: list[str] | None = None
     fatigue_level: str = _DEFAULT_FATIGUE_LEVEL
+    session_events: list[dict[str, str | int | float]] | None = None
 
     @classmethod
     def from_payload(cls, payload: object) -> "AnalyzeTextInput":
@@ -27,6 +28,7 @@ class AnalyzeTextInput:
         target_context = payload.get("target_context", _DEFAULT_TARGET_CONTEXT)
         self_reported_difficulties = payload.get("self_reported_difficulties", [])
         fatigue_level = payload.get("fatigue_level", _DEFAULT_FATIGUE_LEVEL)
+        session_events = payload.get("session_events", [])
 
         if not isinstance(text, str):
             raise ValueError("text must be a string")
@@ -38,6 +40,8 @@ class AnalyzeTextInput:
             raise ValueError("self_reported_difficulties must be a list of strings")
         if not isinstance(fatigue_level, str):
             raise ValueError("fatigue_level must be a string")
+        if not isinstance(session_events, list):
+            raise ValueError("session_events must be a list of event objects")
 
         normalized_text = text.strip()
         normalized_language = language.strip().lower() or _DEFAULT_LANGUAGE
@@ -50,6 +54,26 @@ class AnalyzeTextInput:
             if normalized_item:
                 normalized_difficulties.append(normalized_item)
         normalized_fatigue_level = fatigue_level.strip().lower() or _DEFAULT_FATIGUE_LEVEL
+        normalized_events: list[dict[str, str | int | float]] = []
+        for item in session_events:
+            if not isinstance(item, dict):
+                raise ValueError("session_events must be a list of event objects")
+            event_type = item.get("event_type", "")
+            chunk_order = item.get("chunk_order", 0)
+            seconds = item.get("seconds", 0)
+            if not isinstance(event_type, str):
+                raise ValueError("session_events.event_type must be a string")
+            if not isinstance(chunk_order, int):
+                raise ValueError("session_events.chunk_order must be an integer")
+            if not isinstance(seconds, (int, float)):
+                raise ValueError("session_events.seconds must be numeric")
+            normalized_events.append(
+                {
+                    "event_type": event_type.strip().lower(),
+                    "chunk_order": chunk_order,
+                    "seconds": float(seconds),
+                }
+            )
 
         if not normalized_text:
             raise ValueError("text is required")
@@ -67,4 +91,5 @@ class AnalyzeTextInput:
             target_context=normalized_target_context,
             self_reported_difficulties=normalized_difficulties,
             fatigue_level=normalized_fatigue_level,
+            session_events=normalized_events,
         )
