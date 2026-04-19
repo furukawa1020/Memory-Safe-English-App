@@ -1,7 +1,6 @@
 use axum::{
-    body::{to_bytes, Body},
     extract::State,
-    http::{Request, StatusCode},
+    http::StatusCode,
     response::IntoResponse,
     routing::{any, get},
     Json, Router,
@@ -41,7 +40,10 @@ mod tests {
     use super::*;
     use std::{net::SocketAddr, time::Duration};
 
-    use axum::body::to_bytes;
+    use axum::{
+        body::{to_bytes, Body},
+        http::Request,
+    };
     use tower::ServiceExt;
 
     use crate::{cache::CacheStore, config::Config, state::AppState};
