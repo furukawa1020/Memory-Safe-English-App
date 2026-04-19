@@ -162,3 +162,40 @@ class ListeningPlanResult:
             "pause_points": [pause_point.to_dict() for pause_point in self.pause_points],
             "final_pass_strategy": self.final_pass_strategy,
         }
+
+
+@dataclass(slots=True)
+class SpeakingStep:
+    step: int
+    text: str
+    purpose: str
+    risk_level: str
+    delivery_tip_ja: str
+    delivery_tip_en: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(slots=True)
+class SpeakingPlanResult:
+    version: str
+    language: str
+    summary: str
+    recommended_style: str
+    opener_options: list[str]
+    bridge_phrases: list[str]
+    steps: list[SpeakingStep]
+    rescue_phrases: list[str]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "version": self.version,
+            "language": self.language,
+            "summary": self.summary,
+            "recommended_style": self.recommended_style,
+            "opener_options": self.opener_options,
+            "bridge_phrases": self.bridge_phrases,
+            "steps": [step.to_dict() for step in self.steps],
+            "rescue_phrases": self.rescue_phrases,
+        }

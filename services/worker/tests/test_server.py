@@ -144,3 +144,16 @@ def test_listening_plan_endpoint() -> None:
         assert payload["pause_points"]
         assert payload["final_pass_strategy"]
         assert payload["version"]
+
+
+def test_speaking_plan_endpoint() -> None:
+    with running_server(make_settings()) as server:
+        body = {"text": "In this study, we propose a memory safe interface that reduces overload during reading."}
+        body_text = json.dumps(body)
+        response, payload = post_json(server.server_port, "/analyze/speaking-plan", body, signed_headers(body_text))
+
+        assert response.status == HTTPStatus.OK
+        assert payload["recommended_style"] == "short-linked-sentences"
+        assert payload["steps"]
+        assert payload["rescue_phrases"]
+        assert payload["version"]
