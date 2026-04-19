@@ -1,7 +1,6 @@
 package app
 
 import (
-	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -51,6 +50,30 @@ func TestServerContentFlow(t *testing.T) {
 		t.Fatalf("list contents status = %d, body = %s", listRec.Code, listRec.Body.String())
 	}
 
+	createBody := map[string]any{
+		"title":        "Conference Self Intro",
+		"content_type": "reading",
+		"level":        "intro",
+		"topic":        "self_intro",
+		"language":     "en",
+		"raw_text":     "Hello, my name is Aki, and I study cognitive support interfaces.",
+		"summary_text": "Conference intro",
+	}
+	createRec := authorizedJSONRequest(t, server, accessToken, http.MethodPost, "/contents", createBody)
+	if createRec.Code != http.StatusCreated {
+		t.Fatalf("create content status = %d, body = %s", createRec.Code, createRec.Body.String())
+	}
+
+	var created struct {
+		ContentID string `json:"content_id"`
+	}
+	if err := json.Unmarshal(createRec.Body.Bytes(), &created); err != nil {
+		t.Fatalf("unmarshal create content response: %v", err)
+	}
+	if created.ContentID == "" {
+		t.Fatalf("expected created content id")
+	}
+
 	chunksReq := httptest.NewRequest(http.MethodGet, "/contents/cnt_research_001/chunks", nil)
 	chunksReq.Header.Set("Authorization", "Bearer "+accessToken)
 	chunksRec := httptest.NewRecorder()
@@ -67,32 +90,29 @@ func TestServerContentFlow(t *testing.T) {
 		t.Fatalf("get chunks second status = %d, body = %s", chunksRec2.Code, chunksRec2.Body.String())
 	}
 
-	if workerCalls != 1 {
-		t.Fatalf("expected worker to be called once due to cache, got %d", workerCalls)
+	updateBody := map[string]any{
+		"title":        "Research Presentation Opening",
+		"content_type": "reading",
+		"level":        "intermediate",
+		"topic":        "research",
+		"language":     "en",
+		"raw_text":     "We redesigned reading support to lower memory load during English processing.",
+		"summary_text": "Updated research opening",
 	}
-}
+	updateRec := authorizedJSONRequest(t, server, accessToken, http.MethodPatch, "/contents/cnt_research_001", updateBody)
+	if updateRec.Code != http.StatusOK {
+		t.Fatalf("update content status = %d, body = %s", updateRec.Code, updateRec.Body.String())
+	}
 
-func registerTestUser(t *testing.T, server *http.Server) string {
-	t.Helper()
-	registerBody := map[string]any{
-		"email":           "user@example.com",
-		"password":        "secret1234567",
-		"display_name":    "Aki",
-		"agreed_to_terms": true,
+	chunksReq3 := httptest.NewRequest(http.MethodGet, "/contents/cnt_research_001/chunks", nil)
+	chunksReq3.Header.Set("Authorization", "Bearer "+accessToken)
+	chunksRec3 := httptest.NewRecorder()
+	server.Handler.ServeHTTP(chunksRec3, chunksReq3)
+	if chunksRec3.Code != http.StatusOK {
+		t.Fatalf("get chunks third status = %d, body = %s", chunksRec3.Code, chunksRec3.Body.String())
 	}
-	registerBytes, _ := json.Marshal(registerBody)
-	registerReq := httptest.NewRequest(http.MethodPost, "/auth/register", bytes.NewReader(registerBytes))
-	registerReq.Header.Set("Content-Type", "application/json")
-	registerRec := httptest.NewRecorder()
-	server.Handler.ServeHTTP(registerRec, registerReq)
 
-	var registerResp struct {
-		Tokens struct {
-			AccessToken string `json:"access_token"`
-		} `json:"tokens"`
+	if workerCalls != 2 {
+		t.Fatalf("expected worker to be called twice after cache invalidation, got %d", workerCalls)
 	}
-	if err := json.Unmarshal(registerRec.Body.Bytes(), &registerResp); err != nil {
-		t.Fatalf("unmarshal register response: %v", err)
-	}
-	return registerResp.Tokens.AccessToken
 }
