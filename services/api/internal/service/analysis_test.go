@@ -22,16 +22,19 @@ func (s stubAnalyzer) AnalyzeSkeleton(_ context.Context, text, language string) 
 }
 
 func TestAnalysisServiceAnalyzeChunks(t *testing.T) {
-	svc := NewAnalysisService(stubAnalyzer{
-		chunkResult: domain.ChunkingResult{
-			Version:  "2026-04-19",
-			Language: "en",
-			Chunks: []domain.Chunk{
-				{Order: 1, Text: "we propose", Role: "core", SkeletonRank: 1},
+	svc := NewAnalysisService(
+		stubAnalyzer{
+			chunkResult: domain.ChunkingResult{
+				Version:  "2026-04-19",
+				Language: "en",
+				Chunks: []domain.Chunk{
+					{Order: 1, Text: "we propose", Role: "core", SkeletonRank: 1},
+				},
+				Summary: "we propose",
 			},
-			Summary: "we propose",
 		},
-	})
+		stubAnalyzer{},
+	)
 
 	result, err := svc.AnalyzeChunks(context.Background(), domain.AnalyzeChunksInput{
 		Text:     "We propose a memory safe interface.",

@@ -39,6 +39,7 @@ services/api
 - `POST /auth/refresh`
 - `GET /me`
 - `POST /analysis/chunks`
+- `POST /analysis/skeleton`
 - `GET /contents`
 - `POST /contents`
 - `GET /contents/{id}`
