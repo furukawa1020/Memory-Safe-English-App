@@ -90,3 +90,14 @@ def test_chunking_endpoint_rate_limits_burst_requests() -> None:
         second_response, payload = post_json(server.server_port, "/analyze/chunks", body, signed_headers(body_text))
         assert second_response.status == HTTPStatus.TOO_MANY_REQUESTS
         assert payload["error"]["code"] == "rate_limited"
+
+
+def test_skeleton_endpoint() -> None:
+    with running_server(make_settings()) as server:
+        body = {"text": "In this study, we propose a memory safe interface."}
+        body_text = json.dumps(body)
+        response, payload = post_json(server.server_port, "/analyze/skeleton", body, signed_headers(body_text))
+
+        assert response.status == HTTPStatus.OK
+        assert payload["parts"]
+        assert payload["summary"]
