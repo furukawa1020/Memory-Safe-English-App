@@ -1,6 +1,9 @@
 param(
     [string]$ProxyBaseUrl = "http://127.0.0.1:8070",
-    [string]$AdminToken = "dev-proxy-admin-token"
+    [string]$AdminToken = "dev-proxy-admin-token",
+    [string]$Email = "smoke@example.com",
+    [string]$Password = "correct horse battery staple",
+    [string]$DisplayName = "Smoke Test"
 )
 
 $ErrorActionPreference = "Stop"
@@ -27,33 +30,74 @@ function Invoke-JsonRequest {
     Invoke-RestMethod @params
 }
 
-Write-Host "1. Checking proxy health..."
-$health = Invoke-JsonRequest -Method "GET" -Url "$ProxyBaseUrl/health"
-$health | ConvertTo-Json -Depth 5 | Write-Host
+function Get-AuthTokens {
+    param(
+        [string]$BaseUrl,
+        [string]$EmailAddress,
+        [string]$PlaintextPassword,
+        [string]$Name
+    )
 
-Write-Host "2. Registering a test user through the proxy..."
-$register = Invoke-JsonRequest -Method "POST" -Url "$ProxyBaseUrl/api/auth/register" -Body @{
-    email = "smoke@example.com"
-    password = "correct horse battery staple"
-    display_name = "Smoke Test"
+    try {
+        $registerResponse = Invoke-JsonRequest -Method "POST" -Url "$BaseUrl/api/auth/register" -Body @{
+            email            = $EmailAddress
+            password         = $PlaintextPassword
+            display_name     = $Name
+            agreed_to_terms  = $true
+        }
+
+        return $registerResponse.tokens
+    } catch {
+        Write-Host "Registration did not succeed. Falling back to login..."
+    }
+
+    $loginResponse = Invoke-JsonRequest -Method "POST" -Url "$BaseUrl/api/auth/login" -Body @{
+        email    = $EmailAddress
+        password = $PlaintextPassword
+    }
+
+    return $loginResponse.tokens
 }
-$accessToken = $register.access_token
 
-Write-Host "3. Listing seeded contents..."
-$contents = Invoke-JsonRequest -Method "GET" -Url "$ProxyBaseUrl/api/contents"
-$firstContentId = $contents.items[0].id
-$contents | ConvertTo-Json -Depth 6 | Write-Host
+Write-Host "1. Checking proxy readiness..."
+$readiness = Invoke-JsonRequest -Method "GET" -Url "$ProxyBaseUrl/ready"
+$readiness | ConvertTo-Json -Depth 8 | Write-Host
 
-Write-Host "4. Requesting chunk analysis for the first content..."
-$chunkResult = Invoke-JsonRequest -Method "GET" -Url "$ProxyBaseUrl/api/contents/$firstContentId/chunks" -Headers @{
+Write-Host "2. Registering or logging in the smoke-test user..."
+$tokens = Get-AuthTokens -BaseUrl $ProxyBaseUrl -EmailAddress $Email -PlaintextPassword $Password -Name $DisplayName
+$accessToken = $tokens.access_token
+if (-not $accessToken) {
+    throw "Smoke test could not obtain an access token."
+}
+
+$authHeaders = @{
     Authorization = "Bearer $accessToken"
 }
-$chunkResult | ConvertTo-Json -Depth 6 | Write-Host
 
-Write-Host "5. Checking proxy cache stats..."
+Write-Host "3. Fetching the current user..."
+$me = Invoke-JsonRequest -Method "GET" -Url "$ProxyBaseUrl/api/me" -Headers $authHeaders
+$me | ConvertTo-Json -Depth 6 | Write-Host
+
+Write-Host "4. Listing seeded contents..."
+$contents = Invoke-JsonRequest -Method "GET" -Url "$ProxyBaseUrl/api/contents" -Headers $authHeaders
+if (-not $contents.items -or $contents.items.Count -eq 0) {
+    throw "Smoke test expected at least one seeded content item."
+}
+$firstContentId = $contents.items[0].content_id
+$contents | ConvertTo-Json -Depth 8 | Write-Host
+
+Write-Host "5. Requesting chunk analysis for the first content..."
+$chunkResult = Invoke-JsonRequest -Method "GET" -Url "$ProxyBaseUrl/api/contents/$firstContentId/chunks" -Headers $authHeaders
+$chunkResult | ConvertTo-Json -Depth 8 | Write-Host
+
+Write-Host "6. Requesting skeleton analysis for the first content..."
+$skeletonResult = Invoke-JsonRequest -Method "GET" -Url "$ProxyBaseUrl/api/contents/$firstContentId/skeleton" -Headers $authHeaders
+$skeletonResult | ConvertTo-Json -Depth 8 | Write-Host
+
+Write-Host "7. Checking proxy cache stats..."
 $cacheStats = Invoke-JsonRequest -Method "GET" -Url "$ProxyBaseUrl/admin/cache" -Headers @{
     "X-Proxy-Admin-Token" = $AdminToken
 }
-$cacheStats | ConvertTo-Json -Depth 5 | Write-Host
+$cacheStats | ConvertTo-Json -Depth 8 | Write-Host
 
-Write-Host "Smoke test completed."
+Write-Host "Smoke test completed successfully."
