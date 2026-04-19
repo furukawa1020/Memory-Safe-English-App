@@ -10,8 +10,12 @@ import (
 )
 
 type SessionService struct {
-	sessions repository.SessionRepository
-	users    repository.UserRepository
+	sessions SessionStore
+	users    UserReader
+}
+
+type SessionStore interface {
+	repository.SessionRepository
 }
 
 type StartSessionInput struct {
@@ -28,7 +32,7 @@ type AddEventInput struct {
 	OccurredAt time.Time
 }
 
-func NewSessionService(users repository.UserRepository, sessions repository.SessionRepository) SessionService {
+func NewSessionService(users UserReader, sessions SessionStore) SessionService {
 	return SessionService{
 		sessions: sessions,
 		users:    users,
