@@ -231,3 +231,24 @@ class RescuePlanResult:
             "primary_strategy": self.primary_strategy,
             "phrases": [phrase.to_dict() for phrase in self.phrases],
         }
+
+
+@dataclass(slots=True)
+class AssessmentProfileResult:
+    version: str
+    language: str
+    target_context: str
+    profile_label: str
+    notice: str
+    reading_load_score: int
+    listening_load_score: int
+    speaking_load_score: int
+    recommended_reader_mode: str
+    recommended_listening_mode: str
+    recommended_speaking_mode: str
+    recommended_display_density: str
+    recommended_pause_frequency: str
+    reasons: list[str]
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
