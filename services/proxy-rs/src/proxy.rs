@@ -395,5 +395,19 @@ mod tests {
 
         assert_eq!(sanitized.get("x-request-id").unwrap(), "request-123");
         assert_eq!(sanitized.get("x-forwarded-for").unwrap(), "198.51.100.10");
+        assert_eq!(sanitized.get("x-real-ip").unwrap(), "198.51.100.10");
+    }
+
+    #[test]
+    fn sanitize_request_headers_replaces_untrusted_forwarding_headers() {
+        let mut headers = HeaderMap::new();
+        headers.insert("x-forwarded-for", HeaderValue::from_static("203.0.113.10"));
+        headers.insert("x-real-ip", HeaderValue::from_static("203.0.113.11"));
+        let request_id = HeaderValue::from_static("request-123");
+
+        let sanitized = sanitize_request_headers(&headers, &request_id, "198.51.100.10");
+
+        assert_eq!(sanitized.get("x-forwarded-for").unwrap(), "198.51.100.10");
+        assert_eq!(sanitized.get("x-real-ip").unwrap(), "198.51.100.10");
     }
 }
