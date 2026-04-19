@@ -19,6 +19,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = Config::from_env()?;
     let cache = CacheStore::new(config.cache_ttl, config.cache_max_entries);
     let gc_handle = gc::spawn_gc_task(cache.clone(), config.gc_interval);
+    let admin_rate_limiter = RateLimiter::new(
+        config.admin_rate_limit_max_requests,
+        config.admin_rate_limit_window,
+    );
     let auth_rate_limiter = RateLimiter::new(
         config.auth_rate_limit_max_requests,
         config.auth_rate_limit_window,
@@ -33,6 +37,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         config: config.clone(),
         http_client,
         cache,
+        admin_rate_limiter,
         auth_rate_limiter,
     };
     let app = routes::build_router(app_state);
