@@ -1,4 +1,5 @@
 use axum::{
+    body::Body,
     extract::State,
     http::{HeaderMap, HeaderValue, Response, StatusCode},
     response::IntoResponse,
@@ -47,10 +48,10 @@ struct HealthResponse {
 }
 
 fn with_standard_headers(
-    mut response: Response,
+    mut response: Response<Body>,
     request_id: &HeaderValue,
     cache_state: &'static str,
-) -> Response {
+) -> Response<Body> {
     apply_standard_headers(response.headers_mut(), request_id, cache_state);
     response
 }
