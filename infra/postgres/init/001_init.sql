@@ -1,7 +1,7 @@
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 CREATE TABLE IF NOT EXISTS users (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id TEXT PRIMARY KEY,
     email TEXT UNIQUE,
     password_hash TEXT,
     auth_provider TEXT NOT NULL,
@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 CREATE TABLE IF NOT EXISTS user_profiles (
-    user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     display_name TEXT NOT NULL,
     native_language TEXT NOT NULL DEFAULT 'ja',
     learning_goal TEXT,
@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS user_profiles (
 );
 
 CREATE TABLE IF NOT EXISTS user_settings (
-    user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     chunk_length TEXT NOT NULL DEFAULT 'short',
     font_scale NUMERIC(4,2) NOT NULL DEFAULT 1.0,
     line_spacing NUMERIC(4,2) NOT NULL DEFAULT 1.4,
@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS user_settings (
 );
 
 CREATE TABLE IF NOT EXISTS contents (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id TEXT PRIMARY KEY,
     title TEXT NOT NULL,
     content_type TEXT NOT NULL,
     level TEXT NOT NULL,
@@ -51,8 +51,8 @@ CREATE TABLE IF NOT EXISTS contents (
 );
 
 CREATE TABLE IF NOT EXISTS content_chunks (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    content_id UUID NOT NULL REFERENCES contents(id) ON DELETE CASCADE,
+    id TEXT PRIMARY KEY,
+    content_id TEXT NOT NULL REFERENCES contents(id) ON DELETE CASCADE,
     chunk_order INTEGER NOT NULL,
     chunk_text TEXT NOT NULL,
     chunk_role TEXT,
@@ -63,8 +63,8 @@ CREATE TABLE IF NOT EXISTS content_chunks (
 );
 
 CREATE TABLE IF NOT EXISTS audio_assets (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    content_id UUID REFERENCES contents(id) ON DELETE SET NULL,
+    id TEXT PRIMARY KEY,
+    content_id TEXT REFERENCES contents(id) ON DELETE SET NULL,
     storage_key TEXT NOT NULL,
     duration_ms INTEGER NOT NULL,
     transcript_text TEXT,
@@ -73,19 +73,19 @@ CREATE TABLE IF NOT EXISTS audio_assets (
 );
 
 CREATE TABLE IF NOT EXISTS sessions (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     mode TEXT NOT NULL,
-    content_id UUID REFERENCES contents(id) ON DELETE SET NULL,
+    content_id TEXT REFERENCES contents(id) ON DELETE SET NULL,
     started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     completed_at TIMESTAMPTZ,
     completion_state TEXT NOT NULL DEFAULT 'started'
 );
 
 CREATE TABLE IF NOT EXISTS exercise_attempts (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    exercise_id UUID NOT NULL,
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    exercise_id TEXT NOT NULL,
     mode TEXT NOT NULL,
     started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     completed_at TIMESTAMPTZ,
@@ -94,11 +94,12 @@ CREATE TABLE IF NOT EXISTS exercise_attempts (
 );
 
 CREATE TABLE IF NOT EXISTS event_logs (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    session_id UUID NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
     event_type TEXT NOT NULL,
     payload_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+    occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -108,8 +109,8 @@ CREATE INDEX IF NOT EXISTS idx_event_logs_event_type ON event_logs (event_type);
 CREATE INDEX IF NOT EXISTS idx_event_logs_created_at ON event_logs (created_at);
 
 CREATE TABLE IF NOT EXISTS analytics_snapshots (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     snapshot_date DATE NOT NULL,
     reading_load_score NUMERIC(5,2),
     listening_load_score NUMERIC(5,2),
@@ -120,13 +121,20 @@ CREATE TABLE IF NOT EXISTS analytics_snapshots (
 );
 
 CREATE TABLE IF NOT EXISTS rescue_phrases (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id TEXT PRIMARY KEY,
     category TEXT NOT NULL,
     phrase_en TEXT NOT NULL,
     phrase_ja TEXT,
-    audio_asset_id UUID REFERENCES audio_assets(id) ON DELETE SET NULL,
+    audio_asset_id TEXT REFERENCES audio_assets(id) ON DELETE SET NULL,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS content_analysis_cache (
+    content_id TEXT PRIMARY KEY REFERENCES contents(id) ON DELETE CASCADE,
+    chunking_result JSONB,
+    skeleton_result JSONB,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 INSERT INTO rescue_phrases (category, phrase_en, phrase_ja)
