@@ -20,10 +20,10 @@ pub async fn cache_stats(State(state): State<AppState>, headers: HeaderMap) -> i
     if !is_authorized(&state, &headers) {
         return with_standard_headers(
             (
-            StatusCode::UNAUTHORIZED,
-            Json(AdminErrorResponse {
-                error: "unauthorized",
-            }),
+                StatusCode::UNAUTHORIZED,
+                Json(AdminErrorResponse {
+                    error: "unauthorized",
+                }),
             )
                 .into_response(),
             &request_id,
@@ -48,10 +48,10 @@ pub async fn purge_cache(
     if !is_authorized(&state, &headers) {
         return with_standard_headers(
             (
-            StatusCode::UNAUTHORIZED,
-            Json(AdminErrorResponse {
-                error: "unauthorized",
-            }),
+                StatusCode::UNAUTHORIZED,
+                Json(AdminErrorResponse {
+                    error: "unauthorized",
+                }),
             )
                 .into_response(),
             &request_id,
@@ -66,10 +66,10 @@ pub async fn purge_cache(
         Some(_) => {
             return with_standard_headers(
                 (
-                StatusCode::BAD_REQUEST,
-                Json(AdminErrorResponse {
-                    error: "invalid purge scope",
-                }),
+                    StatusCode::BAD_REQUEST,
+                    Json(AdminErrorResponse {
+                        error: "invalid purge scope",
+                    }),
                 )
                     .into_response(),
                 &request_id,
