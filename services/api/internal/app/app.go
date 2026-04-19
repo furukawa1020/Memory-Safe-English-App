@@ -15,18 +15,10 @@ import (
 
 type Application struct {
 	Config       config.Config
-	Users        interface {
-		service.UserReader
-	}
-	Auth         interface {
-		service.AuthStore
-	}
-	Sessions     interface {
-		service.SessionStore
-	}
-	Contents     interface {
-		service.ContentStore
-	}
+	Users        service.UserReader
+	Auth         service.AuthStore
+	Sessions     service.SessionStore
+	Contents     service.ContentStore
 	PasswordHash password.Hasher
 	TokenManager token.Manager
 	closeFn      func(context.Context) error

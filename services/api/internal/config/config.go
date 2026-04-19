@@ -41,9 +41,6 @@ func (c Config) Validate() error {
 	if c.HTTPAddr == "" {
 		return fmt.Errorf("API_HTTP_ADDR must not be empty")
 	}
-	if c.DatabaseURL != "" && c.AppEnv == "production" && c.DatabaseURL == "" {
-		return fmt.Errorf("DATABASE_URL must not be empty in production")
-	}
 	if c.AuthTokenSecret == "" {
 		return fmt.Errorf("AUTH_TOKEN_SECRET must not be empty")
 	}
