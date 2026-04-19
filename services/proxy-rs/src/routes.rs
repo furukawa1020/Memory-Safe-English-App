@@ -258,6 +258,56 @@ mod tests {
         assert!(text.contains("\"ready\":false"));
     }
 
+    #[tokio::test]
+    async fn mobile_friendly_auth_route_proxies_to_api() {
+        let api = spawn_api_server().await;
+        let worker = spawn_health_server(StatusCode::OK).await;
+        let app = build_router(state_with_urls(api.base_url(), worker.base_url()));
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/auth/login")
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        r#"{"email":"reader@example.com","password":"secret123456"}"#,
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.headers().get("x-proxy-upstream").unwrap(), "api");
+        let body = to_bytes(response.into_body(), 2048).await.unwrap();
+        let text = String::from_utf8(body.to_vec()).unwrap();
+        assert!(text.contains("\"access_token\":\"token-123\""));
+    }
+
+    #[tokio::test]
+    async fn mobile_bootstrap_returns_frontend_ready_metadata() {
+        let api = spawn_health_server(StatusCode::OK).await;
+        let worker = spawn_health_server(StatusCode::OK).await;
+        let app = build_router(state_with_urls(api.base_url(), worker.base_url()));
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/bootstrap/mobile")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = to_bytes(response.into_body(), 4096).await.unwrap();
+        let text = String::from_utf8(body.to_vec()).unwrap();
+        assert!(text.contains("\"android_emulator\":\"http://10.0.2.2:8070\""));
+        assert!(text.contains("\"login\":\"/auth/login\""));
+    }
+
     fn state_with_urls(api_base_url: String, worker_base_url: String) -> AppState {
         AppState {
             config: Config {
@@ -283,6 +333,32 @@ mod tests {
                 (
                     status,
                     AxumJson(serde_json::json!({ "ok": status.is_success() })),
+                )
+            }),
+        );
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+
+        tokio::spawn(async move {
+            axum::serve(listener, app).await.unwrap();
+        });
+
+        TestServer { address }
+    }
+
+    async fn spawn_api_server() -> TestServer {
+        let app = AxumRouter::new().route(
+            "/auth/login",
+            axum::routing::post(|| async {
+                (
+                    StatusCode::OK,
+                    AxumJson(serde_json::json!({
+                        "tokens": {
+                            "access_token": "token-123",
+                            "refresh_token": "refresh-123",
+                            "token_type": "Bearer"
+                        }
+                    })),
                 )
             }),
         );
