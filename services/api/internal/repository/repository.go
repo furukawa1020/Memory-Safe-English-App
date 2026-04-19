@@ -29,3 +29,17 @@ type SessionRepository interface {
 	GetSession(ctx context.Context, sessionID string) (domain.Session, error)
 	AddEvent(ctx context.Context, userID, sessionID, eventType string, payload map[string]any, occurredAt time.Time) (domain.EventLog, error)
 }
+
+type ContentFilter struct {
+	ContentType string
+	Level       string
+	Topic       string
+	Language    string
+}
+
+type ContentRepository interface {
+	ListContents(ctx context.Context, filter ContentFilter) ([]domain.Content, error)
+	GetContent(ctx context.Context, contentID string) (domain.Content, error)
+	GetChunkingResult(ctx context.Context, contentID string) (domain.ChunkingResult, error)
+	SaveChunkingResult(ctx context.Context, contentID string, result domain.ChunkingResult) error
+}
