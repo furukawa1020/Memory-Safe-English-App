@@ -5,6 +5,7 @@ import (
 
 	"memory-safe-english/services/api/internal/config"
 	"memory-safe-english/services/api/internal/handlers"
+	security "memory-safe-english/services/api/internal/security"
 	"memory-safe-english/services/api/internal/security/password"
 	"memory-safe-english/services/api/internal/security/token"
 	"memory-safe-english/services/api/internal/service"
@@ -64,10 +65,15 @@ func (a *Application) Routes() handlers.RouteSet {
 	)
 	analysisService := service.NewAnalysisService(workerAnalyzer, workerAnalyzer)
 	contentService := service.NewContentService(a.Contents, workerAnalyzer, workerAnalyzer)
+	authLimiters := handlers.AuthRateLimiters{
+		Login:    security.NewAttemptLimiter(a.Config.LoginMaxAttempts, a.Config.AuthRateLimitWindow),
+		Register: security.NewAttemptLimiter(a.Config.RegisterMaxAttempts, a.Config.AuthRateLimitWindow),
+		Refresh:  security.NewClientOnlyAttemptLimiter(a.Config.RefreshMaxAttempts, a.Config.AuthRateLimitWindow),
+	}
 
 	return handlers.RouteSet{
 		Health:   handlers.NewHealthHandler(),
-		Auth:     handlers.NewAuthHandler(authService),
+		Auth:     handlers.NewAuthHandler(authService, authLimiters),
 		Me:       handlers.NewMeHandler(userService),
 		Session:  handlers.NewSessionHandler(sessionService),
 		Analysis: handlers.NewAnalysisHandler(analysisService),
