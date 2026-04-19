@@ -6,6 +6,7 @@ It sits in front of the Go API and Python worker and provides:
 
 - shared request handling
 - frontend-friendly API aliases at the proxy root
+- coarse auth route rate limiting before requests reach the API
 - readiness checks
 - short-lived caching for worker analysis responses
 - cache garbage collection
@@ -29,7 +30,9 @@ It sits in front of the Go API and Python worker and provides:
 - admin endpoints require `X-Proxy-Admin-Token`
 - cache responses include `X-Proxy-Cache`
 - proxied responses include `X-Proxy-Upstream`
+- auth routes return `429` with `Retry-After` when the proxy-side limiter is exceeded
 - responses include `X-Content-Type-Options`, `X-Frame-Options`, and `Referrer-Policy`
+- when missing, `X-Forwarded-For` is added before forwarding to the API
 
 ## Run
 
