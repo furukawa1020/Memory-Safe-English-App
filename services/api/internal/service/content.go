@@ -10,8 +10,9 @@ import (
 )
 
 type ContentService struct {
-	contents repository.ContentRepository
-	analyzer ChunkAnalyzer
+	contents         repository.ContentRepository
+	chunkAnalyzer    ChunkAnalyzer
+	skeletonAnalyzer SkeletonAnalyzer
 }
 
 type ListContentsInput struct {
@@ -21,10 +22,11 @@ type ListContentsInput struct {
 	Language    string
 }
 
-func NewContentService(contents repository.ContentRepository, analyzer ChunkAnalyzer) ContentService {
+func NewContentService(contents repository.ContentRepository, chunkAnalyzer ChunkAnalyzer, skeletonAnalyzer SkeletonAnalyzer) ContentService {
 	return ContentService{
-		contents: contents,
-		analyzer: analyzer,
+		contents:         contents,
+		chunkAnalyzer:    chunkAnalyzer,
+		skeletonAnalyzer: skeletonAnalyzer,
 	}
 }
 
@@ -55,12 +57,33 @@ func (s ContentService) GetChunks(ctx context.Context, contentID string) (domain
 	if err != nil {
 		return domain.ChunkingResult{}, err
 	}
-	result, err := s.analyzer.AnalyzeChunks(ctx, content.RawText, content.Language)
+	result, err := s.chunkAnalyzer.AnalyzeChunks(ctx, content.RawText, content.Language)
 	if err != nil {
 		return domain.ChunkingResult{}, err
 	}
 	if err := s.contents.SaveChunkingResult(ctx, contentID, result); err != nil {
 		return domain.ChunkingResult{}, err
+	}
+	return result, nil
+}
+
+func (s ContentService) GetSkeleton(ctx context.Context, contentID string) (domain.SkeletonResult, error) {
+	if contentID == "" {
+		return domain.SkeletonResult{}, domain.ErrInvalidInput
+	}
+	if cached, err := s.contents.GetSkeletonResult(ctx, contentID); err == nil {
+		return cached, nil
+	}
+	content, err := s.contents.GetContent(ctx, contentID)
+	if err != nil {
+		return domain.SkeletonResult{}, err
+	}
+	result, err := s.skeletonAnalyzer.AnalyzeSkeleton(ctx, content.RawText, content.Language)
+	if err != nil {
+		return domain.SkeletonResult{}, err
+	}
+	if err := s.contents.SaveSkeletonResult(ctx, contentID, result); err != nil {
+		return domain.SkeletonResult{}, err
 	}
 	return result, nil
 }
@@ -110,6 +133,9 @@ func (s ContentService) Update(ctx context.Context, contentID string, input doma
 		return domain.Content{}, err
 	}
 	if err := s.contents.DeleteChunkingResult(ctx, contentID); err != nil {
+		return domain.Content{}, err
+	}
+	if err := s.contents.DeleteSkeletonResult(ctx, contentID); err != nil {
 		return domain.Content{}, err
 	}
 	return content, nil

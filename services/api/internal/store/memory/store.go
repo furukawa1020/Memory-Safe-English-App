@@ -21,6 +21,7 @@ type Store struct {
 	events         map[string][]domain.EventLog
 	contents       map[string]domain.Content
 	contentChunks  map[string]domain.ChunkingResult
+	contentSkeleton map[string]domain.SkeletonResult
 }
 
 func NewStore() *Store {
@@ -32,6 +33,7 @@ func NewStore() *Store {
 		events:         make(map[string][]domain.EventLog),
 		contents:       make(map[string]domain.Content),
 		contentChunks:  make(map[string]domain.ChunkingResult),
+		contentSkeleton: make(map[string]domain.SkeletonResult),
 	}
 	store.seedContents()
 	return store
@@ -260,6 +262,36 @@ func (s *Store) DeleteChunkingResult(_ context.Context, contentID string) error 
 	defer s.mu.Unlock()
 
 	delete(s.contentChunks, contentID)
+	return nil
+}
+
+func (s *Store) GetSkeletonResult(_ context.Context, contentID string) (domain.SkeletonResult, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	result, ok := s.contentSkeleton[contentID]
+	if !ok {
+		return domain.SkeletonResult{}, domain.ErrNotFound
+	}
+	return result, nil
+}
+
+func (s *Store) SaveSkeletonResult(_ context.Context, contentID string, result domain.SkeletonResult) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, ok := s.contents[contentID]; !ok {
+		return domain.ErrNotFound
+	}
+	s.contentSkeleton[contentID] = result
+	return nil
+}
+
+func (s *Store) DeleteSkeletonResult(_ context.Context, contentID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	delete(s.contentSkeleton, contentID)
 	return nil
 }
 
