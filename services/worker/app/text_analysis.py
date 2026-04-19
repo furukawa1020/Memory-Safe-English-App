@@ -66,6 +66,17 @@ SOFT_SPLIT_PREFIXES = {
     "which",
 }
 
+HEAVY_CONNECTORS = {
+    "although",
+    "because",
+    "which",
+    "while",
+    "during",
+    "before",
+    "after",
+    "that",
+}
+
 
 def normalize_text(text: str) -> str:
     return " ".join(text.split())
@@ -121,6 +132,26 @@ def infer_role(segment: str, index: int) -> str:
     if looks_core(segment):
         return "core"
     return "support"
+
+
+def estimate_segment_load(segment: str) -> int:
+    words = [word.lower().strip(".,!?") for word in segment.split()]
+    if not words:
+        return 0
+
+    score = len(words)
+    score += sum(1 for word in words if word in HEAVY_CONNECTORS)
+    score += sum(1 for word in words if len(word) >= 9)
+    return score
+
+
+def classify_density(before_count: int, after_count: int) -> str:
+    total = before_count + after_count
+    if total >= 3:
+        return "dense"
+    if total >= 1:
+        return "light"
+    return "minimal"
 
 
 def _find_soft_split(words: list[str], start: int, end: int) -> int:

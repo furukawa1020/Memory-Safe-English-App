@@ -72,6 +72,9 @@ class ReaderFocusStep:
     role: str
     support_before: list[str]
     support_after: list[str]
+    support_density: str
+    overload_risk: str
+    presentation_hint: str
     guidance_ja: str
     guidance_en: str
 
@@ -92,13 +95,27 @@ class CollapsedChunk:
 
 
 @dataclass(slots=True)
+class ReaderHotspot:
+    chunk_order: int
+    text: str
+    risk_level: str
+    reason: str
+    recommendation: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(slots=True)
 class ReaderPlanResult:
     version: str
     language: str
     summary: str
     recommended_mode: str
+    display_strategy: str
     focus_steps: list[ReaderFocusStep]
     collapsed_chunks: list[CollapsedChunk]
+    hotspots: list[ReaderHotspot]
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -106,6 +123,8 @@ class ReaderPlanResult:
             "language": self.language,
             "summary": self.summary,
             "recommended_mode": self.recommended_mode,
+            "display_strategy": self.display_strategy,
             "focus_steps": [step.to_dict() for step in self.focus_steps],
             "collapsed_chunks": [chunk.to_dict() for chunk in self.collapsed_chunks],
+            "hotspots": [hotspot.to_dict() for hotspot in self.hotspots],
         }
