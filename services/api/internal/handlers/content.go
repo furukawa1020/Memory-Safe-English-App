@@ -71,6 +71,15 @@ func (h ContentHandler) GetChunks(w http.ResponseWriter, r *http.Request) {
 	httpjson.Write(w, http.StatusOK, result)
 }
 
+func (h ContentHandler) GetSkeleton(w http.ResponseWriter, r *http.Request) {
+	result, err := h.service.GetSkeleton(r.Context(), r.PathValue("contentID"))
+	if err != nil {
+		httpx.WriteDomainError(w, err, "content_id is required", "content not found")
+		return
+	}
+	httpjson.Write(w, http.StatusOK, result)
+}
+
 func (h ContentHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var input contentUpsertRequest
 	if err := httpx.DecodeJSON(r, &input); err != nil {

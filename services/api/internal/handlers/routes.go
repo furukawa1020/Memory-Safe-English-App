@@ -26,6 +26,7 @@ func RegisterRoutes(mux *http.ServeMux, routes RouteSet, protected ProtectedMidd
 	mux.Handle("GET /contents/{contentID}", protected(http.HandlerFunc(routes.Content.Get)))
 	mux.Handle("PATCH /contents/{contentID}", protected(http.HandlerFunc(routes.Content.Update)))
 	mux.Handle("GET /contents/{contentID}/chunks", protected(http.HandlerFunc(routes.Content.GetChunks)))
+	mux.Handle("GET /contents/{contentID}/skeleton", protected(http.HandlerFunc(routes.Content.GetSkeleton)))
 	mux.Handle("POST /sessions/start", protected(http.HandlerFunc(routes.Session.Start)))
 	mux.Handle("POST /sessions/{sessionID}/event", protected(http.HandlerFunc(routes.Session.AddEvent)))
 	mux.Handle("POST /sessions/{sessionID}/complete", protected(http.HandlerFunc(routes.Session.Complete)))
