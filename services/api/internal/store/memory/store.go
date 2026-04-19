@@ -13,26 +13,26 @@ import (
 )
 
 type Store struct {
-	mu             sync.RWMutex
-	users          map[string]domain.User
-	usersByEmail   map[string]string
-	passwordHashes map[string]string
-	sessions       map[string]domain.Session
-	events         map[string][]domain.EventLog
-	contents       map[string]domain.Content
-	contentChunks  map[string]domain.ChunkingResult
+	mu              sync.RWMutex
+	users           map[string]domain.User
+	usersByEmail    map[string]string
+	passwordHashes  map[string]string
+	sessions        map[string]domain.Session
+	events          map[string][]domain.EventLog
+	contents        map[string]domain.Content
+	contentChunks   map[string]domain.ChunkingResult
 	contentSkeleton map[string]domain.SkeletonResult
 }
 
 func NewStore() *Store {
 	store := &Store{
-		users:          make(map[string]domain.User),
-		usersByEmail:   make(map[string]string),
-		passwordHashes: make(map[string]string),
-		sessions:       make(map[string]domain.Session),
-		events:         make(map[string][]domain.EventLog),
-		contents:       make(map[string]domain.Content),
-		contentChunks:  make(map[string]domain.ChunkingResult),
+		users:           make(map[string]domain.User),
+		usersByEmail:    make(map[string]string),
+		passwordHashes:  make(map[string]string),
+		sessions:        make(map[string]domain.Session),
+		events:          make(map[string][]domain.EventLog),
+		contents:        make(map[string]domain.Content),
+		contentChunks:   make(map[string]domain.ChunkingResult),
 		contentSkeleton: make(map[string]domain.SkeletonResult),
 	}
 	store.seedContents()
