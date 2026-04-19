@@ -40,6 +40,9 @@ type ContentFilter struct {
 type ContentRepository interface {
 	ListContents(ctx context.Context, filter ContentFilter) ([]domain.Content, error)
 	GetContent(ctx context.Context, contentID string) (domain.Content, error)
+	CreateContent(ctx context.Context, content domain.Content) (domain.Content, error)
+	UpdateContent(ctx context.Context, content domain.Content) (domain.Content, error)
 	GetChunkingResult(ctx context.Context, contentID string) (domain.ChunkingResult, error)
 	SaveChunkingResult(ctx context.Context, contentID string, result domain.ChunkingResult) error
+	DeleteChunkingResult(ctx context.Context, contentID string) error
 }
