@@ -8,13 +8,14 @@ use axum::{
 use serde::Serialize;
 
 use crate::{
-    admin, http_response::with_standard_headers, proxy, request_id::resolve_request_id,
+    admin, http_response::with_standard_headers, proxy, readiness, request_id::resolve_request_id,
     state::AppState,
 };
 
 pub fn build_router(state: AppState) -> Router {
     Router::new()
         .route("/health", get(health))
+        .route("/ready", get(readiness::ready))
         .route("/admin/cache", get(admin::cache_stats))
         .route("/admin/cache/purge", post(admin::purge_cache))
         .route("/api/*path", any(proxy::proxy_to_api))
@@ -54,7 +55,10 @@ mod tests {
     use axum::{
         body::{to_bytes, Body},
         http::Request,
+        routing::get,
+        Json as AxumJson, Router as AxumRouter,
     };
+    use tokio::net::TcpListener;
     use tower::ServiceExt;
 
     use crate::{cache::CacheStore, config::Config, state::AppState};
@@ -201,5 +205,97 @@ mod tests {
             .get("POST:/worker/analyze/skeleton:2")
             .await
             .is_some());
+    }
+
+    #[tokio::test]
+    async fn ready_endpoint_returns_ok_when_upstreams_are_healthy() {
+        let api = spawn_health_server(StatusCode::OK).await;
+        let worker = spawn_health_server(StatusCode::OK).await;
+        let app = build_router(state_with_urls(api.base_url(), worker.base_url()));
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/ready")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = to_bytes(response.into_body(), 2048).await.unwrap();
+        let text = String::from_utf8(body.to_vec()).unwrap();
+        assert!(text.contains("\"ready\":true"));
+    }
+
+    #[tokio::test]
+    async fn ready_endpoint_returns_service_unavailable_when_upstream_fails() {
+        let api = spawn_health_server(StatusCode::OK).await;
+        let worker = spawn_health_server(StatusCode::INTERNAL_SERVER_ERROR).await;
+        let app = build_router(state_with_urls(api.base_url(), worker.base_url()));
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/ready")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+        let body = to_bytes(response.into_body(), 2048).await.unwrap();
+        let text = String::from_utf8(body.to_vec()).unwrap();
+        assert!(text.contains("\"ready\":false"));
+    }
+
+    fn state_with_urls(api_base_url: String, worker_base_url: String) -> AppState {
+        AppState {
+            config: Config {
+                http_addr: "127.0.0.1:8070".parse::<SocketAddr>().unwrap(),
+                api_base_url,
+                worker_base_url,
+                admin_token: Some("secret".to_string()),
+                upstream_timeout: Duration::from_secs(5),
+                cache_ttl: Duration::from_secs(60),
+                gc_interval: Duration::from_secs(60),
+                cache_max_entries: 32,
+                max_request_body_bytes: 1024,
+            },
+            http_client: reqwest::Client::new(),
+            cache: CacheStore::new(Duration::from_secs(60), 32),
+        }
+    }
+
+    async fn spawn_health_server(status: StatusCode) -> TestServer {
+        let app = AxumRouter::new().route(
+            "/health",
+            get(move || async move {
+                (
+                    status,
+                    AxumJson(serde_json::json!({ "ok": status.is_success() })),
+                )
+            }),
+        );
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+
+        tokio::spawn(async move {
+            axum::serve(listener, app).await.unwrap();
+        });
+
+        TestServer { address }
+    }
+
+    struct TestServer {
+        address: SocketAddr,
+    }
+
+    impl TestServer {
+        fn base_url(&self) -> String {
+            format!("http://{}", self.address)
+        }
     }
 }
