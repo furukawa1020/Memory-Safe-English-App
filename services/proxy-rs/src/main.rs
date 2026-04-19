@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use mse_proxy::{cache::CacheStore, config::Config, gc, routes, state::AppState};
+use mse_proxy::{cache::CacheStore, config::Config, gc, rate_limit::RateLimiter, routes, state::AppState};
 use reqwest::Client;
 use tokio::{net::TcpListener, signal};
 use tracing::info;
@@ -17,6 +17,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = Config::from_env()?;
     let cache = CacheStore::new(config.cache_ttl, config.cache_max_entries);
     let gc_handle = gc::spawn_gc_task(cache.clone(), config.gc_interval);
+    let auth_rate_limiter = RateLimiter::new(
+        config.auth_rate_limit_max_requests,
+        config.auth_rate_limit_window,
+    );
 
     let http_client = Client::builder()
         .timeout(config.upstream_timeout)
@@ -27,13 +31,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         config: config.clone(),
         http_client,
         cache,
+        auth_rate_limiter,
     };
     let app = routes::build_router(app_state);
 
     let listener = TcpListener::bind(config.http_addr).await?;
     info!(address = %config.http_addr, "proxy listening");
 
-    axum::serve(listener, app)
+    axum::serve(listener, app.into_make_service_with_connect_info::<std::net::SocketAddr>())
         .with_graceful_shutdown(shutdown_signal())
         .await?;
 
