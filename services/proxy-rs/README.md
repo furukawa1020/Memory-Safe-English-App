@@ -33,6 +33,8 @@ It sits in front of the Go API and Python worker and provides:
 - auth routes return `429` with `Retry-After` when the proxy-side limiter is exceeded
 - responses include `X-Content-Type-Options`, `X-Frame-Options`, and `Referrer-Policy`
 - when missing, `X-Forwarded-For` is added before forwarding to the API
+- incoming forwarding headers are only trusted when the immediate peer IP is listed in `PROXY_TRUSTED_PROXY_IPS`
+- `PROXY_ADMIN_TOKEN` must be at least 16 characters long
 
 ## Run
 
