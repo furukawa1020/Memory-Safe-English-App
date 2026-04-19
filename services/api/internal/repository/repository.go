@@ -26,6 +26,7 @@ type AuthRepository interface {
 	GetRefreshFamily(ctx context.Context, familyID string) (domain.RefreshTokenFamily, error)
 	RotateRefreshSession(ctx context.Context, currentTokenID, currentTokenHash string, nextSession domain.RefreshSession) error
 	RevokeRefreshFamily(ctx context.Context, familyID string) error
+	DeleteExpiredRefreshSessions(ctx context.Context, now time.Time) (int64, error)
 }
 
 type SessionRepository interface {

@@ -23,6 +23,7 @@ func newTestConfig() config.Config {
 		LoginMaxAttempts:       10,
 		RegisterMaxAttempts:    5,
 		RefreshMaxAttempts:     20,
+		RefreshCleanupInterval: time.Hour,
 		WorkerBaseURL:          "http://127.0.0.1:8090",
 		WorkerAPIKey:           "worker-api-key",
 		WorkerSignatureKey:     "worker-signature-key",

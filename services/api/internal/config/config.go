@@ -19,6 +19,7 @@ type Config struct {
 	LoginMaxAttempts       int
 	RegisterMaxAttempts    int
 	RefreshMaxAttempts     int
+	RefreshCleanupInterval time.Duration
 	WorkerBaseURL          string
 	WorkerAPIKey           string
 	WorkerSignatureKey     string
@@ -38,6 +39,7 @@ func Load() Config {
 		LoginMaxAttempts:       getEnvInt("AUTH_RATE_LIMIT_LOGIN_MAX_ATTEMPTS", 10),
 		RegisterMaxAttempts:    getEnvInt("AUTH_RATE_LIMIT_REGISTER_MAX_ATTEMPTS", 5),
 		RefreshMaxAttempts:     getEnvInt("AUTH_RATE_LIMIT_REFRESH_MAX_ATTEMPTS", 20),
+		RefreshCleanupInterval: getEnvDuration("AUTH_REFRESH_CLEANUP_INTERVAL", time.Hour),
 		WorkerBaseURL:          getEnv("WORKER_BASE_URL", "http://127.0.0.1:8090"),
 		WorkerAPIKey:           getEnv("WORKER_API_KEY", "dev-worker-api-key"),
 		WorkerSignatureKey:     getEnv("WORKER_SIGNATURE_KEY", "dev-worker-signature-key"),
@@ -72,6 +74,9 @@ func (c Config) Validate() error {
 	}
 	if c.RefreshMaxAttempts <= 0 {
 		return fmt.Errorf("AUTH_RATE_LIMIT_REFRESH_MAX_ATTEMPTS must be positive")
+	}
+	if c.RefreshCleanupInterval <= 0 {
+		return fmt.Errorf("AUTH_REFRESH_CLEANUP_INTERVAL must be positive")
 	}
 	if c.WorkerBaseURL == "" {
 		return fmt.Errorf("WORKER_BASE_URL must not be empty")

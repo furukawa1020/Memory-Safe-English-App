@@ -195,6 +195,21 @@ func (s *Store) RevokeRefreshFamily(_ context.Context, familyID string) error {
 	return nil
 }
 
+func (s *Store) DeleteExpiredRefreshSessions(_ context.Context, now time.Time) (int64, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	var removed int64
+	for id, session := range s.refreshSessions {
+		if session.ExpiresAt.After(now) {
+			continue
+		}
+		delete(s.refreshSessions, id)
+		removed++
+	}
+	return removed, nil
+}
+
 func (s *Store) StartSession(_ context.Context, userID, mode, contentID string) (domain.Session, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

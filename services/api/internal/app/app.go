@@ -23,6 +23,7 @@ type Application struct {
 	PasswordHash password.Hasher
 	TokenManager token.Manager
 	closeFn      func(context.Context) error
+	cancelFn     context.CancelFunc
 }
 
 func NewApplication(cfg config.Config) (*Application, error) {
@@ -41,6 +42,9 @@ func NewApplication(cfg config.Config) (*Application, error) {
 		app.Auth = store
 		app.Sessions = store
 		app.Contents = store
+		cleanupCtx, cancel := context.WithCancel(context.Background())
+		app.cancelFn = cancel
+		go runRefreshCleanupLoop(cleanupCtx, cfg.RefreshCleanupInterval, store)
 		app.closeFn = store.Close
 		return app, nil
 	}
@@ -82,6 +86,9 @@ func (a *Application) Routes() handlers.RouteSet {
 }
 
 func (a *Application) Close(ctx context.Context) error {
+	if a.cancelFn != nil {
+		a.cancelFn()
+	}
 	if a.closeFn == nil {
 		return nil
 	}

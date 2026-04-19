@@ -8,6 +8,7 @@ import (
 	"memory-safe-english/services/api/internal/httpjson"
 	"memory-safe-english/services/api/internal/httpx"
 	security "memory-safe-english/services/api/internal/security"
+	"memory-safe-english/services/api/internal/security/audit"
 	"memory-safe-english/services/api/internal/service"
 )
 
@@ -39,6 +40,7 @@ func NewAuthHandler(service service.AuthService, limiters AuthRateLimiters) Auth
 func (h AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	var req registerRequest
 	if err := httpx.DecodeJSON(r, &req); err != nil {
+		audit.LogAuthEvent(httpx.RequestID(r.Context()), "register_invalid_json", security.ClientIPFromRequest(r), security.NormalizeRateLimitSubject(req.Email), false, "request body must be valid JSON")
 		httpjson.Error(w, http.StatusBadRequest, "invalid_json", "request body must be valid JSON")
 		return
 	}
@@ -54,10 +56,12 @@ func (h AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		AgreedToTerms: req.AgreedToTerms,
 	})
 	if err != nil {
+		audit.LogAuthEvent(httpx.RequestID(r.Context()), "register_failed", security.ClientIPFromRequest(r), security.NormalizeRateLimitSubject(req.Email), false, err.Error())
 		httpx.WriteDomainError(w, err, "email, password, display_name, and terms agreement are required", "user not found")
 		return
 	}
 
+	audit.LogAuthEvent(httpx.RequestID(r.Context()), "register_succeeded", security.ClientIPFromRequest(r), security.NormalizeRateLimitSubject(req.Email), true, "")
 	httpjson.Write(w, http.StatusCreated, result)
 }
 
@@ -67,6 +71,7 @@ func (h AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		Password string `json:"password"`
 	}
 	if err := httpx.DecodeJSON(r, &req); err != nil {
+		audit.LogAuthEvent(httpx.RequestID(r.Context()), "login_invalid_json", security.ClientIPFromRequest(r), security.NormalizeRateLimitSubject(req.Email), false, "request body must be valid JSON")
 		httpjson.Error(w, http.StatusBadRequest, "invalid_json", "request body must be valid JSON")
 		return
 	}
@@ -77,10 +82,12 @@ func (h AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.service.Login(r.Context(), req.Email, req.Password)
 	if err != nil {
+		audit.LogAuthEvent(httpx.RequestID(r.Context()), "login_failed", security.ClientIPFromRequest(r), security.NormalizeRateLimitSubject(req.Email), false, err.Error())
 		httpx.WriteDomainError(w, err, "email and password are required", "user not found")
 		return
 	}
 
+	audit.LogAuthEvent(httpx.RequestID(r.Context()), "login_succeeded", security.ClientIPFromRequest(r), security.NormalizeRateLimitSubject(req.Email), true, "")
 	httpjson.Write(w, http.StatusOK, result)
 }
 
@@ -89,6 +96,7 @@ func (h AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 		RefreshToken string `json:"refresh_token"`
 	}
 	if err := httpx.DecodeJSON(r, &req); err != nil {
+		audit.LogAuthEvent(httpx.RequestID(r.Context()), "refresh_invalid_json", security.ClientIPFromRequest(r), "-", false, "request body must be valid JSON")
 		httpjson.Error(w, http.StatusBadRequest, "invalid_json", "request body must be valid JSON")
 		return
 	}
@@ -99,10 +107,12 @@ func (h AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.service.Refresh(r.Context(), req.RefreshToken)
 	if err != nil {
+		audit.LogAuthEvent(httpx.RequestID(r.Context()), "refresh_failed", security.ClientIPFromRequest(r), "-", false, err.Error())
 		httpx.WriteDomainError(w, err, "refresh_token is required", "user not found")
 		return
 	}
 
+	audit.LogAuthEvent(httpx.RequestID(r.Context()), "refresh_succeeded", security.ClientIPFromRequest(r), "-", true, "")
 	httpjson.Write(w, http.StatusOK, result)
 }
 
@@ -114,6 +124,8 @@ func (h AuthHandler) allowAttempt(w http.ResponseWriter, r *http.Request, limite
 	if decision.Allowed {
 		return true
 	}
+
+	audit.LogAuthEvent(httpx.RequestID(r.Context()), "auth_rate_limited", security.ClientIPFromRequest(r), security.NormalizeRateLimitSubject(subject), false, "too many authentication attempts")
 
 	retryAfterSeconds := int(math.Ceil(decision.RetryAfter.Seconds()))
 	if retryAfterSeconds < 1 {
