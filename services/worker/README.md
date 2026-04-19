@@ -43,6 +43,7 @@ services/worker
 - `POST /analyze/skeleton`
 - `POST /analyze/reader-plan`
 - versioned analysis responses
+- reader plans include focus steps, collapsed support chunks, overload hotspots, and display hints
 - API key authentication
 - HMAC request signing
 - request body and text size limits

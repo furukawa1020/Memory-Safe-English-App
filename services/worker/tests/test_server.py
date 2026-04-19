@@ -125,5 +125,9 @@ def test_reader_plan_endpoint() -> None:
 
         assert response.status == HTTPStatus.OK
         assert payload["recommended_mode"] == "progressive"
+        assert payload["display_strategy"]
         assert payload["focus_steps"]
+        assert "overload_risk" in payload["focus_steps"][0]
+        assert "presentation_hint" in payload["focus_steps"][0]
+        assert "hotspots" in payload
         assert payload["version"]
