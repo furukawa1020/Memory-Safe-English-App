@@ -18,7 +18,10 @@ impl Config {
             http_addr: parse_env("PROXY_HTTP_ADDR", "127.0.0.1:8070")?,
             api_base_url: parse_url("PROXY_API_BASE_URL", "http://127.0.0.1:8080"),
             worker_base_url: parse_url("PROXY_WORKER_BASE_URL", "http://127.0.0.1:8090"),
-            upstream_timeout: Duration::from_secs(parse_env("PROXY_UPSTREAM_TIMEOUT_SECONDS", "10")?),
+            upstream_timeout: Duration::from_secs(parse_env(
+                "PROXY_UPSTREAM_TIMEOUT_SECONDS",
+                "10",
+            )?),
             cache_ttl: Duration::from_secs(parse_env("PROXY_CACHE_TTL_SECONDS", "300")?),
             gc_interval: Duration::from_secs(parse_env("PROXY_GC_INTERVAL_SECONDS", "60")?),
             cache_max_entries: parse_env("PROXY_CACHE_MAX_ENTRIES", "1024")?,
