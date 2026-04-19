@@ -13,6 +13,10 @@ class Chunk:
     role: str
     skeleton_rank: int
 
+    @property
+    def is_core(self) -> bool:
+        return self.skeleton_rank == 1 or self.role == "core"
+
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
