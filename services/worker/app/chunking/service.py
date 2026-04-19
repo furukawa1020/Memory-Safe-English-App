@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.models import Chunk, ChunkingResult
-from app.text_analysis import infer_role, looks_core, normalize_text, segment_text
+from app.models import RESPONSE_VERSION, Chunk, ChunkingResult
+from app.text_analysis import infer_role, looks_core, normalize_text, segment_text, split_long_segment, summarize_segments
 
 
 @dataclass(slots=True)
@@ -13,21 +13,15 @@ class ChunkingService:
     def chunk_text(self, text: str, language: str = "en") -> ChunkingResult:
         normalized = normalize_text(text)
         if not normalized:
-            return ChunkingResult(language=language, chunks=[], summary="")
+            return ChunkingResult(version=RESPONSE_VERSION, language=language, chunks=[], summary="")
 
         segments = segment_text(normalized)
+        if not segments:
+            segments = [normalized]
 
         refined: list[str] = []
         for segment in segments:
-            words = segment.split()
-            if len(words) <= self.max_words_per_chunk:
-                refined.append(segment)
-                continue
-
-            start = 0
-            while start < len(words):
-                refined.append(" ".join(words[start : start + self.max_words_per_chunk]))
-                start += self.max_words_per_chunk
+            refined.extend(split_long_segment(segment, self.max_words_per_chunk))
 
         chunks = [
             Chunk(
@@ -38,5 +32,6 @@ class ChunkingService:
             )
             for index, segment in enumerate(refined)
         ]
-        summary = " / ".join(chunk.text for chunk in chunks[:2])
-        return ChunkingResult(language=language, chunks=chunks, summary=summary)
+        summary_segments = [chunk.text for chunk in chunks if chunk.role == "core"] or [chunk.text for chunk in chunks]
+        summary = summarize_segments(summary_segments, max_segments=2)
+        return ChunkingResult(version=RESPONSE_VERSION, language=language, chunks=chunks, summary=summary)
