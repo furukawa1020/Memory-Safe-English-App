@@ -53,7 +53,7 @@ The local stack is defined in [infra/docker-compose.yml](./infra/docker-compose.
 - `redis`: `127.0.0.1:6379`
 
 All services include health checks. The proxy uses `/ready`, so it becomes healthy only after the API and worker are ready.
-The proxy also exposes mobile-friendly API routes such as `/auth/login`, `/contents`, and `/me`, so the Flutter app can point at the proxy root instead of handling `/api/...` prefixes itself.
+The proxy also exposes mobile-friendly API routes such as `/auth/login`, `/auth/refresh`, `/contents`, and `/me`, so the Flutter app can point at the proxy root instead of handling `/api/...` prefixes itself.
 
 ## Recommended Local Workflow
 

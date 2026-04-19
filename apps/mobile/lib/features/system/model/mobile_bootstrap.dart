@@ -82,6 +82,7 @@ class FrontendRoutes {
     required this.readiness,
     required this.login,
     required this.register,
+    required this.refresh,
     required this.currentUser,
     required this.contents,
     required this.chunkAnalysis,
@@ -90,6 +91,7 @@ class FrontendRoutes {
   final String readiness;
   final String login;
   final String register;
+  final String refresh;
   final String currentUser;
   final String contents;
   final String chunkAnalysis;
@@ -99,6 +101,7 @@ class FrontendRoutes {
       readiness: json['readiness'] as String? ?? '',
       login: json['login'] as String? ?? '',
       register: json['register'] as String? ?? '',
+      refresh: json['refresh'] as String? ?? '',
       currentUser: json['current_user'] as String? ?? '',
       contents: json['contents'] as String? ?? '',
       chunkAnalysis: json['chunk_analysis'] as String? ?? '',

@@ -16,7 +16,7 @@ It sits in front of the Go API and Python worker and provides:
 
 - `GET /health`: liveness
 - `GET /ready`: readiness against API and worker upstreams
-- `GET /bootstrap/mobile`: mobile-facing bootstrap metadata
+- `GET /bootstrap/mobile`: mobile-facing bootstrap metadata including recommended base URLs and route hints
 - `/auth/*`, `/me`, `/analysis/*`, `/contents*`, `/sessions/*`: proxied to the Go API
 - `/api/*`: proxied to the Go API
 - `/worker/*`: proxied to the Python worker

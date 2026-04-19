@@ -32,11 +32,12 @@ class _StartupGateState extends State<StartupGate> {
   @override
   Widget build(BuildContext context) {
     final apiBaseUrl = AppScope.of(context).config.apiBaseUrl;
-    final bootstrap = widget.controller.bootstrap;
 
     return AnimatedBuilder(
       animation: widget.controller,
       builder: (context, _) {
+        final bootstrap = widget.controller.bootstrap;
+
         if (_allowBypass || widget.controller.isReady) {
           return widget.readyChild;
         }
@@ -94,7 +95,7 @@ class _StartupGateState extends State<StartupGate> {
                               _InfoPanel(
                                 title: 'Frontend route map',
                                 body:
-                                    'login ${bootstrap.routes.login}\ncontents ${bootstrap.routes.contents}\nanalyze ${bootstrap.routes.chunkAnalysis}',
+                                    'login ${bootstrap.routes.login}\nrefresh ${bootstrap.routes.refresh}\ncontents ${bootstrap.routes.contents}\nanalyze ${bootstrap.routes.chunkAnalysis}',
                               ),
                               const SizedBox(height: 12),
                             ],

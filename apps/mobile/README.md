@@ -66,6 +66,7 @@ flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8070
 `10.0.2.2` maps the emulator back to the host machine, and `8070` targets the Rust proxy.
 
 The Flutter client uses proxy-root routes such as `/auth/login`, `/contents`, `/analysis/chunks`, and `/ready`.
+It also reads `/bootstrap/mobile` during startup and can refresh access tokens through `/auth/refresh`.
 
 ## Notes
 
