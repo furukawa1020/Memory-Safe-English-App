@@ -8,16 +8,23 @@ use axum::{
 use serde::Serialize;
 
 use crate::{
-    admin, http_response::with_standard_headers, proxy, readiness, request_id::resolve_request_id,
-    state::AppState,
+    admin, frontend, http_response::with_standard_headers, proxy, readiness,
+    request_id::resolve_request_id, state::AppState,
 };
 
 pub fn build_router(state: AppState) -> Router {
     Router::new()
         .route("/health", get(health))
         .route("/ready", get(readiness::ready))
+        .route("/bootstrap/mobile", get(frontend::mobile_bootstrap))
         .route("/admin/cache", get(admin::cache_stats))
         .route("/admin/cache/purge", post(admin::purge_cache))
+        .route("/auth/*path", any(proxy::proxy_to_api))
+        .route("/me", any(proxy::proxy_to_api))
+        .route("/analysis/*path", any(proxy::proxy_to_api))
+        .route("/contents", any(proxy::proxy_to_api))
+        .route("/contents/*path", any(proxy::proxy_to_api))
+        .route("/sessions/*path", any(proxy::proxy_to_api))
         .route("/api/*path", any(proxy::proxy_to_api))
         .route("/worker/*path", any(proxy::proxy_to_worker))
         .with_state(state)
