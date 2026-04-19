@@ -2,16 +2,18 @@ use axum::{
     extract::State,
     http::StatusCode,
     response::IntoResponse,
-    routing::{any, get},
+    routing::{any, get, post},
     Json, Router,
 };
 use serde::Serialize;
 
-use crate::{proxy, state::AppState};
+use crate::{admin, proxy, state::AppState};
 
 pub fn build_router(state: AppState) -> Router {
     Router::new()
         .route("/health", get(health))
+        .route("/admin/cache", get(admin::cache_stats))
+        .route("/admin/cache/purge", post(admin::purge_cache))
         .route("/api/*path", any(proxy::proxy_to_api))
         .route("/worker/*path", any(proxy::proxy_to_worker))
         .with_state(state)
@@ -54,6 +56,7 @@ mod tests {
                 http_addr: "127.0.0.1:8070".parse::<SocketAddr>().unwrap(),
                 api_base_url: "http://127.0.0.1:8080".to_string(),
                 worker_base_url: "http://127.0.0.1:8090".to_string(),
+                admin_token: Some("secret".to_string()),
                 upstream_timeout: Duration::from_secs(5),
                 cache_ttl: Duration::from_secs(60),
                 gc_interval: Duration::from_secs(60),
@@ -82,5 +85,21 @@ mod tests {
         let body = to_bytes(response.into_body(), 1024).await.unwrap();
         let text = String::from_utf8(body.to_vec()).unwrap();
         assert!(text.contains("\"ok\":true"));
+    }
+
+    #[tokio::test]
+    async fn cache_admin_requires_token() {
+        let app = build_router(state());
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/admin/cache")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
     }
 }
