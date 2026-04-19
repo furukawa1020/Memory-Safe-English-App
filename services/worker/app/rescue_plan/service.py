@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from app.chunking import ChunkingService
+from app.context_profile import resolve_context_profile
 from app.models import RESPONSE_VERSION, RescuePhrase, RescuePlanResult
 from app.text_analysis import estimate_segment_load
 
@@ -11,7 +12,8 @@ from app.text_analysis import estimate_segment_load
 class RescuePlanService:
     chunking_service: ChunkingService
 
-    def build(self, text: str, language: str = "en") -> RescuePlanResult:
+    def build(self, text: str, language: str = "en", target_context: str = "general") -> RescuePlanResult:
+        profile = resolve_context_profile(target_context)
         chunking = self.chunking_service.chunk_text(text=text, language=language)
         chunks = chunking.chunks
         total_load = sum(estimate_segment_load(chunk.text) for chunk in chunks)
@@ -23,7 +25,7 @@ class RescuePlanService:
             summary=chunking.summary,
             overload_level=overload_level,
             primary_strategy=_primary_strategy(overload_level),
-            phrases=_build_rescue_phrases(overload_level),
+            phrases=_build_rescue_phrases(overload_level, profile.rescue_priority),
         )
 
 
@@ -44,7 +46,7 @@ def _primary_strategy(overload_level: str) -> str:
     return "use a short confirmation phrase and keep the exchange moving"
 
 
-def _build_rescue_phrases(overload_level: str) -> list[RescuePhrase]:
+def _build_rescue_phrases(overload_level: str, preferred_category: str) -> list[RescuePhrase]:
     base = [
         RescuePhrase(
             category="slow_down",
@@ -82,4 +84,18 @@ def _build_rescue_phrases(overload_level: str) -> list[RescuePhrase]:
             priority=4,
         ),
     ]
-    return sorted(base, key=lambda phrase: phrase.priority)
+    prioritized = []
+    for phrase in base:
+        priority = phrase.priority
+        if phrase.category == preferred_category:
+            priority = 0
+        prioritized.append(
+            RescuePhrase(
+                category=phrase.category,
+                phrase_en=phrase.phrase_en,
+                phrase_ja=phrase.phrase_ja,
+                use_when=phrase.use_when,
+                priority=priority,
+            )
+        )
+    return sorted(prioritized, key=lambda phrase: phrase.priority)

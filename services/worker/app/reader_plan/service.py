@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from app.chunking import ChunkingService
+from app.context_profile import resolve_context_profile
 from app.models import (
     RESPONSE_VERSION,
     Chunk,
@@ -18,7 +19,8 @@ from app.text_analysis import classify_density, estimate_segment_load
 class ReaderPlanService:
     chunking_service: ChunkingService
 
-    def build(self, text: str, language: str = "en") -> ReaderPlanResult:
+    def build(self, text: str, language: str = "en", target_context: str = "general") -> ReaderPlanResult:
+        profile = resolve_context_profile(target_context)
         chunking = self.chunking_service.chunk_text(text=text, language=language)
         chunks = chunking.chunks
         if not chunks:
@@ -58,8 +60,8 @@ class ReaderPlanService:
                     support_density=support_density,
                     overload_risk=overload_risk,
                     presentation_hint=presentation_hint,
-                    guidance_ja=_build_japanese_guidance(focus_chunk, before_chunks, after_chunks),
-                    guidance_en=_build_english_guidance(focus_chunk, before_chunks, after_chunks),
+                    guidance_ja=_build_japanese_guidance(profile.label_ja, focus_chunk, before_chunks, after_chunks),
+                    guidance_en=_build_english_guidance(profile.listening_focus_prompt, focus_chunk, before_chunks, after_chunks),
                 )
             )
 
@@ -130,8 +132,8 @@ def _collect_support_chunks(
     return before, after
 
 
-def _build_japanese_guidance(focus_chunk: Chunk, before_chunks: list[Chunk], after_chunks: list[Chunk]) -> str:
-    parts = [f"まず「{focus_chunk.text}」を主軸として読みます。"]
+def _build_japanese_guidance(context_label: str, focus_chunk: Chunk, before_chunks: list[Chunk], after_chunks: list[Chunk]) -> str:
+    parts = [f"{context_label}として、まず「{focus_chunk.text}」を主軸として読みます。"]
     if before_chunks:
         parts.append("前の補助情報は後回しにして大丈夫です。")
     if after_chunks:
@@ -141,8 +143,8 @@ def _build_japanese_guidance(focus_chunk: Chunk, before_chunks: list[Chunk], aft
     return " ".join(parts)
 
 
-def _build_english_guidance(focus_chunk: Chunk, before_chunks: list[Chunk], after_chunks: list[Chunk]) -> str:
-    parts = [f"Start with '{focus_chunk.text}' as the main idea."]
+def _build_english_guidance(focus_prompt: str, focus_chunk: Chunk, before_chunks: list[Chunk], after_chunks: list[Chunk]) -> str:
+    parts = [focus_prompt, f"Start with '{focus_chunk.text}' as the main idea."]
     if before_chunks:
         parts.append("You can delay the earlier support details.")
     if after_chunks:

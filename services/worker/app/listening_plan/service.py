@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from app.chunking import ChunkingService
+from app.context_profile import resolve_context_profile
 from app.models import Chunk, ListeningPausePoint, ListeningPlanResult, RESPONSE_VERSION
 from app.text_analysis import estimate_segment_load
 
@@ -11,7 +12,8 @@ from app.text_analysis import estimate_segment_load
 class ListeningPlanService:
     chunking_service: ChunkingService
 
-    def build(self, text: str, language: str = "en") -> ListeningPlanResult:
+    def build(self, text: str, language: str = "en", target_context: str = "general") -> ListeningPlanResult:
+        profile = resolve_context_profile(target_context)
         chunking = self.chunking_service.chunk_text(text=text, language=language)
         chunks = chunking.chunks
         if not chunks:
@@ -37,8 +39,8 @@ class ListeningPlanService:
                     index=len(pause_points) + 1,
                     after_chunk_order=chunk.order,
                     pause_reason=_build_pause_reason(chunk),
-                    cue_en=_build_english_cue(chunk),
-                    cue_ja=_build_japanese_cue(chunk),
+                    cue_en=_build_english_cue(profile.listening_focus_prompt, chunk),
+                    cue_ja=_build_japanese_cue(profile.label_ja, chunk),
                     preview_text=" / ".join(running_preview[-2:]),
                     risk_level=risk_level,
                 )
@@ -79,16 +81,16 @@ def _build_pause_reason(chunk: Chunk) -> str:
     return "light checkpoint"
 
 
-def _build_english_cue(chunk: Chunk) -> str:
+def _build_english_cue(focus_prompt: str, chunk: Chunk) -> str:
     if chunk.is_core:
-        return "Pause here and confirm the main action or claim."
-    return "Pause here and keep only the key meaning before continuing."
+        return f"{focus_prompt} Pause here and confirm the main action or claim."
+    return f"{focus_prompt} Pause here and keep only the key meaning before continuing."
 
 
-def _build_japanese_cue(chunk: Chunk) -> str:
+def _build_japanese_cue(context_label: str, chunk: Chunk) -> str:
     if chunk.is_core:
-        return "ここで止めて、主な動きや主張だけ確認します。"
-    return "ここで止めて、細部より要点だけ残して次へ進みます。"
+        return f"{context_label}として、ここで止めて主な動きや主張だけ確認します。"
+    return f"{context_label}として、ここで止めて細部より要点だけ残して次へ進みます。"
 
 
 def _recommend_speed(chunks: list[Chunk], pause_points: list[ListeningPausePoint]) -> str:

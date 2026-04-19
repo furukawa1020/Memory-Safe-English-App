@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from app.chunking import ChunkingService
+from app.context_profile import resolve_context_profile
 from app.models import RESPONSE_VERSION, SpeakingPlanResult, SpeakingStep
 from app.text_analysis import estimate_segment_load
 
@@ -11,7 +12,8 @@ from app.text_analysis import estimate_segment_load
 class SpeakingPlanService:
     chunking_service: ChunkingService
 
-    def build(self, text: str, language: str = "en") -> SpeakingPlanResult:
+    def build(self, text: str, language: str = "en", target_context: str = "general") -> SpeakingPlanResult:
+        profile = resolve_context_profile(target_context)
         chunking = self.chunking_service.chunk_text(text=text, language=language)
         chunks = chunking.chunks
         if not chunks:
@@ -43,7 +45,7 @@ class SpeakingPlanService:
             language=language,
             summary=chunking.summary,
             recommended_style="short-linked-sentences",
-            opener_options=_build_openers(chunking.summary),
+            opener_options=_build_openers(profile.speaking_opener_prefix, chunking.summary),
             bridge_phrases=[
                 "First,",
                 "Next,",
@@ -101,10 +103,10 @@ def _build_english_tip(role: str) -> str:
     return "Keep it short enough to say in one breath."
 
 
-def _build_openers(summary: str) -> list[str]:
+def _build_openers(prefix: str, summary: str) -> list[str]:
     if not summary:
-        return ["The main point is this."]
+        return [f"{prefix}: this is the main point."]
     return [
-        f"The main point is: {summary}.",
+        f"{prefix}: {summary}.",
         f"In short, {summary}.",
     ]
