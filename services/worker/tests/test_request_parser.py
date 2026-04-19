@@ -17,7 +17,7 @@ class _StubHandler(BaseHTTPRequestHandler):
 
 
 def test_parse_analysis_request_parses_valid_payload() -> None:
-    payload = json.dumps({"text": "We propose a memory safe interface.", "language": "en"}).encode("utf-8")
+    payload = json.dumps({"text": "We propose a memory safe interface.", "language": "en", "target_context": "research"}).encode("utf-8")
     handler = _StubHandler(
         path="/analyze/chunks",
         payload=payload,
@@ -30,6 +30,7 @@ def test_parse_analysis_request_parses_valid_payload() -> None:
     assert request is not None
     assert request.route_operation == "chunking"
     assert request.payload.language == "en"
+    assert request.payload.target_context == "research"
 
 
 def test_parse_analysis_request_rejects_non_object_payload() -> None:
@@ -50,6 +51,22 @@ def test_parse_analysis_request_rejects_non_object_payload() -> None:
 
 def test_parse_analysis_request_rejects_invalid_language_tag() -> None:
     payload = json.dumps({"text": "hello", "language": "日本語"}).encode("utf-8")
+    handler = _StubHandler(
+        path="/analyze/chunks",
+        payload=payload,
+        headers={"Content-Type": "application/json", "Content-Length": str(len(payload))},
+    )
+
+    request, error = parse_analysis_request(handler, max_body_bytes=1024)
+
+    assert request is None
+    assert error is not None
+    assert error[0] == HTTPStatus.BAD_REQUEST
+    assert error[1]["error"]["code"] == "invalid_request"
+
+
+def test_parse_analysis_request_rejects_invalid_target_context() -> None:
+    payload = json.dumps({"text": "hello", "target_context": "会議"}).encode("utf-8")
     handler = _StubHandler(
         path="/analyze/chunks",
         payload=payload,

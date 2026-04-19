@@ -81,11 +81,20 @@ docker build -t mse-worker services/worker
 ```json
 {
   "text": "In this study, we propose a memory safe interface.",
-  "language": "en"
+  "language": "en",
+  "target_context": "research"
 }
 ```
 
 The same request shape works for all analysis endpoints.
+
+Supported `target_context` values:
+
+- `general`
+- `self_intro`
+- `research`
+- `meeting`
+- `daily`
 
 ## Verify
 

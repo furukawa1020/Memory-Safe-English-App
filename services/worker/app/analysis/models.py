@@ -37,7 +37,8 @@ class AnalyzeTextInput:
             raise ValueError("text is required")
         if not normalized_language.isascii() or not normalized_language.replace("-", "").isalpha():
             raise ValueError("language must be an ASCII language tag")
-        if not normalized_target_context.isascii() or "_" in normalized_target_context and not normalized_target_context.replace("_", "").isalpha():
+        context_key = normalized_target_context.replace("_", "")
+        if not normalized_target_context.isascii() or not context_key.isalpha():
             raise ValueError("target_context must be an ASCII context key")
 
         return cls(
