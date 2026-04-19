@@ -311,6 +311,7 @@ fn should_skip_header(header_name: &str) -> bool {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum Upstream {
     Api,
+    ProxyRateLimited,
     Worker,
 }
 
@@ -318,6 +319,7 @@ impl Upstream {
     fn route_prefix(&self) -> &'static str {
         match self {
             Self::Api => "/api",
+            Self::ProxyRateLimited => "",
             Self::Worker => "/worker",
         }
     }
@@ -325,6 +327,7 @@ impl Upstream {
     fn header_value(&self) -> &'static str {
         match self {
             Self::Api => "api",
+            Self::ProxyRateLimited => "proxy-auth-rate-limit",
             Self::Worker => "worker",
         }
     }
@@ -332,6 +335,7 @@ impl Upstream {
     fn cache_header_value(&self) -> &'static str {
         match self {
             Self::Api => "api-cache",
+            Self::ProxyRateLimited => "proxy-auth-rate-limit",
             Self::Worker => "worker-cache",
         }
     }
