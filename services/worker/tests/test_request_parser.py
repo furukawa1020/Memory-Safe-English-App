@@ -105,3 +105,19 @@ def test_parse_analysis_request_rejects_invalid_fatigue_level() -> None:
     assert error is not None
     assert error[0] == HTTPStatus.BAD_REQUEST
     assert error[1]["error"]["code"] == "invalid_request"
+
+
+def test_parse_analysis_request_rejects_invalid_session_events() -> None:
+    payload = json.dumps({"text": "hello", "session_events": ["bad"]}).encode("utf-8")
+    handler = _StubHandler(
+        path="/analyze/collapse-patterns",
+        payload=payload,
+        headers={"Content-Type": "application/json", "Content-Length": str(len(payload))},
+    )
+
+    request, error = parse_analysis_request(handler, max_body_bytes=1024)
+
+    assert request is None
+    assert error is not None
+    assert error[0] == HTTPStatus.BAD_REQUEST
+    assert error[1]["error"]["code"] == "invalid_request"

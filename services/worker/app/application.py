@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from app.assessment import AssessmentService
 from app.analysis import AnalysisService
+from app.collapse_patterns import CollapsePatternService
 from app.chunking import ChunkingService
 from app.config import Settings
 from app.listening_plan import ListeningPlanService
@@ -24,6 +25,7 @@ class Application:
     speaking_plan_service: SpeakingPlanService
     rescue_plan_service: RescuePlanService
     assessment_service: AssessmentService
+    collapse_pattern_service: CollapsePatternService
     analysis_service: AnalysisService
     rate_limiter: SlidingWindowRateLimiter
 
@@ -38,6 +40,7 @@ def build_application(settings: Settings | None = None) -> Application:
     speaking_plan_service = SpeakingPlanService(chunking_service=chunking_service)
     rescue_plan_service = RescuePlanService(chunking_service=chunking_service)
     assessment_service = AssessmentService()
+    collapse_pattern_service = CollapsePatternService(chunking_service=chunking_service)
     return Application(
         settings=resolved_settings,
         chunking_service=chunking_service,
@@ -47,6 +50,7 @@ def build_application(settings: Settings | None = None) -> Application:
         speaking_plan_service=speaking_plan_service,
         rescue_plan_service=rescue_plan_service,
         assessment_service=assessment_service,
+        collapse_pattern_service=collapse_pattern_service,
         analysis_service=AnalysisService(
             chunk_analyzer=chunking_service,
             skeleton_analyzer=skeleton_service,
@@ -55,6 +59,7 @@ def build_application(settings: Settings | None = None) -> Application:
             speaking_plan_analyzer=speaking_plan_service,
             rescue_plan_analyzer=rescue_plan_service,
             assessment_analyzer=assessment_service,
+            collapse_pattern_analyzer=collapse_pattern_service,
         ),
         rate_limiter=SlidingWindowRateLimiter(
             max_requests=resolved_settings.rate_limit_max_requests,

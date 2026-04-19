@@ -6,6 +6,7 @@ from typing import Protocol
 from app.analysis.models import AnalyzeTextInput
 from app.models import (
     AssessmentProfileResult,
+    CollapsePatternResult,
     ChunkingResult,
     ListeningPlanResult,
     ReaderPlanResult,
@@ -51,6 +52,16 @@ class AssessmentAnalyzer(Protocol):
     ) -> AssessmentProfileResult: ...
 
 
+class CollapsePatternAnalyzer(Protocol):
+    def analyze(
+        self,
+        text: str,
+        *,
+        language: str = "en",
+        session_events: list[dict[str, str | int | float]] | None = None,
+    ) -> CollapsePatternResult: ...
+
+
 @dataclass(frozen=True, slots=True)
 class AnalysisRoute:
     path: str
@@ -67,8 +78,9 @@ class AnalysisService:
     speaking_plan_analyzer: SpeakingPlanAnalyzer
     rescue_plan_analyzer: RescuePlanAnalyzer
     assessment_analyzer: AssessmentAnalyzer
+    collapse_pattern_analyzer: CollapsePatternAnalyzer
 
-    def analyze(self, operation: str, request: AnalyzeTextInput) -> ChunkingResult | SkeletonResult | ReaderPlanResult | ListeningPlanResult | SpeakingPlanResult | RescuePlanResult | AssessmentProfileResult:
+    def analyze(self, operation: str, request: AnalyzeTextInput) -> ChunkingResult | SkeletonResult | ReaderPlanResult | ListeningPlanResult | SpeakingPlanResult | RescuePlanResult | AssessmentProfileResult | CollapsePatternResult:
         if operation == "chunking":
             return self.chunk_analyzer.chunk_text(text=request.text, language=request.language)
         if operation == "skeleton":
@@ -105,6 +117,12 @@ class AnalysisService:
                 self_reported_difficulties=request.self_reported_difficulties,
                 fatigue_level=request.fatigue_level,
             )
+        if operation == "collapse_patterns":
+            return self.collapse_pattern_analyzer.analyze(
+                text=request.text,
+                language=request.language,
+                session_events=request.session_events,
+            )
         raise ValueError(f"unsupported analysis operation: {operation}")
 
     @staticmethod
@@ -117,4 +135,5 @@ class AnalysisService:
             AnalysisRoute(path="/analyze/speaking-plan", audit_name="speaking_plan_analyzed", operation="speaking_plan"),
             AnalysisRoute(path="/analyze/rescue-plan", audit_name="rescue_plan_analyzed", operation="rescue_plan"),
             AnalysisRoute(path="/analyze/assessment", audit_name="assessment_analyzed", operation="assessment"),
+            AnalysisRoute(path="/analyze/collapse-patterns", audit_name="collapse_patterns_analyzed", operation="collapse_patterns"),
         )

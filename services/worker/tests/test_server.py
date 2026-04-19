@@ -188,3 +188,21 @@ def test_assessment_endpoint() -> None:
         assert payload["recommended_reader_mode"]
         assert payload["recommended_pause_frequency"]
         assert payload["notice"]
+
+
+def test_collapse_patterns_endpoint() -> None:
+    with running_server(make_settings()) as server:
+        body = {
+            "text": "In this study, we propose a memory safe interface that reduces overload during reading.",
+            "session_events": [
+                {"event_type": "repeat", "chunk_order": 2, "seconds": 0},
+                {"event_type": "long_pause", "chunk_order": 2, "seconds": 4.5},
+            ],
+        }
+        body_text = json.dumps(body)
+        response, payload = post_json(server.server_port, "/analyze/collapse-patterns", body, signed_headers(body_text))
+
+        assert response.status == HTTPStatus.OK
+        assert payload["dominant_pattern"]
+        assert payload["sites"]
+        assert payload["version"]
