@@ -157,3 +157,16 @@ def test_speaking_plan_endpoint() -> None:
         assert payload["steps"]
         assert payload["rescue_phrases"]
         assert payload["version"]
+
+
+def test_rescue_plan_endpoint() -> None:
+    with running_server(make_settings()) as server:
+        body = {"text": "In this study, we propose a memory safe interface that reduces overload during reading."}
+        body_text = json.dumps(body)
+        response, payload = post_json(server.server_port, "/analyze/rescue-plan", body, signed_headers(body_text))
+
+        assert response.status == HTTPStatus.OK
+        assert payload["overload_level"]
+        assert payload["primary_strategy"]
+        assert payload["phrases"]
+        assert payload["version"]

@@ -199,3 +199,35 @@ class SpeakingPlanResult:
             "steps": [step.to_dict() for step in self.steps],
             "rescue_phrases": self.rescue_phrases,
         }
+
+
+@dataclass(slots=True)
+class RescuePhrase:
+    category: str
+    phrase_en: str
+    phrase_ja: str
+    use_when: str
+    priority: int
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(slots=True)
+class RescuePlanResult:
+    version: str
+    language: str
+    summary: str
+    overload_level: str
+    primary_strategy: str
+    phrases: list[RescuePhrase]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "version": self.version,
+            "language": self.language,
+            "summary": self.summary,
+            "overload_level": self.overload_level,
+            "primary_strategy": self.primary_strategy,
+            "phrases": [phrase.to_dict() for phrase in self.phrases],
+        }
