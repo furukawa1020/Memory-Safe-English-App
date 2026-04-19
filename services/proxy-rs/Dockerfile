@@ -9,7 +9,10 @@ RUN cargo build --release
 FROM debian:bookworm-slim
 WORKDIR /app
 
-RUN useradd --system --uid 10001 proxyuser
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --system --uid 10001 proxyuser
 COPY --from=builder /app/target/release/mse-proxy /usr/local/bin/mse-proxy
 
 USER proxyuser
