@@ -45,4 +45,7 @@ type ContentRepository interface {
 	GetChunkingResult(ctx context.Context, contentID string) (domain.ChunkingResult, error)
 	SaveChunkingResult(ctx context.Context, contentID string, result domain.ChunkingResult) error
 	DeleteChunkingResult(ctx context.Context, contentID string) error
+	GetSkeletonResult(ctx context.Context, contentID string) (domain.SkeletonResult, error)
+	SaveSkeletonResult(ctx context.Context, contentID string, result domain.SkeletonResult) error
+	DeleteSkeletonResult(ctx context.Context, contentID string) error
 }
