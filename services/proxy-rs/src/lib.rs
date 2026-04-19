@@ -4,6 +4,7 @@ pub mod config;
 pub mod gc;
 pub mod http_response;
 pub mod proxy;
+pub mod readiness;
 pub mod request_id;
 pub mod response_headers;
 pub mod routes;
