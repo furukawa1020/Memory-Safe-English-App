@@ -41,21 +41,43 @@ func New(baseURL, apiKey, signatureKey string, timeout time.Duration) *Client {
 }
 
 func (c *Client) AnalyzeChunks(ctx context.Context, text, language string) (domain.ChunkingResult, error) {
+	var result domain.ChunkingResult
+	if err := c.analyze(ctx, "/analyze/chunks", text, language, &result); err != nil {
+		return domain.ChunkingResult{}, err
+	}
+	if len(result.Chunks) == 0 && result.Summary == "" {
+		return domain.ChunkingResult{}, fmt.Errorf("%w: worker returned empty analysis", domain.ErrUnavailable)
+	}
+	return result, nil
+}
+
+func (c *Client) AnalyzeSkeleton(ctx context.Context, text, language string) (domain.SkeletonResult, error) {
+	var result domain.SkeletonResult
+	if err := c.analyze(ctx, "/analyze/skeleton", text, language, &result); err != nil {
+		return domain.SkeletonResult{}, err
+	}
+	if len(result.Parts) == 0 && result.Summary == "" {
+		return domain.SkeletonResult{}, fmt.Errorf("%w: worker returned empty skeleton analysis", domain.ErrUnavailable)
+	}
+	return result, nil
+}
+
+func (c *Client) analyze(ctx context.Context, path, text, language string, out any) error {
 	requestBody := map[string]string{
 		"text":     text,
 		"language": language,
 	}
 	bodyBytes, err := json.Marshal(requestBody)
 	if err != nil {
-		return domain.ChunkingResult{}, fmt.Errorf("marshal worker request: %w", err)
+		return fmt.Errorf("marshal worker request: %w", err)
 	}
 
 	timestamp := fmt.Sprintf("%d", c.now().Unix())
 	signature := sign(timestamp, bodyBytes, c.signatureKey)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/analyze/chunks", bytes.NewReader(bodyBytes))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+path, bytes.NewReader(bodyBytes))
 	if err != nil {
-		return domain.ChunkingResult{}, fmt.Errorf("build worker request: %w", err)
+		return fmt.Errorf("build worker request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Worker-Api-Key", c.apiKey)
@@ -68,28 +90,24 @@ func (c *Client) AnalyzeChunks(ctx context.Context, text, language string) (doma
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
-			return domain.ChunkingResult{}, fmt.Errorf("%w: worker request timed out", domain.ErrUnavailable)
+			return fmt.Errorf("%w: worker request timed out", domain.ErrUnavailable)
 		}
-		return domain.ChunkingResult{}, fmt.Errorf("%w: call worker: %v", domain.ErrUnavailable, err)
+		return fmt.Errorf("%w: call worker: %v", domain.ErrUnavailable, err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		return domain.ChunkingResult{}, UpstreamError{
+		return UpstreamError{
 			StatusCode: resp.StatusCode,
 			Message:    strings.TrimSpace(string(body)),
 		}
 	}
 
-	var result domain.ChunkingResult
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return domain.ChunkingResult{}, fmt.Errorf("%w: decode worker response: %v", domain.ErrUnavailable, err)
+	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
+		return fmt.Errorf("%w: decode worker response: %v", domain.ErrUnavailable, err)
 	}
-	if len(result.Chunks) == 0 && result.Summary == "" {
-		return domain.ChunkingResult{}, fmt.Errorf("%w: worker returned empty analysis", domain.ErrUnavailable)
-	}
-	return result, nil
+	return nil
 }
 
 func sign(timestamp string, body []byte, key string) string {
