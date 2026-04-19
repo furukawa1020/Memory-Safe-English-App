@@ -344,6 +344,7 @@ impl Upstream {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use http::HeaderValue;
 
     #[test]
     fn only_worker_analysis_posts_are_cacheable() {
@@ -370,5 +371,16 @@ mod tests {
         )
         .is_none());
         assert!(cache_key(&Upstream::Api, &http::Method::POST, "/api/contents", &body).is_none());
+    }
+
+    #[test]
+    fn sanitize_request_headers_sets_forwarded_for_when_missing() {
+        let headers = HeaderMap::new();
+        let request_id = HeaderValue::from_static("request-123");
+
+        let sanitized = sanitize_request_headers(&headers, &request_id, "198.51.100.10");
+
+        assert_eq!(sanitized.get("x-request-id").unwrap(), "request-123");
+        assert_eq!(sanitized.get("x-forwarded-for").unwrap(), "198.51.100.10");
     }
 }
