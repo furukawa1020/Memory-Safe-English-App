@@ -30,3 +30,16 @@ type EventLog struct {
 	OccurredAt time.Time      `json:"occurred_at"`
 	CreatedAt  time.Time      `json:"created_at"`
 }
+
+type Content struct {
+	ID          string    `json:"content_id"`
+	Title       string    `json:"title"`
+	ContentType string    `json:"content_type"`
+	Level       string    `json:"level"`
+	Topic       string    `json:"topic"`
+	Language    string    `json:"language"`
+	RawText     string    `json:"raw_text"`
+	SummaryText string    `json:"summary_text,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
