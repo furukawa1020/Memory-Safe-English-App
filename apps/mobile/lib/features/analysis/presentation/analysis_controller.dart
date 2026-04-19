@@ -14,7 +14,7 @@ class AnalysisController extends ChangeNotifier {
 
   Future<void> analyze(String text) async {
     if (text.trim().isEmpty) {
-      errorText = '英文を入力してください';
+      errorText = 'Enter some English text first.';
       notifyListeners();
       return;
     }
@@ -22,10 +22,11 @@ class AnalysisController extends ChangeNotifier {
     isSubmitting = true;
     errorText = null;
     notifyListeners();
+
     try {
       result = await _repository.analyzeText(text);
     } catch (_) {
-      errorText = '解析に失敗しました';
+      errorText = 'Analysis failed. Please try again.';
     } finally {
       isSubmitting = false;
       notifyListeners();
