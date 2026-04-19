@@ -46,12 +46,13 @@ async fn forward(state: AppState, request: Request<Body>, upstream: Upstream) ->
         .uri()
         .path_and_query()
         .map(|value| value.as_str())
-        .unwrap_or("/");
+        .unwrap_or("/")
+        .to_string();
 
-    if upstream == Upstream::Api && rate_limit::is_auth_path(&method, path_and_query) {
+    if upstream == Upstream::Api && rate_limit::is_auth_path(&method, &path_and_query) {
         let decision = state
             .auth_rate_limiter
-            .allow(&auth_rate_limit_key(path_and_query, &client_ip))
+            .allow(&auth_rate_limit_key(&path_and_query, &client_ip))
             .await;
         if !decision.allowed {
             return rate_limited_response(
@@ -76,14 +77,14 @@ async fn forward(state: AppState, request: Request<Body>, upstream: Upstream) ->
         }
     };
 
-    let maybe_cache_key = cache_key(&upstream, &method, path_and_query, &body_bytes);
+    let maybe_cache_key = cache_key(&upstream, &method, &path_and_query, &body_bytes);
     if let Some(key) = maybe_cache_key.as_ref() {
         if let Some(cached) = state.cache.get(key).await {
             return build_cached_response(cached, &request_id, upstream.cache_header_value());
         }
     }
 
-    let upstream_url = match upstream_url(&state, &upstream, path_and_query) {
+    let upstream_url = match upstream_url(&state, &upstream, &path_and_query) {
         Ok(url) => url,
         Err(_) => {
             return error_response(
