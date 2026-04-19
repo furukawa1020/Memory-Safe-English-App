@@ -4,7 +4,15 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from app.analysis.models import AnalyzeTextInput
-from app.models import ChunkingResult, ListeningPlanResult, ReaderPlanResult, RescuePlanResult, SkeletonResult, SpeakingPlanResult
+from app.models import (
+    AssessmentProfileResult,
+    ChunkingResult,
+    ListeningPlanResult,
+    ReaderPlanResult,
+    RescuePlanResult,
+    SkeletonResult,
+    SpeakingPlanResult,
+)
 
 
 class ChunkAnalyzer(Protocol):
@@ -31,6 +39,18 @@ class RescuePlanAnalyzer(Protocol):
     def build(self, text: str, language: str = "en", target_context: str = "general") -> RescuePlanResult: ...
 
 
+class AssessmentAnalyzer(Protocol):
+    def assess(
+        self,
+        text: str,
+        *,
+        language: str = "en",
+        target_context: str = "general",
+        self_reported_difficulties: list[str] | None = None,
+        fatigue_level: str = "unknown",
+    ) -> AssessmentProfileResult: ...
+
+
 @dataclass(frozen=True, slots=True)
 class AnalysisRoute:
     path: str
@@ -46,8 +66,9 @@ class AnalysisService:
     listening_plan_analyzer: ListeningPlanAnalyzer
     speaking_plan_analyzer: SpeakingPlanAnalyzer
     rescue_plan_analyzer: RescuePlanAnalyzer
+    assessment_analyzer: AssessmentAnalyzer
 
-    def analyze(self, operation: str, request: AnalyzeTextInput) -> ChunkingResult | SkeletonResult | ReaderPlanResult | ListeningPlanResult | SpeakingPlanResult | RescuePlanResult:
+    def analyze(self, operation: str, request: AnalyzeTextInput) -> ChunkingResult | SkeletonResult | ReaderPlanResult | ListeningPlanResult | SpeakingPlanResult | RescuePlanResult | AssessmentProfileResult:
         if operation == "chunking":
             return self.chunk_analyzer.chunk_text(text=request.text, language=request.language)
         if operation == "skeleton":
@@ -76,6 +97,14 @@ class AnalysisService:
                 language=request.language,
                 target_context=request.target_context,
             )
+        if operation == "assessment":
+            return self.assessment_analyzer.assess(
+                text=request.text,
+                language=request.language,
+                target_context=request.target_context,
+                self_reported_difficulties=request.self_reported_difficulties,
+                fatigue_level=request.fatigue_level,
+            )
         raise ValueError(f"unsupported analysis operation: {operation}")
 
     @staticmethod
@@ -87,4 +116,5 @@ class AnalysisService:
             AnalysisRoute(path="/analyze/listening-plan", audit_name="listening_plan_analyzed", operation="listening_plan"),
             AnalysisRoute(path="/analyze/speaking-plan", audit_name="speaking_plan_analyzed", operation="speaking_plan"),
             AnalysisRoute(path="/analyze/rescue-plan", audit_name="rescue_plan_analyzed", operation="rescue_plan"),
+            AnalysisRoute(path="/analyze/assessment", audit_name="assessment_analyzed", operation="assessment"),
         )

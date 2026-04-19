@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from app.assessment import AssessmentService
 from app.analysis import AnalysisService
 from app.chunking import ChunkingService
 from app.config import Settings
@@ -22,6 +23,7 @@ class Application:
     listening_plan_service: ListeningPlanService
     speaking_plan_service: SpeakingPlanService
     rescue_plan_service: RescuePlanService
+    assessment_service: AssessmentService
     analysis_service: AnalysisService
     rate_limiter: SlidingWindowRateLimiter
 
@@ -35,6 +37,7 @@ def build_application(settings: Settings | None = None) -> Application:
     listening_plan_service = ListeningPlanService(chunking_service=chunking_service)
     speaking_plan_service = SpeakingPlanService(chunking_service=chunking_service)
     rescue_plan_service = RescuePlanService(chunking_service=chunking_service)
+    assessment_service = AssessmentService()
     return Application(
         settings=resolved_settings,
         chunking_service=chunking_service,
@@ -43,6 +46,7 @@ def build_application(settings: Settings | None = None) -> Application:
         listening_plan_service=listening_plan_service,
         speaking_plan_service=speaking_plan_service,
         rescue_plan_service=rescue_plan_service,
+        assessment_service=assessment_service,
         analysis_service=AnalysisService(
             chunk_analyzer=chunking_service,
             skeleton_analyzer=skeleton_service,
@@ -50,6 +54,7 @@ def build_application(settings: Settings | None = None) -> Application:
             listening_plan_analyzer=listening_plan_service,
             speaking_plan_analyzer=speaking_plan_service,
             rescue_plan_analyzer=rescue_plan_service,
+            assessment_analyzer=assessment_service,
         ),
         rate_limiter=SlidingWindowRateLimiter(
             max_requests=resolved_settings.rate_limit_max_requests,

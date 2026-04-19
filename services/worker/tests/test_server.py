@@ -170,3 +170,21 @@ def test_rescue_plan_endpoint() -> None:
         assert payload["primary_strategy"]
         assert payload["phrases"]
         assert payload["version"]
+
+
+def test_assessment_endpoint() -> None:
+    with running_server(make_settings()) as server:
+        body = {
+            "text": "In this study, we propose a memory safe interface that reduces overload during reading.",
+            "target_context": "research",
+            "self_reported_difficulties": ["sentence_integration", "audio_tracking"],
+            "fatigue_level": "medium",
+        }
+        body_text = json.dumps(body)
+        response, payload = post_json(server.server_port, "/analyze/assessment", body, signed_headers(body_text))
+
+        assert response.status == HTTPStatus.OK
+        assert payload["profile_label"]
+        assert payload["recommended_reader_mode"]
+        assert payload["recommended_pause_frequency"]
+        assert payload["notice"]
