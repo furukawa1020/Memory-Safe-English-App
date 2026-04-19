@@ -13,7 +13,10 @@ pub fn spawn_gc_task(cache: CacheStore, interval: Duration) -> JoinHandle<()> {
             ticker.tick().await;
             let result = cache.sweep_expired().await;
             if result.expired_removed == 0 && result.overflow_removed == 0 {
-                debug!(remaining = result.remaining, "cache gc sweep completed without removals");
+                debug!(
+                    remaining = result.remaining,
+                    "cache gc sweep completed without removals"
+                );
                 continue;
             }
 
