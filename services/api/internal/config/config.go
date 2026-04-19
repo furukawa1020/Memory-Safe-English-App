@@ -15,6 +15,10 @@ type Config struct {
 	AccessTokenTTL         time.Duration
 	RefreshTokenTTL        time.Duration
 	PasswordHashIterations int
+	AuthRateLimitWindow    time.Duration
+	LoginMaxAttempts       int
+	RegisterMaxAttempts    int
+	RefreshMaxAttempts     int
 	WorkerBaseURL          string
 	WorkerAPIKey           string
 	WorkerSignatureKey     string
@@ -30,6 +34,10 @@ func Load() Config {
 		AccessTokenTTL:         getEnvDuration("AUTH_ACCESS_TOKEN_TTL", 15*time.Minute),
 		RefreshTokenTTL:        getEnvDuration("AUTH_REFRESH_TOKEN_TTL", 7*24*time.Hour),
 		PasswordHashIterations: getEnvInt("PASSWORD_HASH_ITERATIONS", 120000),
+		AuthRateLimitWindow:    getEnvDuration("AUTH_RATE_LIMIT_WINDOW", 10*time.Minute),
+		LoginMaxAttempts:       getEnvInt("AUTH_RATE_LIMIT_LOGIN_MAX_ATTEMPTS", 10),
+		RegisterMaxAttempts:    getEnvInt("AUTH_RATE_LIMIT_REGISTER_MAX_ATTEMPTS", 5),
+		RefreshMaxAttempts:     getEnvInt("AUTH_RATE_LIMIT_REFRESH_MAX_ATTEMPTS", 20),
 		WorkerBaseURL:          getEnv("WORKER_BASE_URL", "http://127.0.0.1:8090"),
 		WorkerAPIKey:           getEnv("WORKER_API_KEY", "dev-worker-api-key"),
 		WorkerSignatureKey:     getEnv("WORKER_SIGNATURE_KEY", "dev-worker-signature-key"),
@@ -52,6 +60,18 @@ func (c Config) Validate() error {
 	}
 	if c.PasswordHashIterations < 100000 {
 		return fmt.Errorf("PASSWORD_HASH_ITERATIONS must be at least 100000")
+	}
+	if c.AuthRateLimitWindow <= 0 {
+		return fmt.Errorf("AUTH_RATE_LIMIT_WINDOW must be positive")
+	}
+	if c.LoginMaxAttempts <= 0 {
+		return fmt.Errorf("AUTH_RATE_LIMIT_LOGIN_MAX_ATTEMPTS must be positive")
+	}
+	if c.RegisterMaxAttempts <= 0 {
+		return fmt.Errorf("AUTH_RATE_LIMIT_REGISTER_MAX_ATTEMPTS must be positive")
+	}
+	if c.RefreshMaxAttempts <= 0 {
+		return fmt.Errorf("AUTH_RATE_LIMIT_REFRESH_MAX_ATTEMPTS must be positive")
 	}
 	if c.WorkerBaseURL == "" {
 		return fmt.Errorf("WORKER_BASE_URL must not be empty")
