@@ -16,19 +16,19 @@ class SkeletonAnalyzer(Protocol):
 
 
 class ReaderPlanAnalyzer(Protocol):
-    def build(self, text: str, language: str = "en") -> ReaderPlanResult: ...
+    def build(self, text: str, language: str = "en", target_context: str = "general") -> ReaderPlanResult: ...
 
 
 class ListeningPlanAnalyzer(Protocol):
-    def build(self, text: str, language: str = "en") -> ListeningPlanResult: ...
+    def build(self, text: str, language: str = "en", target_context: str = "general") -> ListeningPlanResult: ...
 
 
 class SpeakingPlanAnalyzer(Protocol):
-    def build(self, text: str, language: str = "en") -> SpeakingPlanResult: ...
+    def build(self, text: str, language: str = "en", target_context: str = "general") -> SpeakingPlanResult: ...
 
 
 class RescuePlanAnalyzer(Protocol):
-    def build(self, text: str, language: str = "en") -> RescuePlanResult: ...
+    def build(self, text: str, language: str = "en", target_context: str = "general") -> RescuePlanResult: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,13 +53,29 @@ class AnalysisService:
         if operation == "skeleton":
             return self.skeleton_analyzer.extract(text=request.text, language=request.language)
         if operation == "reader_plan":
-            return self.reader_plan_analyzer.build(text=request.text, language=request.language)
+            return self.reader_plan_analyzer.build(
+                text=request.text,
+                language=request.language,
+                target_context=request.target_context,
+            )
         if operation == "listening_plan":
-            return self.listening_plan_analyzer.build(text=request.text, language=request.language)
+            return self.listening_plan_analyzer.build(
+                text=request.text,
+                language=request.language,
+                target_context=request.target_context,
+            )
         if operation == "speaking_plan":
-            return self.speaking_plan_analyzer.build(text=request.text, language=request.language)
+            return self.speaking_plan_analyzer.build(
+                text=request.text,
+                language=request.language,
+                target_context=request.target_context,
+            )
         if operation == "rescue_plan":
-            return self.rescue_plan_analyzer.build(text=request.text, language=request.language)
+            return self.rescue_plan_analyzer.build(
+                text=request.text,
+                language=request.language,
+                target_context=request.target_context,
+            )
         raise ValueError(f"unsupported analysis operation: {operation}")
 
     @staticmethod
