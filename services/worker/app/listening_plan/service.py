@@ -23,7 +23,7 @@ class ListeningPlanService:
                 summary="",
                 recommended_speed="0.85x",
                 pause_points=[],
-                final_pass_strategy="listen_once_without pauses after the chunk-by-chunk pass",
+                final_pass_strategy="listen once without pauses after the chunk-by-chunk pass",
             )
 
         pause_points: list[ListeningPausePoint] = []
