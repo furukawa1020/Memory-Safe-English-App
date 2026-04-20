@@ -79,7 +79,7 @@ def _build_rescue_phrases(overload_level: str, preferred_category: str) -> list[
         RescuePhrase(
             category="confirm",
             phrase_en="Do you mean ...?",
-            phrase_ja="つまり ... という意味ですか。",
+            phrase_ja="つまり…という意味ですか。",
             use_when="Use this when you think you caught the idea and want to confirm it.",
             priority=4,
         ),
