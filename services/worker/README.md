@@ -1,8 +1,9 @@
-# Worker Service
+# Worker サービス
 
-`services/worker` is the Python analysis worker for chunking, skeleton extraction, reader-plan generation, listening pause planning, speaking response planning, conversation rescue planning, onboarding assessment, collapse-pattern analysis, and analytics summary generation.
+`services/worker` は、ワーキングメモリ負荷を下げるための分析ロジックを担う Python ワーカーです。  
+英語をそのまま処理させるのではなく、`読む` `聞く` `話す` `レスキュー` `初期診断` `処理落ち分析` を、低負荷な学習 UI につなぎやすい形へ変換します。
 
-## Structure
+## ディレクトリ構成
 
 ```text
 services/worker
@@ -32,66 +33,105 @@ services/worker
 `- README.md
 ```
 
-## Design
+## 役割
 
-- `app/analysis/`: typed request models and operation dispatch
-- `app/chunking/`: chunking service
-- `app/context_profile.py`: context-aware defaults for research, meeting, self-intro, and daily flows
-- `app/assessment/`: onboarding profile estimation for initial mode recommendations
-- `app/analytics_summary/`: next-step recommendations from assessment and collapse patterns
-- `app/collapse_patterns/`: collapse-site analysis from session event traces
-- `app/skeleton/`: skeleton extraction service
-- `app/reader_plan/`: progressive reading plan generation for low-memory reading flows
-- `app/listening_plan/`: pause-plan generation for lower-load listening passes
-- `app/rescue_plan/`: rescue phrase planning for overload moments in conversation
-- `app/speaking_plan/`: short-step response planning for low-load speaking support
-- `app/http/request_parser.py`: HTTP request parsing and validation
-- `app/http/routes.py`: endpoint to operation mapping
-- `app/http/handlers.py`: transport and security guards
-- `app/text_analysis.py`: shared heuristics used by chunking and skeleton extraction
+- `app/analysis/`
+  分析リクエストの入力モデルと operation 振り分け
+- `app/chunking/`
+  英文を意味チャンクへ分割
+- `app/skeleton/`
+  文の骨格抽出
+- `app/reader_plan/`
+  読むときに何を先に見せるべきかを返す
+- `app/listening_plan/`
+  どこで止めると保持負荷が下がるかを返す
+- `app/speaking_plan/`
+  長文ではなく短文連結で話す手順を返す
+- `app/rescue_plan/`
+  会話中に詰まったときの定型レスキュー表現を返す
+- `app/assessment/`
+  初期診断として、表示密度や推奨モードの初期値を返す
+- `app/collapse_patterns/`
+  イベントログから処理落ち箇所と崩れ方を要約する
+- `app/analytics_summary/`
+  診断結果と処理落ち傾向をまとめて次回の推奨練習を返す
+- `app/context_profile.py`
+  `research` `meeting` `self_intro` `daily` など場面別の既定動作
+- `app/http/`
+  HTTP 受付、バリデーション、認証、署名検証
 
-## Current Features
+## 現在の主な機能
 
 - `GET /health`
 - `POST /analyze/chunks`
 - `POST /analyze/skeleton`
 - `POST /analyze/reader-plan`
 - `POST /analyze/listening-plan`
+- `POST /analyze/speaking-plan`
 - `POST /analyze/rescue-plan`
 - `POST /analyze/assessment`
-- `POST /analyze/analytics-summary`
 - `POST /analyze/collapse-patterns`
-- `POST /analyze/speaking-plan`
-- versioned analysis responses
-- reader plans include focus steps, collapsed support chunks, overload hotspots, and display hints
-- listening plans include pause checkpoints, replay cues, and recommended playback speed
-- rescue plans include prioritized rescue phrases and a primary conversation strategy
-- assessment returns initial reader/listening/speaking mode recommendations and display defaults
-- analytics summary returns next focus recommendations from assessment and collapse signals
-- collapse-pattern analysis turns session events into hotspot summaries and lighter-display recommendations
-- speaking plans include short response steps, opener options, bridge phrases, and rescue phrases
-- `target_context` changes cues and default guidance for research, self-intro, meeting, and daily use cases
-- API key authentication
+- `POST /analyze/analytics-summary`
+
+## 返せる内容
+
+- `reader-plan`
+  主軸チャンク、補助情報の折りたたみ候補、表示ヒント、負荷 hotspot
+- `listening-plan`
+  停止点、再確認キュー、推奨再生速度
+- `speaking-plan`
+  短文ステップ、opener、bridge phrase、レスキュー文
+- `rescue-plan`
+  優先度つきの聞き返し・要約依頼・時間稼ぎフレーズ
+- `assessment`
+  読む・聞く・話すの負荷スコア、初期推奨モード、表示密度
+- `collapse-patterns`
+  崩れやすい chunk、理由、推奨表示、`reading/listening/speaking` のどれ寄りか
+- `analytics-summary`
+  assessment と collapse-patterns をまとめた次回推奨
+
+## 文脈別の出し分け
+
+`target_context` によってガイダンスや recommendation が変わります。
+
+- `general`
+- `self_intro`
+- `research`
+- `meeting`
+- `daily`
+
+たとえば、
+
+- `research` では `claim / method / result` を優先
+- `meeting` では `decision / action item` を優先
+- `self_intro` では `role / identity / goal` を優先
+
+するように設計しています。
+
+## セキュリティ
+
+- API key 認証
 - HMAC request signing
-- request body and text size limits
+- request body サイズ制限
+- text 長制限
 - typed request validation
 - request timeout
 - rate limiting
-- structured audit logging
+- audit logging
 
-## Run
+## 実行
 
 ```bash
 python -m app.server
 ```
 
-## Container
+## Docker ビルド
 
 ```bash
 docker build -t mse-worker services/worker
 ```
 
-## Example Request
+## リクエスト例
 
 ```json
 {
@@ -101,17 +141,13 @@ docker build -t mse-worker services/worker
 }
 ```
 
-The same request shape works for all analysis endpoints.
+`assessment` や `analytics-summary` では、必要に応じて以下も渡せます。
 
-Supported `target_context` values:
+- `self_reported_difficulties`
+- `fatigue_level`
+- `session_events`
 
-- `general`
-- `self_intro`
-- `research`
-- `meeting`
-- `daily`
-
-## Verify
+## 検証
 
 ```bash
 python -m pytest tests -q

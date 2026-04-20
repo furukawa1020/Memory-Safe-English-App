@@ -16,5 +16,7 @@ def test_collapse_patterns_detects_high_risk_site_from_events() -> None:
     )
 
     assert result.dominant_pattern
+    assert result.likely_mode == "reading"
+    assert result.mode_signals["reading"] >= 3
     assert result.sites
     assert result.sites[0].recommendation

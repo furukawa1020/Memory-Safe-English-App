@@ -204,6 +204,8 @@ def test_collapse_patterns_endpoint() -> None:
 
         assert response.status == HTTPStatus.OK
         assert payload["dominant_pattern"]
+        assert payload["likely_mode"]
+        assert payload["mode_signals"]
         assert payload["sites"]
         assert payload["version"]
 

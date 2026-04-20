@@ -21,6 +21,7 @@ class CollapsePatternService:
         chunking = self.chunking_service.chunk_text(text=text, language=language)
         chunks = chunking.chunks
         events = session_events or []
+        mode_signals = _collect_mode_signals(events)
 
         sites: list[CollapseSite] = []
         for chunk in chunks:
@@ -50,8 +51,31 @@ class CollapsePatternService:
             language=language,
             summary=chunking.summary,
             dominant_pattern=_dominant_pattern(sites),
+            likely_mode=_likely_mode(mode_signals),
+            mode_signals=mode_signals,
             sites=sites,
         )
+
+
+def _collect_mode_signals(events: list[dict[str, str | int | float]]) -> dict[str, int]:
+    mapping = {
+        "repeat": "reading",
+        "support_open": "reading",
+        "long_pause": "reading",
+        "audio_restart": "listening",
+        "audio_pause": "listening",
+        "speed_down": "listening",
+        "speech_restart": "speaking",
+        "long_silence": "speaking",
+        "template_open": "speaking",
+    }
+    signals = {"reading": 0, "listening": 0, "speaking": 0}
+    for event in events:
+        event_type = str(event.get("event_type", ""))
+        mode = mapping.get(event_type)
+        if mode is not None:
+            signals[mode] += 1
+    return signals
 
 
 def _classify_risk(stop_count: int, load_score: int) -> str:
@@ -94,3 +118,13 @@ def _dominant_pattern(sites: list[CollapseSite]) -> str:
     if modifier_count >= len(sites) / 2:
         return "collapse often happens around modifiers and supporting detail"
     return "collapse tends to happen when the main chunk becomes heavy or repeated"
+
+
+def _likely_mode(mode_signals: dict[str, int]) -> str:
+    strongest_mode = max(mode_signals, key=mode_signals.get)
+    if mode_signals[strongest_mode] == 0:
+        return "mixed"
+    tied_modes = [mode for mode, score in mode_signals.items() if score == mode_signals[strongest_mode]]
+    if len(tied_modes) > 1:
+        return "mixed"
+    return strongest_mode

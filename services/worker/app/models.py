@@ -274,6 +274,8 @@ class CollapsePatternResult:
     language: str
     summary: str
     dominant_pattern: str
+    likely_mode: str
+    mode_signals: dict[str, int]
     sites: list[CollapseSite]
 
     def to_dict(self) -> dict[str, Any]:
@@ -282,6 +284,8 @@ class CollapsePatternResult:
             "language": self.language,
             "summary": self.summary,
             "dominant_pattern": self.dominant_pattern,
+            "likely_mode": self.likely_mode,
+            "mode_signals": self.mode_signals,
             "sites": [site.to_dict() for site in self.sites],
         }
 
