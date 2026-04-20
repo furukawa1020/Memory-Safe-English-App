@@ -24,3 +24,4 @@ def test_analytics_summary_returns_next_focus_and_recommendations() -> None:
     assert result.assessment.recommended_reader_mode
     assert result.collapse_patterns.dominant_pattern
     assert result.recommendations
+    assert "claim" in result.recommendations[0].title.lower() or "method" in result.recommendations[0].title.lower()

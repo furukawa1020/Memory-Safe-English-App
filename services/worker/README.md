@@ -20,6 +20,7 @@ services/worker
 |  |- speaking_plan/
 |  |- application.py
 |  |- config.py
+|  |- context_profile.py
 |  |- models.py
 |  |- observability.py
 |  |- rate_limit.py
@@ -35,6 +36,7 @@ services/worker
 
 - `app/analysis/`: typed request models and operation dispatch
 - `app/chunking/`: chunking service
+- `app/context_profile.py`: context-aware defaults for research, meeting, self-intro, and daily flows
 - `app/assessment/`: onboarding profile estimation for initial mode recommendations
 - `app/analytics_summary/`: next-step recommendations from assessment and collapse patterns
 - `app/collapse_patterns/`: collapse-site analysis from session event traces
@@ -68,6 +70,7 @@ services/worker
 - analytics summary returns next focus recommendations from assessment and collapse signals
 - collapse-pattern analysis turns session events into hotspot summaries and lighter-display recommendations
 - speaking plans include short response steps, opener options, bridge phrases, and rescue phrases
+- `target_context` changes cues and default guidance for research, self-intro, meeting, and daily use cases
 - API key authentication
 - HMAC request signing
 - request body and text size limits
