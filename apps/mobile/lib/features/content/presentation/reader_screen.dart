@@ -25,6 +25,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
   bool _isLoading = true;
   String? _errorText;
   ReaderMode _mode = ReaderMode.chunk;
+  int _focusIndex = 0;
 
   @override
   void initState() {
@@ -51,6 +52,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
         _content = content;
         _chunks = chunks;
         _skeleton = skeleton;
+        _focusIndex = 0;
       });
     } catch (_) {
       if (mounted) {
@@ -127,9 +129,33 @@ class _ReaderScreenState extends State<ReaderScreen> {
                               ],
                               selected: {_mode},
                               onSelectionChanged: (selection) =>
-                                  setState(() => _mode = selection.first),
+                                  setState(() {
+                                    _mode = selection.first;
+                                    _focusIndex = 0;
+                                  }),
                             ),
                             const SizedBox(height: 16),
+                            if (_mode == ReaderMode.chunk ||
+                                _mode == ReaderMode.assisted ||
+                                _mode == ReaderMode.skeleton) ...[
+                              _ReaderStepper(
+                                currentIndex: _focusIndex,
+                                totalCount: _mode == ReaderMode.skeleton
+                                    ? skeleton.parts.length
+                                    : chunks.chunks.length,
+                                onPrevious: _focusIndex > 0
+                                    ? () => setState(() => _focusIndex -= 1)
+                                    : null,
+                                onNext: _focusIndex <
+                                        ((_mode == ReaderMode.skeleton
+                                                ? skeleton.parts.length
+                                                : chunks.chunks.length) -
+                                            1)
+                                    ? () => setState(() => _focusIndex += 1)
+                                    : null,
+                              ),
+                              const SizedBox(height: 16),
+                            ],
                             Expanded(
                               child: SingleChildScrollView(
                                 child: _buildModeView(content, chunks, skeleton),
@@ -158,9 +184,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
           chunks: chunks.chunks,
           dimSupport: false,
           onlyCore: false,
+          focusIndex: _focusIndex,
         );
       case ReaderMode.skeleton:
-        return _SkeletonListView(parts: skeleton.parts);
+        return _SkeletonListView(parts: skeleton.parts, focusIndex: _focusIndex);
       case ReaderMode.assisted:
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -171,6 +198,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
               chunks: chunks.chunks,
               dimSupport: true,
               onlyCore: false,
+              focusIndex: _focusIndex,
             ),
           ],
         );
@@ -183,11 +211,13 @@ class _ChunkListView extends StatelessWidget {
     required this.chunks,
     required this.dimSupport,
     required this.onlyCore,
+    required this.focusIndex,
   });
 
   final List<ChunkItem> chunks;
   final bool dimSupport;
   final bool onlyCore;
+  final int focusIndex;
 
   @override
   Widget build(BuildContext context) {
@@ -196,10 +226,21 @@ class _ChunkListView extends StatelessWidget {
         : chunks;
     return Column(
       children: [
-        for (final chunk in visible) ...[
+        for (var index = 0; index < visible.length; index++) ...[
+          final chunk = visible[index],
           Opacity(
-            opacity: dimSupport && !chunk.isCore ? 0.48 : 1,
+            opacity: _resolveOpacity(index, chunk),
             child: Card(
+              elevation: index == focusIndex ? 3 : 0,
+              shape: RoundedRectangleBorder(
+                side: BorderSide(
+                  color: index == focusIndex
+                      ? Theme.of(context).colorScheme.primary
+                      : Colors.transparent,
+                  width: 1.4,
+                ),
+                borderRadius: BorderRadius.circular(12),
+              ),
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Row(
@@ -247,19 +288,47 @@ class _ChunkListView extends StatelessWidget {
       ],
     );
   }
+
+  double _resolveOpacity(int index, ChunkItem chunk) {
+    if (index == focusIndex) {
+      return 1;
+    }
+    if (dimSupport && !chunk.isCore) {
+      return 0.36;
+    }
+    if ((index - focusIndex).abs() == 1) {
+      return 0.74;
+    }
+    return 0.42;
+  }
 }
 
 class _SkeletonListView extends StatelessWidget {
-  const _SkeletonListView({required this.parts});
+  const _SkeletonListView({
+    required this.parts,
+    required this.focusIndex,
+  });
 
   final List<SkeletonPart> parts;
+  final int focusIndex;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        for (final part in parts) ...[
+        for (var index = 0; index < parts.length; index++) ...[
+          final part = parts[index],
           Card(
+            elevation: index == focusIndex ? 3 : 0,
+            shape: RoundedRectangleBorder(
+              side: BorderSide(
+                color: index == focusIndex
+                    ? Theme.of(context).colorScheme.primary
+                    : Colors.transparent,
+                width: 1.4,
+              ),
+              borderRadius: BorderRadius.circular(12),
+            ),
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Row(
@@ -312,6 +381,57 @@ class _SkeletonListView extends StatelessWidget {
           const SizedBox(height: 10),
         ],
       ],
+    );
+  }
+}
+
+class _ReaderStepper extends StatelessWidget {
+  const _ReaderStepper({
+    required this.currentIndex,
+    required this.totalCount,
+    required this.onPrevious,
+    required this.onNext,
+  });
+
+  final int currentIndex;
+  final int totalCount;
+  final VoidCallback? onPrevious;
+  final VoidCallback? onNext;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            IconButton(
+              onPressed: onPrevious,
+              icon: const Icon(Icons.arrow_back_rounded),
+            ),
+            Expanded(
+              child: Column(
+                children: [
+                  Text(
+                    'Step ${currentIndex + 1} / $totalCount',
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                  const SizedBox(height: 8),
+                  LinearProgressIndicator(
+                    value: totalCount == 0 ? 0 : (currentIndex + 1) / totalCount,
+                    minHeight: 8,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              onPressed: onNext,
+              icon: const Icon(Icons.arrow_forward_rounded),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -71,8 +71,10 @@ class _ContentHomeTabState extends State<_ContentHomeTab> {
               children: [
                 const _HeroCard(
                   title: 'Chunk Reader',
-                  subtitle: 'Read with meaning chunks kept visible so sentence-level load stays lower.',
+                  subtitle: 'Keep the sentence stable by reading one meaning unit at a time instead of holding the whole line in memory.',
                 ),
+                const SizedBox(height: 18),
+                const _QuickStartPanel(),
                 const SizedBox(height: 18),
                 Text('Recommended Content', style: Theme.of(context).textTheme.titleLarge),
                 const SizedBox(height: 12),
@@ -230,7 +232,14 @@ class _ContentTile extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(item.title, style: Theme.of(context).textTheme.titleMedium),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(item.title, style: Theme.of(context).textTheme.titleMedium),
+                  ),
+                  const Icon(Icons.arrow_forward_rounded),
+                ],
+              ),
               const SizedBox(height: 8),
               Text(item.summaryText),
               const SizedBox(height: 14),
@@ -247,6 +256,80 @@ class _ContentTile extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _QuickStartPanel extends StatelessWidget {
+  const _QuickStartPanel();
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Today\'s low-load flow', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 10),
+            const _FlowStep(
+              index: 1,
+              title: 'Open one short text',
+              subtitle: 'Start with a single item instead of choosing too many tasks at once.',
+            ),
+            const SizedBox(height: 10),
+            const _FlowStep(
+              index: 2,
+              title: 'Use Chunk or Assisted first',
+              subtitle: 'Keep support detail dimmed until the core meaning feels stable.',
+            ),
+            const SizedBox(height: 10),
+            const _FlowStep(
+              index: 3,
+              title: 'Move to Skeleton only after the main idea lands',
+              subtitle: 'Do not force yourself to hold every modifier from the start.',
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FlowStep extends StatelessWidget {
+  const _FlowStep({
+    required this.index,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final int index;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        CircleAvatar(
+          radius: 16,
+          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+          child: Text('$index'),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: Theme.of(context).textTheme.titleSmall),
+              const SizedBox(height: 4),
+              Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
