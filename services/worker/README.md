@@ -88,7 +88,7 @@ services/worker
 - `collapse-patterns`
   崩れやすい chunk、理由、推奨表示、`reading/listening/speaking` のどれ寄りか
 - `analytics-summary`
-  assessment と collapse-patterns をまとめた次回推奨
+  assessment と collapse-patterns をまとめた次回推奨。最近のイベントが `reading/listening/speaking` のどれ寄りかも踏まえて順序を調整
 
 ## 文脈別の出し分け
 

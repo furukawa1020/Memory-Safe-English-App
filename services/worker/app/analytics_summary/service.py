@@ -53,6 +53,7 @@ class AnalyticsSummaryService:
 
 def _build_recommendations(context_key: str, assessment, collapse_patterns) -> list[PracticeRecommendation]:
     recommendations: list[PracticeRecommendation] = []
+    mode_priority = _mode_priority(collapse_patterns.likely_mode)
 
     if collapse_patterns.sites:
         primary_site = collapse_patterns.sites[0]
@@ -69,8 +70,8 @@ def _build_recommendations(context_key: str, assessment, collapse_patterns) -> l
             PracticeRecommendation(
                 area="reading",
                 title=_reading_title(context_key),
-                reason=_reading_reason(context_key),
-                priority=2,
+                reason=_reading_reason(context_key, collapse_patterns.likely_mode),
+                priority=mode_priority["reading"],
             )
         )
     if assessment.listening_load_score >= 4:
@@ -78,8 +79,8 @@ def _build_recommendations(context_key: str, assessment, collapse_patterns) -> l
             PracticeRecommendation(
                 area="listening",
                 title=_listening_title(context_key),
-                reason=_listening_reason(context_key),
-                priority=3,
+                reason=_listening_reason(context_key, collapse_patterns.likely_mode),
+                priority=mode_priority["listening"],
             )
         )
     if assessment.speaking_load_score >= 4:
@@ -87,8 +88,8 @@ def _build_recommendations(context_key: str, assessment, collapse_patterns) -> l
             PracticeRecommendation(
                 area="speaking",
                 title=_speaking_title(context_key),
-                reason=_speaking_reason(context_key),
-                priority=4,
+                reason=_speaking_reason(context_key, collapse_patterns.likely_mode),
+                priority=mode_priority["speaking"],
             )
         )
 
@@ -127,16 +128,6 @@ def _reading_title(context_key: str) -> str:
     return "Start with assisted chunk reading"
 
 
-def _reading_reason(context_key: str) -> str:
-    if context_key == "research":
-        return "Research sentences often hide the main claim inside dense support, so keep detail collapsed until the core claim is stable."
-    if context_key == "meeting":
-        return "Meeting language is easier to keep when decision and action chunks stay visible while extra explanation stays collapsed."
-    if context_key == "self_intro":
-        return "Self-introduction flows are safer when role and main identity chunks stay visible before extra detail appears."
-    return "Reading load is high enough that support detail should stay collapsed at first."
-
-
 def _listening_title(context_key: str) -> str:
     if context_key == "research":
         return "Use checkpoint listening around claim, method, and result"
@@ -147,14 +138,21 @@ def _listening_title(context_key: str) -> str:
     return "Use chunk-pause listening first"
 
 
-def _listening_reason(context_key: str) -> str:
+def _listening_reason(context_key: str, likely_mode: str) -> str:
     if context_key == "research":
-        return "Frequent pauses after claim or result units will reduce the need to retain long academic sentences."
+        base = "Frequent pauses after claim or result units will reduce the need to retain long academic sentences."
+        return _attach_mode_hint(base, likely_mode, "listening")
     if context_key == "meeting":
-        return "Frequent pauses after decisions or action items will reduce overload during fast meeting turns."
+        base = "Frequent pauses after decisions or action items will reduce overload during fast meeting turns."
+        return _attach_mode_hint(base, likely_mode, "listening")
     if context_key == "daily":
-        return "Short pauses help keep only the everyday meaning without carrying extra detail forward."
-    return "Listening load is high enough that frequent pause points will help retain the main idea."
+        base = "Short pauses help keep only the everyday meaning without carrying extra detail forward."
+        return _attach_mode_hint(base, likely_mode, "listening")
+    return _attach_mode_hint(
+        "Listening load is high enough that frequent pause points will help retain the main idea.",
+        likely_mode,
+        "listening",
+    )
 
 
 def _speaking_title(context_key: str) -> str:
@@ -167,11 +165,51 @@ def _speaking_title(context_key: str) -> str:
     return "Switch to template short steps"
 
 
-def _speaking_reason(context_key: str) -> str:
+def _speaking_reason(context_key: str, likely_mode: str) -> str:
     if context_key == "research":
-        return "Short linked steps are safer than long academic explanations when claim, method, and result must stay stable."
+        base = "Short linked steps are safer than long academic explanations when claim, method, and result must stay stable."
+        return _attach_mode_hint(base, likely_mode, "speaking")
     if context_key == "meeting":
-        return "Short linked steps are safer than long updates when decisions and next actions need to stay stable."
+        base = "Short linked steps are safer than long updates when decisions and next actions need to stay stable."
+        return _attach_mode_hint(base, likely_mode, "speaking")
     if context_key == "self_intro":
-        return "Short linked steps are safer than long personal explanations when role, background, and goal must stay stable."
-    return "Speaking load is high enough that short linked sentences are safer than longer free speech."
+        base = "Short linked steps are safer than long personal explanations when role, background, and goal must stay stable."
+        return _attach_mode_hint(base, likely_mode, "speaking")
+    return _attach_mode_hint(
+        "Speaking load is high enough that short linked sentences are safer than longer free speech.",
+        likely_mode,
+        "speaking",
+    )
+
+
+def _reading_reason(context_key: str, likely_mode: str) -> str:
+    if context_key == "research":
+        base = "Research sentences often hide the main claim inside dense support, so keep detail collapsed until the core claim is stable."
+        return _attach_mode_hint(base, likely_mode, "reading")
+    if context_key == "meeting":
+        base = "Meeting language is easier to keep when decision and action chunks stay visible while extra explanation stays collapsed."
+        return _attach_mode_hint(base, likely_mode, "reading")
+    if context_key == "self_intro":
+        base = "Self-introduction flows are safer when role and main identity chunks stay visible before extra detail appears."
+        return _attach_mode_hint(base, likely_mode, "reading")
+    return _attach_mode_hint(
+        "Reading load is high enough that support detail should stay collapsed at first.",
+        likely_mode,
+        "reading",
+    )
+
+
+def _mode_priority(likely_mode: str) -> dict[str, int]:
+    if likely_mode == "reading":
+        return {"reading": 2, "listening": 3, "speaking": 4}
+    if likely_mode == "listening":
+        return {"listening": 2, "reading": 3, "speaking": 4}
+    if likely_mode == "speaking":
+        return {"speaking": 2, "reading": 3, "listening": 4}
+    return {"reading": 2, "listening": 3, "speaking": 4}
+
+
+def _attach_mode_hint(base: str, likely_mode: str, recommendation_mode: str) -> str:
+    if likely_mode == recommendation_mode:
+        return f"{base} Recent session events also suggest this is the current main collapse mode."
+    return base
