@@ -1,27 +1,28 @@
 # Memory Safe English
 
-Memory Safe English is an English-learning product designed for users who struggle with working-memory load during reading, listening, and speaking！
+Memory Safe English は、ワーキングメモリ負荷が低い人でも英語を処理しやすくするための学習プロダクトです。  
+読む・聞く・話す・会話レスキューを、`保持しなくても処理しやすい形` に変換することを目的にしています。
 
-This repository is a monorepo with four main parts:
+このリポジトリはモノレポで、主に次の 4 つで構成されています。
 
-- a Flutter mobile app
-- a Go API
-- a Python analysis worker
-- a Rust proxy with short-lived cache management
+- Flutter モバイルアプリ
+- Go API
+- Python 分析ワーカー
+- Rust プロキシ
 
-## Repository Structure
+## リポジトリ構成
 
 ```text
 .
 |- apps/
-|  `- mobile/                 # Flutter app
+|  `- mobile/                 # Flutter アプリ
 |- services/
 |  |- api/                    # Go REST API
-|  |- worker/                 # Python analysis worker
-|  `- proxy-rs/               # Rust proxy, cache, and GC
+|  |- worker/                 # Python 分析ワーカー
+|  `- proxy-rs/               # Rust プロキシ、キャッシュ、GC
 |- infra/
-|  |- docker-compose.yml      # Local development stack
-|  `- postgres/init/          # Initial SQL
+|  |- docker-compose.yml      # ローカル開発用スタック
+|  `- postgres/init/          # 初期 SQL
 |- docs/
 |  |- architecture.md
 |  |- api-outline.md
@@ -30,21 +31,27 @@ This repository is a monorepo with four main parts:
 `- scripts/
    |- bootstrap-mobile.ps1
    |- dev-doctor.ps1
+   |- run-mobile.ps1
    |- smoke-test.ps1
+   |- start-android-emulator.ps1
    |- start-dev-stack.ps1
    `- stop-dev-stack.ps1
 ```
 
-## Services
+## 各サービスの役割
 
-- `services/api`: authentication, content delivery, sessions, and worker orchestration
-- `services/worker`: chunk and skeleton analysis with request signing
-- `services/proxy-rs`: reverse proxy, frontend-friendly API aliases, auth route rate limiting, cache GC, admin endpoints, readiness checks
-- `apps/mobile`: Flutter client for auth, content browsing, and reader flow
+- `services/api`
+  認証、コンテンツ配信、セッション管理、worker 連携
+- `services/worker`
+  chunking / skeleton / reader-plan / listening-plan / speaking-plan / rescue-plan / assessment / analytics
+- `services/proxy-rs`
+  前段プロキシ、フロント向け route 集約、認証系 rate limit、短期キャッシュ、readiness
+- `apps/mobile`
+  認証、コンテンツ一覧、Reader フローを持つ Flutter クライアント
 
-## Local Stack
+## ローカル開発スタック
 
-The local stack is defined in [infra/docker-compose.yml](./infra/docker-compose.yml).
+ローカルスタックは [infra/docker-compose.yml](./infra/docker-compose.yml) で定義しています。
 
 - `proxy`: `http://127.0.0.1:8070`
 - `api`: `http://127.0.0.1:8080`
@@ -52,95 +59,111 @@ The local stack is defined in [infra/docker-compose.yml](./infra/docker-compose.
 - `postgres`: `127.0.0.1:5432`
 - `redis`: `127.0.0.1:6379`
 
-All services include health checks. The proxy uses `/ready`, so it becomes healthy only after the API and worker are ready.
-The proxy also exposes mobile-friendly API routes such as `/auth/login`, `/auth/refresh`, `/contents`, and `/me`, so the Flutter app can point at the proxy root instead of handling `/api/...` prefixes itself. It now also applies a coarse auth rate limit before requests reach the API.
-If the proxy is deployed behind another trusted reverse proxy or load balancer, configure `PROXY_TRUSTED_PROXY_IPS` so forwarded client IP headers are only accepted from that trusted peer.
-Admin endpoints on the proxy can also be locked down with `PROXY_ADMIN_ALLOWED_IPS` and have their own independent rate limit window.
-The Go API rotates refresh tokens on every refresh and revokes the full token family if an older refresh token is replayed.
-The Go API also writes auth audit logs and periodically removes expired refresh sessions.
+すべてのサービスに health check を入れてあります。  
+proxy は `/ready` を使うため、API と worker の両方が準備できてから healthy になります。
 
-## Recommended Local Workflow
+## 推奨ローカルワークフロー
 
-### 1. Start the stack
+### 1. バックエンドスタックを起動する
 
-Before starting, make sure Docker Desktop is running.
+先に Docker Desktop を起動してください。
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\start-dev-stack.ps1
 ```
 
-This script:
+このスクリプトは次を行います。
 
-- validates Docker availability
-- runs `docker compose up -d --build`
-- waits for all containers to become healthy
-- runs the smoke test by default
+- Docker の利用可否を確認
+- `docker compose up -d --build` を実行
+- 全コンテナが healthy になるまで待機
+- 既定では smoke test も実行
 
-### 2. Run the smoke test manually
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test.ps1
-```
-
-The smoke test exercises:
-
-- proxy readiness
-- mobile bootstrap metadata
-- auth register or login
-- content listing
-- chunk analysis
-- skeleton analysis
-- proxy admin cache stats
-
-### 3. Prepare the Flutter app
-
-Flutter is not bundled in this repository. Install the Flutter SDK first, then run:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap-mobile.ps1
-```
-
-The script creates missing platform scaffolding and runs `flutter pub get`.
-
-### 4. Check local prerequisites
+### 2. doctor で不足を確認する
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\dev-doctor.ps1
 ```
 
-The doctor script checks:
+このスクリプトは次を確認します。
 
-- Docker CLI availability
-- Docker daemon availability
-- Flutter SDK availability
-- Android `adb` availability
+- Docker CLI
+- Docker daemon
+- Flutter SDK
+- adb
+- Android emulator
+- AVD
 - proxy readiness
 
-### 5. Run the app in an Android emulator
+### 3. Flutter アプリを bootstrap する
+
+Flutter SDK はこのリポジトリに含まれていません。先に Flutter を入れてから実行してください。
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap-mobile.ps1
+```
+
+このスクリプトは次を行います。
+
+- Flutter の存在確認
+- 必要なら `flutter create .` で platform ファイル生成
+- `flutter pub get`
+
+### 4. Android エミュレーターを起動する
+
+Android Studio などで AVD を作成済みなら、次で起動できます。
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\start-android-emulator.ps1
+```
+
+複数の AVD がある場合は、先頭のものを既定で使います。  
+指定したい場合は次のようにします。
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\start-android-emulator.ps1 -AvdName Pixel_8_API_35
+```
+
+### 5. アプリをエミュレーターで起動する
+
+手動で起動する場合:
 
 ```bash
 flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8070
 ```
 
-`10.0.2.2` lets the Android emulator reach the host machine, and `8070` points the mobile app at the Rust proxy.
+`10.0.2.2` は Android エミュレーターからホスト側へ戻るためのアドレスです。  
+`8070` は Rust proxy を指します。
 
-You can also use the helper scripts:
+補助スクリプトを使う場合:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\start-android-emulator.ps1
 powershell -ExecutionPolicy Bypass -File .\scripts\run-mobile.ps1 -StartEmulator
 ```
 
-You can also use the helper scripts:
+バックエンドも一緒に起動したい場合:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\start-android-emulator.ps1
-powershell -ExecutionPolicy Bypass -File .\scripts\run-mobile.ps1 -StartEmulator
+powershell -ExecutionPolicy Bypass -File .\scripts\run-mobile.ps1 -StartStack -StartEmulator
 ```
 
-## Verification
+## smoke test
 
-Backend verification commands:
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test.ps1
+```
+
+smoke test では次を確認します。
+
+- proxy readiness
+- mobile bootstrap metadata
+- auth register / login
+- content listing
+- chunk analysis
+- skeleton analysis
+- proxy admin cache stats
+
+## バックエンド検証
 
 ```bash
 cd services/api && go test ./...
@@ -148,7 +171,7 @@ cd services/worker && python -m pytest tests -q
 cd services/proxy-rs && cargo test
 ```
 
-## Documentation
+## ドキュメント
 
 - [Architecture](./docs/architecture.md)
 - [API Outline](./docs/api-outline.md)
