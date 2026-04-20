@@ -35,6 +35,7 @@ struct MobileBootstrapResponse {
     checked_at_unix_ms: u128,
     recommended_base_urls: RecommendedBaseUrls,
     routes: FrontendRoutes,
+    capabilities: FrontendCapabilities,
     api: readiness::UpstreamStatus,
     worker: readiness::UpstreamStatus,
 }
@@ -46,6 +47,7 @@ impl MobileBootstrapResponse {
             checked_at_unix_ms: report.checked_at_unix_ms,
             recommended_base_urls: RecommendedBaseUrls::default(),
             routes: FrontendRoutes::default(),
+            capabilities: FrontendCapabilities::default(),
             api: report.api.clone(),
             worker: report.worker.clone(),
         }
@@ -78,6 +80,11 @@ struct FrontendRoutes {
     current_user: &'static str,
     contents: &'static str,
     chunk_analysis: &'static str,
+    skeleton_analysis: &'static str,
+    reader_plan: &'static str,
+    listening_plan: &'static str,
+    speaking_plan: &'static str,
+    rescue_plan: &'static str,
 }
 
 impl Default for FrontendRoutes {
@@ -90,6 +97,38 @@ impl Default for FrontendRoutes {
             current_user: "/me",
             contents: "/contents",
             chunk_analysis: "/analysis/chunks",
+            skeleton_analysis: "/analysis/skeleton",
+            reader_plan: "/analysis/reader-plan",
+            listening_plan: "/analysis/listening-plan",
+            speaking_plan: "/analysis/speaking-plan",
+            rescue_plan: "/analysis/rescue-plan",
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+struct FrontendCapabilities {
+    chunk_reader: bool,
+    skeleton_reader: bool,
+    reader_plan: bool,
+    listening_plan: bool,
+    speaking_plan: bool,
+    rescue_plan: bool,
+    onboarding_assessment: bool,
+    analytics_summary: bool,
+}
+
+impl Default for FrontendCapabilities {
+    fn default() -> Self {
+        Self {
+            chunk_reader: true,
+            skeleton_reader: true,
+            reader_plan: true,
+            listening_plan: true,
+            speaking_plan: true,
+            rescue_plan: true,
+            onboarding_assessment: true,
+            analytics_summary: true,
         }
     }
 }
