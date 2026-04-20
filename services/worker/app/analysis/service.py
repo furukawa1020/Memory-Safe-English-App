@@ -6,6 +6,7 @@ from typing import Protocol
 from app.analysis.models import AnalyzeTextInput
 from app.models import (
     AssessmentProfileResult,
+    AnalyticsSummaryResult,
     CollapsePatternResult,
     ChunkingResult,
     ListeningPlanResult,
@@ -62,6 +63,19 @@ class CollapsePatternAnalyzer(Protocol):
     ) -> CollapsePatternResult: ...
 
 
+class AnalyticsSummaryAnalyzer(Protocol):
+    def summarize(
+        self,
+        text: str,
+        *,
+        language: str = "en",
+        target_context: str = "general",
+        self_reported_difficulties: list[str] | None = None,
+        fatigue_level: str = "unknown",
+        session_events: list[dict[str, str | int | float]] | None = None,
+    ) -> AnalyticsSummaryResult: ...
+
+
 @dataclass(frozen=True, slots=True)
 class AnalysisRoute:
     path: str
@@ -79,8 +93,9 @@ class AnalysisService:
     rescue_plan_analyzer: RescuePlanAnalyzer
     assessment_analyzer: AssessmentAnalyzer
     collapse_pattern_analyzer: CollapsePatternAnalyzer
+    analytics_summary_analyzer: AnalyticsSummaryAnalyzer
 
-    def analyze(self, operation: str, request: AnalyzeTextInput) -> ChunkingResult | SkeletonResult | ReaderPlanResult | ListeningPlanResult | SpeakingPlanResult | RescuePlanResult | AssessmentProfileResult | CollapsePatternResult:
+    def analyze(self, operation: str, request: AnalyzeTextInput) -> ChunkingResult | SkeletonResult | ReaderPlanResult | ListeningPlanResult | SpeakingPlanResult | RescuePlanResult | AssessmentProfileResult | CollapsePatternResult | AnalyticsSummaryResult:
         if operation == "chunking":
             return self.chunk_analyzer.chunk_text(text=request.text, language=request.language)
         if operation == "skeleton":
@@ -123,6 +138,15 @@ class AnalysisService:
                 language=request.language,
                 session_events=request.session_events,
             )
+        if operation == "analytics_summary":
+            return self.analytics_summary_analyzer.summarize(
+                text=request.text,
+                language=request.language,
+                target_context=request.target_context,
+                self_reported_difficulties=request.self_reported_difficulties,
+                fatigue_level=request.fatigue_level,
+                session_events=request.session_events,
+            )
         raise ValueError(f"unsupported analysis operation: {operation}")
 
     @staticmethod
@@ -136,4 +160,5 @@ class AnalysisService:
             AnalysisRoute(path="/analyze/rescue-plan", audit_name="rescue_plan_analyzed", operation="rescue_plan"),
             AnalysisRoute(path="/analyze/assessment", audit_name="assessment_analyzed", operation="assessment"),
             AnalysisRoute(path="/analyze/collapse-patterns", audit_name="collapse_patterns_analyzed", operation="collapse_patterns"),
+            AnalysisRoute(path="/analyze/analytics-summary", audit_name="analytics_summary_analyzed", operation="analytics_summary"),
         )

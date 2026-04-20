@@ -206,3 +206,24 @@ def test_collapse_patterns_endpoint() -> None:
         assert payload["dominant_pattern"]
         assert payload["sites"]
         assert payload["version"]
+
+
+def test_analytics_summary_endpoint() -> None:
+    with running_server(make_settings()) as server:
+        body = {
+            "text": "In this study, we propose a memory safe interface that reduces overload during reading.",
+            "target_context": "research",
+            "self_reported_difficulties": ["sentence_integration", "audio_tracking"],
+            "fatigue_level": "medium",
+            "session_events": [
+                {"event_type": "repeat", "chunk_order": 2, "seconds": 4.0},
+            ],
+        }
+        body_text = json.dumps(body)
+        response, payload = post_json(server.server_port, "/analyze/analytics-summary", body, signed_headers(body_text))
+
+        assert response.status == HTTPStatus.OK
+        assert payload["next_focus"]
+        assert payload["assessment"]
+        assert payload["collapse_patterns"]
+        assert payload["recommendations"]

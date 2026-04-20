@@ -1,6 +1,6 @@
 # Worker Service
 
-`services/worker` is the Python analysis worker for chunking, skeleton extraction, reader-plan generation, listening pause planning, speaking response planning, conversation rescue planning, onboarding assessment, and collapse-pattern analysis.
+`services/worker` is the Python analysis worker for chunking, skeleton extraction, reader-plan generation, listening pause planning, speaking response planning, conversation rescue planning, onboarding assessment, collapse-pattern analysis, and analytics summary generation.
 
 ## Structure
 
@@ -8,6 +8,7 @@
 services/worker
 |- app/
 |  |- analysis/
+|  |- analytics_summary/
 |  |- assessment/
 |  |- collapse_patterns/
 |  |- chunking/
@@ -35,6 +36,7 @@ services/worker
 - `app/analysis/`: typed request models and operation dispatch
 - `app/chunking/`: chunking service
 - `app/assessment/`: onboarding profile estimation for initial mode recommendations
+- `app/analytics_summary/`: next-step recommendations from assessment and collapse patterns
 - `app/collapse_patterns/`: collapse-site analysis from session event traces
 - `app/skeleton/`: skeleton extraction service
 - `app/reader_plan/`: progressive reading plan generation for low-memory reading flows
@@ -55,6 +57,7 @@ services/worker
 - `POST /analyze/listening-plan`
 - `POST /analyze/rescue-plan`
 - `POST /analyze/assessment`
+- `POST /analyze/analytics-summary`
 - `POST /analyze/collapse-patterns`
 - `POST /analyze/speaking-plan`
 - versioned analysis responses
@@ -62,6 +65,7 @@ services/worker
 - listening plans include pause checkpoints, replay cues, and recommended playback speed
 - rescue plans include prioritized rescue phrases and a primary conversation strategy
 - assessment returns initial reader/listening/speaking mode recommendations and display defaults
+- analytics summary returns next focus recommendations from assessment and collapse signals
 - collapse-pattern analysis turns session events into hotspot summaries and lighter-display recommendations
 - speaking plans include short response steps, opener options, bridge phrases, and rescue phrases
 - API key authentication
