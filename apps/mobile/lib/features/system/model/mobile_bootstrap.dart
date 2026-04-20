@@ -6,6 +6,7 @@ class MobileBootstrap {
     required this.checkedAtUnixMs,
     required this.recommendedBaseUrls,
     required this.routes,
+    required this.capabilities,
     required this.api,
     required this.worker,
   });
@@ -14,6 +15,7 @@ class MobileBootstrap {
   final int checkedAtUnixMs;
   final RecommendedBaseUrls recommendedBaseUrls;
   final FrontendRoutes routes;
+  final FrontendCapabilities capabilities;
   final UpstreamStatus api;
   final UpstreamStatus worker;
 
@@ -34,6 +36,10 @@ class MobileBootstrap {
       ),
       routes: FrontendRoutes.fromJson(
         json['routes'] as Map<String, dynamic>? ?? const <String, dynamic>{},
+      ),
+      capabilities: FrontendCapabilities.fromJson(
+        json['capabilities'] as Map<String, dynamic>? ??
+            const <String, dynamic>{},
       ),
       api: UpstreamStatus.fromJson(
         json['api'] as Map<String, dynamic>? ?? const <String, dynamic>{},
@@ -86,6 +92,11 @@ class FrontendRoutes {
     required this.currentUser,
     required this.contents,
     required this.chunkAnalysis,
+    required this.skeletonAnalysis,
+    required this.readerPlan,
+    required this.listeningPlan,
+    required this.speakingPlan,
+    required this.rescuePlan,
   });
 
   final String readiness;
@@ -95,6 +106,11 @@ class FrontendRoutes {
   final String currentUser;
   final String contents;
   final String chunkAnalysis;
+  final String skeletonAnalysis;
+  final String readerPlan;
+  final String listeningPlan;
+  final String speakingPlan;
+  final String rescuePlan;
 
   factory FrontendRoutes.fromJson(Map<String, dynamic> json) {
     return FrontendRoutes(
@@ -105,6 +121,48 @@ class FrontendRoutes {
       currentUser: json['current_user'] as String? ?? '',
       contents: json['contents'] as String? ?? '',
       chunkAnalysis: json['chunk_analysis'] as String? ?? '',
+      skeletonAnalysis: json['skeleton_analysis'] as String? ?? '',
+      readerPlan: json['reader_plan'] as String? ?? '',
+      listeningPlan: json['listening_plan'] as String? ?? '',
+      speakingPlan: json['speaking_plan'] as String? ?? '',
+      rescuePlan: json['rescue_plan'] as String? ?? '',
+    );
+  }
+}
+
+class FrontendCapabilities {
+  const FrontendCapabilities({
+    required this.chunkReader,
+    required this.skeletonReader,
+    required this.readerPlan,
+    required this.listeningPlan,
+    required this.speakingPlan,
+    required this.rescuePlan,
+    required this.onboardingAssessment,
+    required this.analyticsSummary,
+  });
+
+  final bool chunkReader;
+  final bool skeletonReader;
+  final bool readerPlan;
+  final bool listeningPlan;
+  final bool speakingPlan;
+  final bool rescuePlan;
+  final bool onboardingAssessment;
+  final bool analyticsSummary;
+
+  factory FrontendCapabilities.fromJson(Map<String, dynamic> json) {
+    bool readBool(String key) => json[key] as bool? ?? false;
+
+    return FrontendCapabilities(
+      chunkReader: readBool('chunk_reader'),
+      skeletonReader: readBool('skeleton_reader'),
+      readerPlan: readBool('reader_plan'),
+      listeningPlan: readBool('listening_plan'),
+      speakingPlan: readBool('speaking_plan'),
+      rescuePlan: readBool('rescue_plan'),
+      onboardingAssessment: readBool('onboarding_assessment'),
+      analyticsSummary: readBool('analytics_summary'),
     );
   }
 }
