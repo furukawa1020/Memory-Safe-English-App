@@ -1,0 +1,126 @@
+param(
+    [string]$AvdName,
+    [int]$BootTimeoutSeconds = 180
+)
+
+$ErrorActionPreference = "Stop"
+if (Test-Path variable:PSNativeCommandUseErrorActionPreference) {
+    $PSNativeCommandUseErrorActionPreference = $false
+}
+
+function Get-AndroidSdkRoot {
+    if ($env:ANDROID_SDK_ROOT) {
+        return $env:ANDROID_SDK_ROOT
+    }
+    if ($env:ANDROID_HOME) {
+        return $env:ANDROID_HOME
+    }
+    return $null
+}
+
+function Get-EmulatorCommand {
+    $command = Get-Command emulator -ErrorAction SilentlyContinue
+    if ($command) {
+        return $command.Source
+    }
+
+    $sdkRoot = Get-AndroidSdkRoot
+    if (-not $sdkRoot) {
+        return $null
+    }
+
+    $candidate = Join-Path $sdkRoot "emulator\emulator.exe"
+    if (Test-Path $candidate) {
+        return $candidate
+    }
+
+    return $null
+}
+
+function Get-AdbCommand {
+    $command = Get-Command adb -ErrorAction SilentlyContinue
+    if ($command) {
+        return $command.Source
+    }
+
+    $sdkRoot = Get-AndroidSdkRoot
+    if (-not $sdkRoot) {
+        return $null
+    }
+
+    $candidate = Join-Path $sdkRoot "platform-tools\adb.exe"
+    if (Test-Path $candidate) {
+        return $candidate
+    }
+
+    return $null
+}
+
+function Get-AvailableAvds {
+    param([string]$EmulatorPath)
+
+    $output = & $EmulatorPath -list-avds
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to list Android Virtual Devices."
+    }
+
+    return @($output | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+}
+
+function Wait-ForEmulatorBoot {
+    param(
+        [string]$AdbPath,
+        [int]$TimeoutSeconds
+    )
+
+    & $AdbPath wait-for-device
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    while ((Get-Date) -lt $deadline) {
+        $bootCompleted = (& $AdbPath shell getprop sys.boot_completed 2>$null | Out-String).Trim()
+        if ($bootCompleted -eq "1") {
+            return
+        }
+        Start-Sleep -Seconds 3
+    }
+
+    throw "Timed out while waiting for the Android emulator to finish booting."
+}
+
+$emulatorPath = Get-EmulatorCommand
+if (-not $emulatorPath) {
+    throw "Android emulator command was not found. Install Android Studio or Android SDK emulator tools first."
+}
+
+$adbPath = Get-AdbCommand
+if (-not $adbPath) {
+    throw "adb was not found. Install Android platform tools first."
+}
+
+$availableAvds = Get-AvailableAvds -EmulatorPath $emulatorPath
+if (-not $availableAvds -or $availableAvds.Count -eq 0) {
+    throw "No Android Virtual Device was found. Create an AVD in Android Studio first."
+}
+
+$selectedAvd = $AvdName
+if (-not $selectedAvd) {
+    if ($availableAvds.Count -eq 1) {
+        $selectedAvd = $availableAvds[0]
+    } else {
+        $selectedAvd = $availableAvds[0]
+        Write-Host "Multiple AVDs were found. Using the first one by default: $selectedAvd"
+        Write-Host "Available AVDs:"
+        $availableAvds | ForEach-Object { Write-Host "- $_" }
+    }
+}
+
+if ($availableAvds -notcontains $selectedAvd) {
+    throw "AVD '$selectedAvd' was not found. Available AVDs: $($availableAvds -join ', ')"
+}
+
+Write-Host "Starting Android emulator: $selectedAvd"
+Start-Process -FilePath $emulatorPath -ArgumentList @("-avd", $selectedAvd) | Out-Null
+
+Write-Host "Waiting for emulator boot to complete..."
+Wait-ForEmulatorBoot -AdbPath $adbPath -TimeoutSeconds $BootTimeoutSeconds
+
+Write-Host "Android emulator is ready."

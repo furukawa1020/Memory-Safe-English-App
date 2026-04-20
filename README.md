@@ -124,6 +124,20 @@ flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8070
 
 `10.0.2.2` lets the Android emulator reach the host machine, and `8070` points the mobile app at the Rust proxy.
 
+You can also use the helper scripts:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\start-android-emulator.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\run-mobile.ps1 -StartEmulator
+```
+
+You can also use the helper scripts:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\start-android-emulator.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\run-mobile.ps1 -StartEmulator
+```
+
 ## Verification
 
 Backend verification commands:

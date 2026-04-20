@@ -26,6 +26,35 @@ function Get-CheckResult {
     }
 }
 
+function Get-AndroidSdkRoot {
+    if ($env:ANDROID_SDK_ROOT) {
+        return $env:ANDROID_SDK_ROOT
+    }
+    if ($env:ANDROID_HOME) {
+        return $env:ANDROID_HOME
+    }
+    return $null
+}
+
+function Get-EmulatorExecutable {
+    $command = Get-Command emulator -ErrorAction SilentlyContinue
+    if ($command) {
+        return $command.Source
+    }
+
+    $sdkRoot = Get-AndroidSdkRoot
+    if (-not $sdkRoot) {
+        return $null
+    }
+
+    $candidate = Join-Path $sdkRoot "emulator\emulator.exe"
+    if (Test-Path $candidate) {
+        return $candidate
+    }
+
+    return $null
+}
+
 $results = New-Object System.Collections.Generic.List[object]
 
 $dockerInstalled = Test-CommandAvailable -CommandName "docker"
@@ -47,6 +76,28 @@ $results.Add((Get-CheckResult -Name "flutter_sdk" -Passed $flutterInstalled -Det
 $adbInstalled = Test-CommandAvailable -CommandName "adb"
 $adbDetails = if ($adbInstalled) { "Android Debug Bridge found in PATH." } else { "Install Android platform tools or Android Studio." }
 $results.Add((Get-CheckResult -Name "adb" -Passed $adbInstalled -Details $adbDetails))
+
+$emulatorExecutable = Get-EmulatorExecutable
+$emulatorInstalled = -not [string]::IsNullOrWhiteSpace($emulatorExecutable)
+$emulatorDetails = if ($emulatorInstalled) { "Android emulator command was found." } else { "Install Android emulator tools or Android Studio." }
+$results.Add((Get-CheckResult -Name "android_emulator" -Passed $emulatorInstalled -Details $emulatorDetails))
+
+$avdAvailable = $false
+$avdDetails = "No Android Virtual Device found."
+if ($emulatorInstalled) {
+    try {
+        $avdList = @(& $emulatorExecutable -list-avds | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+        if ($avdList.Count -gt 0) {
+            $avdAvailable = $true
+            $avdDetails = "Available AVDs: $($avdList -join ', ')"
+        } else {
+            $avdDetails = "Android emulator is installed, but no AVD is configured."
+        }
+    } catch {
+        $avdDetails = "Failed to query AVDs. Check Android SDK setup."
+    }
+}
+$results.Add((Get-CheckResult -Name "android_avd" -Passed $avdAvailable -Details $avdDetails))
 
 $proxyReady = $false
 try {
@@ -76,6 +127,12 @@ if ($failedChecks.Count -gt 0) {
     }
     if ($failedChecks.name -contains "adb") {
         Write-Host "- Install Android Studio or platform tools and start an emulator"
+    }
+    if ($failedChecks.name -contains "android_emulator") {
+        Write-Host "- Install Android emulator tools or Android Studio"
+    }
+    if ($failedChecks.name -contains "android_avd") {
+        Write-Host "- Create an Android Virtual Device, then run .\scripts\start-android-emulator.ps1"
     }
     if ($failedChecks.name -contains "proxy_ready" -and $dockerDaemonReady) {
         Write-Host "- Start the backend stack, then retry the doctor script"
