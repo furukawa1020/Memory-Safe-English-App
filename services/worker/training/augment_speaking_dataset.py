@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +19,9 @@ class Seq2SeqGenerator:
     num_beams: int = 4
     temperature: float = 0.2
     cache_dir: str = ""
+    _torch: Any = field(init=False, repr=False)
+    _tokenizer: Any = field(init=False, repr=False)
+    _model: Any = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
         import torch
