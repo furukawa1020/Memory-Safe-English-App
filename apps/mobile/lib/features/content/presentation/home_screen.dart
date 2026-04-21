@@ -122,13 +122,38 @@ class _AnalysisTabState extends State<_AnalysisTab> {
       child: AnimatedBuilder(
         animation: widget.controller,
         builder: (context, _) {
-          final result = widget.controller.result;
+          final chunkResult = widget.controller.chunkResult;
+          final listeningResult = widget.controller.listeningResult;
+          final speakingResult = widget.controller.speakingResult;
           return ListView(
             padding: const EdgeInsets.all(20),
             children: [
               const _HeroCard(
                 title: 'Free Analysis',
-                subtitle: 'Paste English text and inspect chunk boundaries before reading it in full.',
+                subtitle: 'Paste English text and switch between reading, listening, and speaking support before you try the full task.',
+              ),
+              const SizedBox(height: 16),
+              SegmentedButton<AnalysisMode>(
+                segments: const [
+                  ButtonSegment(
+                    value: AnalysisMode.chunks,
+                    icon: Icon(Icons.view_stream_outlined),
+                    label: Text('Chunks'),
+                  ),
+                  ButtonSegment(
+                    value: AnalysisMode.listening,
+                    icon: Icon(Icons.hearing_outlined),
+                    label: Text('Listening'),
+                  ),
+                  ButtonSegment(
+                    value: AnalysisMode.speaking,
+                    icon: Icon(Icons.record_voice_over_outlined),
+                    label: Text('Speaking'),
+                  ),
+                ],
+                selected: {widget.controller.mode},
+                onSelectionChanged: (selection) =>
+                    widget.controller.setMode(selection.first),
               ),
               const SizedBox(height: 16),
               TextField(
@@ -145,21 +170,40 @@ class _AnalysisTabState extends State<_AnalysisTab> {
                 onPressed: widget.controller.isSubmitting ? null : () => widget.controller.analyze(_textController.text),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 12),
-                  child: Text(widget.controller.isSubmitting ? 'Analyzing...' : 'Analyze chunks'),
+                  child: Text(
+                    widget.controller.isSubmitting
+                        ? 'Analyzing...'
+                        : switch (widget.controller.mode) {
+                            AnalysisMode.chunks => 'Analyze chunks',
+                            AnalysisMode.listening => 'Build listening plan',
+                            AnalysisMode.speaking => 'Build speaking plan',
+                          },
+                  ),
                 ),
               ),
               if (widget.controller.errorText != null) ...[
                 const SizedBox(height: 12),
                 Text(widget.controller.errorText!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
               ],
-              if (result != null) ...[
+              if (chunkResult != null &&
+                  widget.controller.mode == AnalysisMode.chunks) ...[
                 const SizedBox(height: 18),
-                Text(result.summary, style: Theme.of(context).textTheme.titleMedium),
+                Text(chunkResult.summary, style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 12),
-                for (final chunk in result.chunks) ...[
+                for (final chunk in chunkResult.chunks) ...[
                   _AnalysisChunkCard(chunk: chunk),
                   const SizedBox(height: 10),
                 ],
+              ],
+              if (listeningResult != null &&
+                  widget.controller.mode == AnalysisMode.listening) ...[
+                const SizedBox(height: 18),
+                _ListeningPlanCard(result: listeningResult),
+              ],
+              if (speakingResult != null &&
+                  widget.controller.mode == AnalysisMode.speaking) ...[
+                const SizedBox(height: 18),
+                _SpeakingPlanCard(result: speakingResult),
               ],
             ],
           );
@@ -352,6 +396,143 @@ class _AnalysisChunkCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _ListeningPlanCard extends StatelessWidget {
+  const _ListeningPlanCard({required this.result});
+
+  final ListeningPlanResult result;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(result.summary, style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            Text('Recommended speed: ${result.recommendedSpeed}'),
+            const SizedBox(height: 8),
+            Text(result.finalPassStrategy),
+            const SizedBox(height: 14),
+            for (final point in result.pausePoints) ...[
+              _PlanSectionLabel(
+                title: 'Pause ${point.index}',
+                subtitle: '${point.pauseReason} • risk ${point.riskLevel}',
+              ),
+              const SizedBox(height: 6),
+              Text(point.previewText),
+              const SizedBox(height: 4),
+              Text(point.cueJa),
+              const SizedBox(height: 12),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SpeakingPlanCard extends StatelessWidget {
+  const _SpeakingPlanCard({required this.result});
+
+  final SpeakingPlanResult result;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(result.summary, style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            Text('Recommended style: ${result.recommendedStyle}'),
+            if (result.openerOptions.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              const _PlanSectionLabel(
+                title: 'Openers',
+                subtitle: 'Use one of these to start without holding the whole answer.',
+              ),
+              const SizedBox(height: 6),
+              for (final opener in result.openerOptions) ...[
+                Text('• $opener'),
+                const SizedBox(height: 4),
+              ],
+            ],
+            if (result.steps.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              const _PlanSectionLabel(
+                title: 'Speaking steps',
+                subtitle: 'Keep each step short and stable.',
+              ),
+              const SizedBox(height: 6),
+              for (final step in result.steps) ...[
+                Card(
+                  elevation: 0,
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('${step.step}. ${step.text}'),
+                        const SizedBox(height: 6),
+                        Text(
+                          '${step.purpose} • risk ${step.riskLevel}',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        const SizedBox(height: 6),
+                        Text(step.deliveryTipJa),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
+            ],
+            if (result.rescuePhrases.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              const _PlanSectionLabel(
+                title: 'Rescue phrases',
+                subtitle: 'Fallback lines for when the sentence starts to collapse.',
+              ),
+              const SizedBox(height: 6),
+              for (final phrase in result.rescuePhrases) ...[
+                Text('• $phrase'),
+                const SizedBox(height: 4),
+              ],
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PlanSectionLabel extends StatelessWidget {
+  const _PlanSectionLabel({
+    required this.title,
+    required this.subtitle,
+  });
+
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: Theme.of(context).textTheme.titleSmall),
+        const SizedBox(height: 2),
+        Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
+      ],
     );
   }
 }

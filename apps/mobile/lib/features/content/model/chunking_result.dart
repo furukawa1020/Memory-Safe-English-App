@@ -209,3 +209,139 @@ class ReaderPlanResult {
     );
   }
 }
+
+class ListeningPausePoint {
+  const ListeningPausePoint({
+    required this.index,
+    required this.afterChunkOrder,
+    required this.pauseReason,
+    required this.cueEn,
+    required this.cueJa,
+    required this.previewText,
+    required this.riskLevel,
+  });
+
+  final int index;
+  final int afterChunkOrder;
+  final String pauseReason;
+  final String cueEn;
+  final String cueJa;
+  final String previewText;
+  final String riskLevel;
+
+  factory ListeningPausePoint.fromJson(Map<String, dynamic> json) {
+    return ListeningPausePoint(
+      index: json['index'] as int? ?? 0,
+      afterChunkOrder: json['after_chunk_order'] as int? ?? 0,
+      pauseReason: json['pause_reason'] as String? ?? '',
+      cueEn: json['cue_en'] as String? ?? '',
+      cueJa: json['cue_ja'] as String? ?? '',
+      previewText: json['preview_text'] as String? ?? '',
+      riskLevel: json['risk_level'] as String? ?? '',
+    );
+  }
+}
+
+class ListeningPlanResult {
+  const ListeningPlanResult({
+    required this.version,
+    required this.language,
+    required this.summary,
+    required this.recommendedSpeed,
+    required this.pausePoints,
+    required this.finalPassStrategy,
+  });
+
+  final String version;
+  final String language;
+  final String summary;
+  final String recommendedSpeed;
+  final List<ListeningPausePoint> pausePoints;
+  final String finalPassStrategy;
+
+  factory ListeningPlanResult.fromJson(Map<String, dynamic> json) {
+    final points = json['pause_points'] as List<dynamic>? ?? const [];
+    return ListeningPlanResult(
+      version: json['version'] as String? ?? '',
+      language: json['language'] as String? ?? 'en',
+      summary: json['summary'] as String? ?? '',
+      recommendedSpeed: json['recommended_speed'] as String? ?? '',
+      pausePoints: points
+          .map((item) => ListeningPausePoint.fromJson(item as Map<String, dynamic>))
+          .toList(),
+      finalPassStrategy: json['final_pass_strategy'] as String? ?? '',
+    );
+  }
+}
+
+class SpeakingStepItem {
+  const SpeakingStepItem({
+    required this.step,
+    required this.text,
+    required this.purpose,
+    required this.riskLevel,
+    required this.deliveryTipJa,
+    required this.deliveryTipEn,
+  });
+
+  final int step;
+  final String text;
+  final String purpose;
+  final String riskLevel;
+  final String deliveryTipJa;
+  final String deliveryTipEn;
+
+  factory SpeakingStepItem.fromJson(Map<String, dynamic> json) {
+    return SpeakingStepItem(
+      step: json['step'] as int? ?? 0,
+      text: json['text'] as String? ?? '',
+      purpose: json['purpose'] as String? ?? '',
+      riskLevel: json['risk_level'] as String? ?? '',
+      deliveryTipJa: json['delivery_tip_ja'] as String? ?? '',
+      deliveryTipEn: json['delivery_tip_en'] as String? ?? '',
+    );
+  }
+}
+
+class SpeakingPlanResult {
+  const SpeakingPlanResult({
+    required this.version,
+    required this.language,
+    required this.summary,
+    required this.recommendedStyle,
+    required this.openerOptions,
+    required this.bridgePhrases,
+    required this.steps,
+    required this.rescuePhrases,
+  });
+
+  final String version;
+  final String language;
+  final String summary;
+  final String recommendedStyle;
+  final List<String> openerOptions;
+  final List<String> bridgePhrases;
+  final List<SpeakingStepItem> steps;
+  final List<String> rescuePhrases;
+
+  factory SpeakingPlanResult.fromJson(Map<String, dynamic> json) {
+    List<String> readStringList(String key) {
+      final values = json[key] as List<dynamic>? ?? const [];
+      return values.map((item) => item.toString()).toList();
+    }
+
+    final steps = json['steps'] as List<dynamic>? ?? const [];
+    return SpeakingPlanResult(
+      version: json['version'] as String? ?? '',
+      language: json['language'] as String? ?? 'en',
+      summary: json['summary'] as String? ?? '',
+      recommendedStyle: json['recommended_style'] as String? ?? '',
+      openerOptions: readStringList('opener_options'),
+      bridgePhrases: readStringList('bridge_phrases'),
+      rescuePhrases: readStringList('rescue_phrases'),
+      steps: steps
+          .map((item) => SpeakingStepItem.fromJson(item as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+}

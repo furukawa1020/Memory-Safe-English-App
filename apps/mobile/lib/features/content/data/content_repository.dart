@@ -36,6 +36,22 @@ class ContentRepository {
     return ReaderPlanResult.fromJson(response);
   }
 
+  Future<ListeningPlanResult> fetchListeningPlan(String text) async {
+    final response = await _apiClient.post(
+      '/analysis/listening-plan',
+      body: <String, dynamic>{'text': text, 'language': 'en'},
+    );
+    return ListeningPlanResult.fromJson(response);
+  }
+
+  Future<SpeakingPlanResult> fetchSpeakingPlan(String text) async {
+    final response = await _apiClient.post(
+      '/analysis/speaking-plan',
+      body: <String, dynamic>{'text': text, 'language': 'en'},
+    );
+    return SpeakingPlanResult.fromJson(response);
+  }
+
   Future<ChunkingResult> analyzeText(String text) async {
     final response = await _apiClient.post(
       '/analysis/chunks',

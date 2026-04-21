@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart';
 import '../../content/data/content_repository.dart';
 import '../../content/model/chunking_result.dart';
 
+enum AnalysisMode { chunks, listening, speaking }
+
 class AnalysisController extends ChangeNotifier {
   AnalysisController(this._repository);
 
@@ -10,7 +12,16 @@ class AnalysisController extends ChangeNotifier {
 
   bool isSubmitting = false;
   String? errorText;
-  ChunkingResult? result;
+  AnalysisMode mode = AnalysisMode.chunks;
+  ChunkingResult? chunkResult;
+  ListeningPlanResult? listeningResult;
+  SpeakingPlanResult? speakingResult;
+
+  void setMode(AnalysisMode value) {
+    mode = value;
+    errorText = null;
+    notifyListeners();
+  }
 
   Future<void> analyze(String text) async {
     if (text.trim().isEmpty) {
@@ -24,7 +35,14 @@ class AnalysisController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      result = await _repository.analyzeText(text);
+      switch (mode) {
+        case AnalysisMode.chunks:
+          chunkResult = await _repository.analyzeText(text);
+        case AnalysisMode.listening:
+          listeningResult = await _repository.fetchListeningPlan(text);
+        case AnalysisMode.speaking:
+          speakingResult = await _repository.fetchSpeakingPlan(text);
+      }
     } catch (_) {
       errorText = 'Analysis failed. Please try again.';
     } finally {
