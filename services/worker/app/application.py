@@ -9,6 +9,7 @@ from app.collapse_patterns import CollapsePatternService
 from app.chunking import ChunkingService
 from app.config import Settings
 from app.listening_plan import ListeningPlanService
+from app.practice_set import PracticeSetService
 from app.reader_plan import ReaderPlanService
 from app.rate_limit import SlidingWindowRateLimiter
 from app.rescue_plan import RescuePlanService
@@ -28,6 +29,7 @@ class Application:
     assessment_service: AssessmentService
     collapse_pattern_service: CollapsePatternService
     analytics_summary_service: AnalyticsSummaryService
+    practice_set_service: PracticeSetService
     analysis_service: AnalysisService
     rate_limiter: SlidingWindowRateLimiter
 
@@ -47,6 +49,13 @@ def build_application(settings: Settings | None = None) -> Application:
         assessment_service=assessment_service,
         collapse_pattern_service=collapse_pattern_service,
     )
+    practice_set_service = PracticeSetService(
+        reader_plan_service=reader_plan_service,
+        listening_plan_service=listening_plan_service,
+        speaking_plan_service=speaking_plan_service,
+        rescue_plan_service=rescue_plan_service,
+        assessment_service=assessment_service,
+    )
     return Application(
         settings=resolved_settings,
         chunking_service=chunking_service,
@@ -58,6 +67,7 @@ def build_application(settings: Settings | None = None) -> Application:
         assessment_service=assessment_service,
         collapse_pattern_service=collapse_pattern_service,
         analytics_summary_service=analytics_summary_service,
+        practice_set_service=practice_set_service,
         analysis_service=AnalysisService(
             chunk_analyzer=chunking_service,
             skeleton_analyzer=skeleton_service,
@@ -68,6 +78,7 @@ def build_application(settings: Settings | None = None) -> Application:
             assessment_analyzer=assessment_service,
             collapse_pattern_analyzer=collapse_pattern_service,
             analytics_summary_analyzer=analytics_summary_service,
+            practice_set_analyzer=practice_set_service,
         ),
         rate_limiter=SlidingWindowRateLimiter(
             max_requests=resolved_settings.rate_limit_max_requests,
