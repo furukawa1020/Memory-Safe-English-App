@@ -1,5 +1,6 @@
 import json
 
+from training.augment_speaking_dataset import parse_json_payload, validate_speaking_output
 from training.generate_speaking_dataset import build_general_record
 from training.prepare_seq2seq_data import normalize_record
 
@@ -34,3 +35,21 @@ def test_generated_speaking_record_has_expected_shape() -> None:
     assert record["target_context"] == "general"
     assert "opener_options" in record["output"]
     assert "steps" in record["output"]
+
+
+def test_validate_speaking_output_accepts_expected_shape() -> None:
+    payload = {
+        "summary": "I will give the short answer.",
+        "opener_options": ["First, I will give the short answer."],
+        "bridge_phrases": ["Then,"],
+        "steps": [{"step": 1, "text": "First, I will give the short answer.", "purpose": "opener"}],
+        "rescue_phrases": ["Let me say the short version first."],
+    }
+
+    assert validate_speaking_output(payload)
+
+
+def test_parse_json_payload_extracts_object_from_wrapped_text() -> None:
+    payload = parse_json_payload('prefix {"summary":"ok","opener_options":["a"],"bridge_phrases":["b"],"steps":[{"step":1,"text":"x","purpose":"opener"}],"rescue_phrases":["r"]} suffix')
+
+    assert payload["summary"] == "ok"
