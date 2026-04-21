@@ -4,27 +4,41 @@ from app.analysis import AnalysisService, AnalyzeTextInput
 from app.collapse_patterns import CollapsePatternService
 from app.chunking import ChunkingService
 from app.listening_plan import ListeningPlanService
+from app.practice_set import PracticeSetService
 from app.reader_plan import ReaderPlanService
 from app.rescue_plan import RescuePlanService
 from app.speaking_plan import SpeakingPlanService
 from app.skeleton import SkeletonService
 
 
-def test_analysis_service_dispatches_chunking() -> None:
-    service = AnalysisService(
-        chunk_analyzer=ChunkingService(max_words_per_chunk=4),
+def _build_analysis_service() -> AnalysisService:
+    chunking_service = ChunkingService(max_words_per_chunk=4)
+    assessment_service = AssessmentService()
+    return AnalysisService(
+        chunk_analyzer=chunking_service,
         skeleton_analyzer=SkeletonService(),
-        reader_plan_analyzer=ReaderPlanService(chunking_service=ChunkingService(max_words_per_chunk=4)),
-        listening_plan_analyzer=ListeningPlanService(chunking_service=ChunkingService(max_words_per_chunk=4)),
-        speaking_plan_analyzer=SpeakingPlanService(chunking_service=ChunkingService(max_words_per_chunk=4)),
-        rescue_plan_analyzer=RescuePlanService(chunking_service=ChunkingService(max_words_per_chunk=4)),
-        assessment_analyzer=AssessmentService(),
-        collapse_pattern_analyzer=CollapsePatternService(chunking_service=ChunkingService(max_words_per_chunk=4)),
+        reader_plan_analyzer=ReaderPlanService(chunking_service=chunking_service),
+        listening_plan_analyzer=ListeningPlanService(chunking_service=chunking_service),
+        speaking_plan_analyzer=SpeakingPlanService(chunking_service=chunking_service),
+        rescue_plan_analyzer=RescuePlanService(chunking_service=chunking_service),
+        assessment_analyzer=assessment_service,
+        collapse_pattern_analyzer=CollapsePatternService(chunking_service=chunking_service),
         analytics_summary_analyzer=AnalyticsSummaryService(
-            assessment_service=AssessmentService(),
-            collapse_pattern_service=CollapsePatternService(chunking_service=ChunkingService(max_words_per_chunk=4)),
+            assessment_service=assessment_service,
+            collapse_pattern_service=CollapsePatternService(chunking_service=chunking_service),
+        ),
+        practice_set_analyzer=PracticeSetService(
+            reader_plan_service=ReaderPlanService(chunking_service=chunking_service),
+            listening_plan_service=ListeningPlanService(chunking_service=chunking_service),
+            speaking_plan_service=SpeakingPlanService(chunking_service=chunking_service),
+            rescue_plan_service=RescuePlanService(chunking_service=chunking_service),
+            assessment_service=assessment_service,
         ),
     )
+
+
+def test_analysis_service_dispatches_chunking() -> None:
+    service = _build_analysis_service()
 
     result = service.analyze("chunking", AnalyzeTextInput(text="We propose a memory safe interface.", language="en"))
 
@@ -33,20 +47,7 @@ def test_analysis_service_dispatches_chunking() -> None:
 
 
 def test_analysis_service_dispatches_skeleton() -> None:
-    service = AnalysisService(
-        chunk_analyzer=ChunkingService(max_words_per_chunk=4),
-        skeleton_analyzer=SkeletonService(),
-        reader_plan_analyzer=ReaderPlanService(chunking_service=ChunkingService(max_words_per_chunk=4)),
-        listening_plan_analyzer=ListeningPlanService(chunking_service=ChunkingService(max_words_per_chunk=4)),
-        speaking_plan_analyzer=SpeakingPlanService(chunking_service=ChunkingService(max_words_per_chunk=4)),
-        rescue_plan_analyzer=RescuePlanService(chunking_service=ChunkingService(max_words_per_chunk=4)),
-        assessment_analyzer=AssessmentService(),
-        collapse_pattern_analyzer=CollapsePatternService(chunking_service=ChunkingService(max_words_per_chunk=4)),
-        analytics_summary_analyzer=AnalyticsSummaryService(
-            assessment_service=AssessmentService(),
-            collapse_pattern_service=CollapsePatternService(chunking_service=ChunkingService(max_words_per_chunk=4)),
-        ),
-    )
+    service = _build_analysis_service()
 
     result = service.analyze("skeleton", AnalyzeTextInput(text="We propose a memory safe interface.", language="en"))
 
@@ -55,21 +56,7 @@ def test_analysis_service_dispatches_skeleton() -> None:
 
 
 def test_analysis_service_dispatches_reader_plan() -> None:
-    chunking_service = ChunkingService(max_words_per_chunk=4)
-    service = AnalysisService(
-        chunk_analyzer=chunking_service,
-        skeleton_analyzer=SkeletonService(),
-        reader_plan_analyzer=ReaderPlanService(chunking_service=chunking_service),
-        listening_plan_analyzer=ListeningPlanService(chunking_service=chunking_service),
-        speaking_plan_analyzer=SpeakingPlanService(chunking_service=chunking_service),
-        rescue_plan_analyzer=RescuePlanService(chunking_service=chunking_service),
-        assessment_analyzer=AssessmentService(),
-        collapse_pattern_analyzer=CollapsePatternService(chunking_service=chunking_service),
-        analytics_summary_analyzer=AnalyticsSummaryService(
-            assessment_service=AssessmentService(),
-            collapse_pattern_service=CollapsePatternService(chunking_service=chunking_service),
-        ),
-    )
+    service = _build_analysis_service()
 
     result = service.analyze("reader_plan", AnalyzeTextInput(text="In this study, we propose a memory safe interface.", language="en"))
 
@@ -79,21 +66,7 @@ def test_analysis_service_dispatches_reader_plan() -> None:
 
 
 def test_analysis_service_dispatches_listening_plan() -> None:
-    chunking_service = ChunkingService(max_words_per_chunk=4)
-    service = AnalysisService(
-        chunk_analyzer=chunking_service,
-        skeleton_analyzer=SkeletonService(),
-        reader_plan_analyzer=ReaderPlanService(chunking_service=chunking_service),
-        listening_plan_analyzer=ListeningPlanService(chunking_service=chunking_service),
-        speaking_plan_analyzer=SpeakingPlanService(chunking_service=chunking_service),
-        rescue_plan_analyzer=RescuePlanService(chunking_service=chunking_service),
-        assessment_analyzer=AssessmentService(),
-        collapse_pattern_analyzer=CollapsePatternService(chunking_service=chunking_service),
-        analytics_summary_analyzer=AnalyticsSummaryService(
-            assessment_service=AssessmentService(),
-            collapse_pattern_service=CollapsePatternService(chunking_service=chunking_service),
-        ),
-    )
+    service = _build_analysis_service()
 
     result = service.analyze("listening_plan", AnalyzeTextInput(text="In this study, we propose a memory safe interface.", language="en"))
 
@@ -103,21 +76,7 @@ def test_analysis_service_dispatches_listening_plan() -> None:
 
 
 def test_analysis_service_dispatches_speaking_plan() -> None:
-    chunking_service = ChunkingService(max_words_per_chunk=4)
-    service = AnalysisService(
-        chunk_analyzer=chunking_service,
-        skeleton_analyzer=SkeletonService(),
-        reader_plan_analyzer=ReaderPlanService(chunking_service=chunking_service),
-        listening_plan_analyzer=ListeningPlanService(chunking_service=chunking_service),
-        speaking_plan_analyzer=SpeakingPlanService(chunking_service=chunking_service),
-        rescue_plan_analyzer=RescuePlanService(chunking_service=chunking_service),
-        assessment_analyzer=AssessmentService(),
-        collapse_pattern_analyzer=CollapsePatternService(chunking_service=chunking_service),
-        analytics_summary_analyzer=AnalyticsSummaryService(
-            assessment_service=AssessmentService(),
-            collapse_pattern_service=CollapsePatternService(chunking_service=chunking_service),
-        ),
-    )
+    service = _build_analysis_service()
 
     result = service.analyze("speaking_plan", AnalyzeTextInput(text="In this study, we propose a memory safe interface.", language="en"))
 
@@ -127,21 +86,7 @@ def test_analysis_service_dispatches_speaking_plan() -> None:
 
 
 def test_analysis_service_dispatches_rescue_plan() -> None:
-    chunking_service = ChunkingService(max_words_per_chunk=4)
-    service = AnalysisService(
-        chunk_analyzer=chunking_service,
-        skeleton_analyzer=SkeletonService(),
-        reader_plan_analyzer=ReaderPlanService(chunking_service=chunking_service),
-        listening_plan_analyzer=ListeningPlanService(chunking_service=chunking_service),
-        speaking_plan_analyzer=SpeakingPlanService(chunking_service=chunking_service),
-        rescue_plan_analyzer=RescuePlanService(chunking_service=chunking_service),
-        assessment_analyzer=AssessmentService(),
-        collapse_pattern_analyzer=CollapsePatternService(chunking_service=chunking_service),
-        analytics_summary_analyzer=AnalyticsSummaryService(
-            assessment_service=AssessmentService(),
-            collapse_pattern_service=CollapsePatternService(chunking_service=chunking_service),
-        ),
-    )
+    service = _build_analysis_service()
 
     result = service.analyze("rescue_plan", AnalyzeTextInput(text="In this study, we propose a memory safe interface that reduces overload during reading.", language="en"))
 
@@ -151,21 +96,7 @@ def test_analysis_service_dispatches_rescue_plan() -> None:
 
 
 def test_analysis_service_dispatches_assessment() -> None:
-    chunking_service = ChunkingService(max_words_per_chunk=4)
-    service = AnalysisService(
-        chunk_analyzer=chunking_service,
-        skeleton_analyzer=SkeletonService(),
-        reader_plan_analyzer=ReaderPlanService(chunking_service=chunking_service),
-        listening_plan_analyzer=ListeningPlanService(chunking_service=chunking_service),
-        speaking_plan_analyzer=SpeakingPlanService(chunking_service=chunking_service),
-        rescue_plan_analyzer=RescuePlanService(chunking_service=chunking_service),
-        assessment_analyzer=AssessmentService(),
-        collapse_pattern_analyzer=CollapsePatternService(chunking_service=chunking_service),
-        analytics_summary_analyzer=AnalyticsSummaryService(
-            assessment_service=AssessmentService(),
-            collapse_pattern_service=CollapsePatternService(chunking_service=chunking_service),
-        ),
-    )
+    service = _build_analysis_service()
 
     result = service.analyze(
         "assessment",
@@ -184,21 +115,7 @@ def test_analysis_service_dispatches_assessment() -> None:
 
 
 def test_analysis_service_dispatches_collapse_patterns() -> None:
-    chunking_service = ChunkingService(max_words_per_chunk=4)
-    service = AnalysisService(
-        chunk_analyzer=chunking_service,
-        skeleton_analyzer=SkeletonService(),
-        reader_plan_analyzer=ReaderPlanService(chunking_service=chunking_service),
-        listening_plan_analyzer=ListeningPlanService(chunking_service=chunking_service),
-        speaking_plan_analyzer=SpeakingPlanService(chunking_service=chunking_service),
-        rescue_plan_analyzer=RescuePlanService(chunking_service=chunking_service),
-        assessment_analyzer=AssessmentService(),
-        collapse_pattern_analyzer=CollapsePatternService(chunking_service=chunking_service),
-        analytics_summary_analyzer=AnalyticsSummaryService(
-            assessment_service=AssessmentService(),
-            collapse_pattern_service=CollapsePatternService(chunking_service=chunking_service),
-        ),
-    )
+    service = _build_analysis_service()
 
     result = service.analyze(
         "collapse_patterns",
@@ -217,21 +134,7 @@ def test_analysis_service_dispatches_collapse_patterns() -> None:
 
 
 def test_analysis_service_dispatches_analytics_summary() -> None:
-    chunking_service = ChunkingService(max_words_per_chunk=4)
-    service = AnalysisService(
-        chunk_analyzer=chunking_service,
-        skeleton_analyzer=SkeletonService(),
-        reader_plan_analyzer=ReaderPlanService(chunking_service=chunking_service),
-        listening_plan_analyzer=ListeningPlanService(chunking_service=chunking_service),
-        speaking_plan_analyzer=SpeakingPlanService(chunking_service=chunking_service),
-        rescue_plan_analyzer=RescuePlanService(chunking_service=chunking_service),
-        assessment_analyzer=AssessmentService(),
-        collapse_pattern_analyzer=CollapsePatternService(chunking_service=chunking_service),
-        analytics_summary_analyzer=AnalyticsSummaryService(
-            assessment_service=AssessmentService(),
-            collapse_pattern_service=CollapsePatternService(chunking_service=chunking_service),
-        ),
-    )
+    service = _build_analysis_service()
 
     result = service.analyze(
         "analytics_summary",
@@ -247,3 +150,22 @@ def test_analysis_service_dispatches_analytics_summary() -> None:
 
     assert result.next_focus
     assert result.recommendations
+
+
+def test_analysis_service_dispatches_practice_set() -> None:
+    service = _build_analysis_service()
+
+    result = service.analyze(
+        "practice_set",
+        AnalyzeTextInput(
+            text="In this study, we propose a memory safe interface that reduces overload during reading.",
+            language="en",
+            target_context="research",
+            self_reported_difficulties=["sentence_integration", "audio_tracking"],
+            fatigue_level="medium",
+        ),
+    )
+
+    assert result.summary
+    assert result.suggested_order
+    assert result.sections
