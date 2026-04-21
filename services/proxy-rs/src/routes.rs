@@ -68,11 +68,17 @@ mod tests {
     use tokio::net::TcpListener;
     use tower::ServiceExt;
 
-    use crate::{cache::CacheStore, config::Config, rate_limit::RateLimiter, state::AppState};
+    use crate::{
+        cache::CacheStore,
+        config::{Config, RuntimeEnvironment},
+        rate_limit::RateLimiter,
+        state::AppState,
+    };
 
     fn state() -> AppState {
         AppState {
             config: Config {
+                runtime_environment: RuntimeEnvironment::Development,
                 http_addr: "127.0.0.1:8070".parse::<SocketAddr>().unwrap(),
                 api_base_url: "http://127.0.0.1:8080".to_string(),
                 worker_base_url: "http://127.0.0.1:8090".to_string(),
@@ -436,6 +442,7 @@ mod tests {
     ) -> AppState {
         AppState {
             config: Config {
+                runtime_environment: RuntimeEnvironment::Development,
                 http_addr: "127.0.0.1:8070".parse::<SocketAddr>().unwrap(),
                 api_base_url,
                 worker_base_url,
