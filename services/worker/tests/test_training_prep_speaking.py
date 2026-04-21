@@ -1,5 +1,6 @@
 import json
 
+from training.generate_speaking_dataset import build_general_record
 from training.prepare_seq2seq_data import normalize_record
 
 
@@ -24,3 +25,12 @@ def test_normalize_record_includes_speaking_metadata_in_prompt() -> None:
     assert "Difficulty focus: sentence_holding" in result["prompt"]
     assert "Problem types: opener_only, two_step_link" in result["prompt"]
     assert json.loads(result["target"])["opener_options"][0].startswith("First,")
+
+
+def test_generated_speaking_record_has_expected_shape() -> None:
+    record = build_general_record(__import__("random").Random(42), 1)
+
+    assert record["task"] == "speaking_plan"
+    assert record["target_context"] == "general"
+    assert "opener_options" in record["output"]
+    assert "steps" in record["output"]
