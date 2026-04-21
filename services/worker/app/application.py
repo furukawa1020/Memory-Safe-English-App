@@ -9,6 +9,7 @@ from app.collapse_patterns import CollapsePatternService
 from app.chunking import ChunkingService
 from app.config import Settings
 from app.listening_plan import ListeningPlanService
+from app.nlp_backend import build_chunk_backend
 from app.practice_set import PracticeSetService
 from app.reader_plan import ReaderPlanService
 from app.rate_limit import SlidingWindowRateLimiter
@@ -37,7 +38,10 @@ class Application:
 def build_application(settings: Settings | None = None) -> Application:
     resolved_settings = settings or Settings.load()
     resolved_settings.validate()
-    chunking_service = ChunkingService(max_words_per_chunk=resolved_settings.max_words_per_chunk)
+    chunking_service = ChunkingService(
+        max_words_per_chunk=resolved_settings.max_words_per_chunk,
+        backend=build_chunk_backend(resolved_settings),
+    )
     skeleton_service = SkeletonService()
     reader_plan_service = ReaderPlanService(chunking_service=chunking_service)
     listening_plan_service = ListeningPlanService(chunking_service=chunking_service)

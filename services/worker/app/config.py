@@ -15,6 +15,10 @@ _DEFAULT_REQUIRE_REQUEST_SIGNATURE: Final[bool] = True
 _DEFAULT_SIGNATURE_MAX_AGE_SECONDS: Final[int] = 300
 _DEFAULT_RATE_LIMIT_MAX_REQUESTS: Final[int] = 30
 _DEFAULT_RATE_LIMIT_WINDOW_SECONDS: Final[int] = 60
+_DEFAULT_NLP_BACKEND: Final[str] = "heuristic"
+_DEFAULT_TRANSFORMER_TASK: Final[str] = "text2text-generation"
+_DEFAULT_TRANSFORMER_DEVICE: Final[int] = -1
+_DEFAULT_TRANSFORMER_MAX_NEW_TOKENS: Final[int] = 256
 
 
 @dataclass(slots=True)
@@ -32,6 +36,11 @@ class Settings:
     request_timeout_seconds: int = _DEFAULT_REQUEST_TIMEOUT_SECONDS
     rate_limit_max_requests: int = _DEFAULT_RATE_LIMIT_MAX_REQUESTS
     rate_limit_window_seconds: int = _DEFAULT_RATE_LIMIT_WINDOW_SECONDS
+    nlp_backend: str = _DEFAULT_NLP_BACKEND
+    transformer_model_name: str = ""
+    transformer_task: str = _DEFAULT_TRANSFORMER_TASK
+    transformer_device: int = _DEFAULT_TRANSFORMER_DEVICE
+    transformer_max_new_tokens: int = _DEFAULT_TRANSFORMER_MAX_NEW_TOKENS
 
     @classmethod
     def load(cls) -> "Settings":
@@ -49,6 +58,11 @@ class Settings:
             request_timeout_seconds=_get_int("WORKER_REQUEST_TIMEOUT_SECONDS", _DEFAULT_REQUEST_TIMEOUT_SECONDS),
             rate_limit_max_requests=_get_int("WORKER_RATE_LIMIT_MAX_REQUESTS", _DEFAULT_RATE_LIMIT_MAX_REQUESTS),
             rate_limit_window_seconds=_get_int("WORKER_RATE_LIMIT_WINDOW_SECONDS", _DEFAULT_RATE_LIMIT_WINDOW_SECONDS),
+            nlp_backend=os.getenv("WORKER_NLP_BACKEND", _DEFAULT_NLP_BACKEND).strip().lower(),
+            transformer_model_name=os.getenv("WORKER_TRANSFORMER_MODEL", "").strip(),
+            transformer_task=os.getenv("WORKER_TRANSFORMER_TASK", _DEFAULT_TRANSFORMER_TASK).strip().lower(),
+            transformer_device=_get_int("WORKER_TRANSFORMER_DEVICE", _DEFAULT_TRANSFORMER_DEVICE),
+            transformer_max_new_tokens=_get_int("WORKER_TRANSFORMER_MAX_NEW_TOKENS", _DEFAULT_TRANSFORMER_MAX_NEW_TOKENS),
         )
         settings.validate()
         return settings
@@ -74,6 +88,12 @@ class Settings:
             raise ValueError("WORKER_RATE_LIMIT_MAX_REQUESTS must be positive")
         if self.rate_limit_window_seconds <= 0:
             raise ValueError("WORKER_RATE_LIMIT_WINDOW_SECONDS must be positive")
+        if self.nlp_backend not in {"heuristic", "transformer"}:
+            raise ValueError("WORKER_NLP_BACKEND must be heuristic or transformer")
+        if self.nlp_backend == "transformer" and not self.transformer_model_name:
+            raise ValueError("WORKER_TRANSFORMER_MODEL must be set when WORKER_NLP_BACKEND=transformer")
+        if self.transformer_max_new_tokens <= 0:
+            raise ValueError("WORKER_TRANSFORMER_MAX_NEW_TOKENS must be positive")
 
 
 def _get_int(name: str, fallback: int) -> int:

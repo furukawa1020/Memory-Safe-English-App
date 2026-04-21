@@ -3,6 +3,13 @@ name = "memory-safe-english-worker"
 version = "0.1.0"
 description = "Lightweight NLP and speech worker for Memory Safe English"
 requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+transformer = [
+  "transformers>=4.40.0",
+  "torch>=2.2.0",
+]
 
 [build-system]
 requires = ["setuptools>=68"]
