@@ -72,9 +72,9 @@ class PracticeSetService:
             version=RESPONSE_VERSION,
             language=language,
             target_context=target_context,
-            summary=reader_plan.summary or speaking_plan.summary or text[:80],
+            summary=_build_practice_summary(reader_plan, speaking_plan, text),
             suggested_order=_build_suggested_order(assessment),
-            profile_note=_build_profile_note(assessment),
+            profile_note=_build_profile_note(assessment, _build_suggested_order(assessment)),
             sections=sections,
         )
 
@@ -245,18 +245,20 @@ def _build_suggested_order(assessment) -> list[str]:
     return [mode for mode, _ in ordered]
 
 
-def _build_profile_note(assessment) -> str:
-    strongest_area = max(
-        [
-            ("reading", assessment.reading_load_score),
-            ("listening", assessment.listening_load_score),
-            ("speaking", assessment.speaking_load_score),
-        ],
-        key=lambda item: item[1],
-    )[0]
+def _build_profile_note(assessment, suggested_order: list[str]) -> str:
+    starting_area = suggested_order[0] if suggested_order else "reading"
     return (
-        f"Start with {strongest_area} support. "
+        f"Start with {starting_area} support. "
         f"Use reader mode '{assessment.recommended_reader_mode}', "
         f"listening mode '{assessment.recommended_listening_mode}', "
         f"and speaking mode '{assessment.recommended_speaking_mode}'."
     )
+
+
+def _build_practice_summary(reader_plan, speaking_plan, original_text: str) -> str:
+    focus_texts = [step.text.strip(" .") for step in reader_plan.focus_steps[:2] if step.text.strip(" .")]
+    if focus_texts:
+        return " / ".join(focus_texts)
+    if speaking_plan.summary:
+        return speaking_plan.summary.strip(" .")
+    return original_text.strip()[:120]

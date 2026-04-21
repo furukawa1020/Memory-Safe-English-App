@@ -14,6 +14,7 @@ def test_speaking_plan_creates_short_steps_and_rescue_phrases() -> None:
     assert result.recommended_style == "short-linked-sentences"
     assert result.opener_options
     assert result.opener_options[0].startswith("Let me introduce myself")
+    assert "this is the main point" not in result.opener_options[0].lower()
     assert result.steps
     assert result.steps[0].delivery_tip_ja
     assert result.rescue_phrases

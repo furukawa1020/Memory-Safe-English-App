@@ -43,9 +43,9 @@ class SpeakingPlanService:
         return SpeakingPlanResult(
             version=RESPONSE_VERSION,
             language=language,
-            summary=chunking.summary,
+            summary=_build_spoken_summary(chunks, chunking.summary),
             recommended_style="short-linked-sentences",
-            opener_options=_build_openers(profile.speaking_opener_prefix, chunking.summary),
+            opener_options=_build_openers(profile.speaking_opener_prefix, chunks, chunking.summary),
             bridge_phrases=[
                 "First,",
                 "Next,",
@@ -103,10 +103,28 @@ def _build_english_tip(role: str) -> str:
     return "Keep it short enough to say in one breath."
 
 
-def _build_openers(prefix: str, summary: str) -> list[str]:
-    if not summary:
+def _build_openers(prefix: str, chunks, summary: str) -> list[str]:
+    opener_base = _derive_opener_base(chunks, summary)
+    if not opener_base:
         return [f"{prefix}: this is the main point."]
     return [
-        f"{prefix}: {summary}.",
-        f"In short, {summary}.",
+        f"{prefix}: {opener_base}.",
+        f"In short, {opener_base}.",
     ]
+
+
+def _build_spoken_summary(chunks, fallback: str) -> str:
+    core_texts = [chunk.text.strip(" .") for chunk in chunks if chunk.role == "core"]
+    if core_texts:
+        return " / ".join(core_texts[:2])
+    if fallback:
+        return fallback.strip(" .")
+    return ""
+
+
+def _derive_opener_base(chunks, summary: str) -> str:
+    selected = [chunk.text.strip(" .") for chunk in chunks[:2]]
+    candidate = " ".join(part for part in selected if part).strip()
+    if candidate:
+        return candidate
+    return summary.strip(" .")

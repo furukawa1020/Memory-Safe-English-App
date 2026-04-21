@@ -28,6 +28,7 @@ def test_practice_set_builds_multi_mode_tasks() -> None:
     assert result.summary
     assert result.suggested_order
     assert result.profile_note
+    assert result.profile_note.startswith(f"Start with {result.suggested_order[0]}")
     assert len(result.sections) == 4
     assert result.sections[0].mode == "reading"
     assert result.sections[0].why_this_works
