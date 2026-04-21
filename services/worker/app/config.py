@@ -19,6 +19,9 @@ _DEFAULT_NLP_BACKEND: Final[str] = "heuristic"
 _DEFAULT_TRANSFORMER_TASK: Final[str] = "text2text-generation"
 _DEFAULT_TRANSFORMER_DEVICE: Final[int] = -1
 _DEFAULT_TRANSFORMER_MAX_NEW_TOKENS: Final[int] = 256
+_DEFAULT_TRANSFORMER_MAX_INPUT_TOKENS: Final[int] = 512
+_DEFAULT_TRANSFORMER_NUM_BEAMS: Final[int] = 4
+_DEFAULT_TRANSFORMER_TEMPERATURE: Final[float] = 0.0
 
 
 @dataclass(slots=True)
@@ -41,6 +44,10 @@ class Settings:
     transformer_task: str = _DEFAULT_TRANSFORMER_TASK
     transformer_device: int = _DEFAULT_TRANSFORMER_DEVICE
     transformer_max_new_tokens: int = _DEFAULT_TRANSFORMER_MAX_NEW_TOKENS
+    transformer_max_input_tokens: int = _DEFAULT_TRANSFORMER_MAX_INPUT_TOKENS
+    transformer_num_beams: int = _DEFAULT_TRANSFORMER_NUM_BEAMS
+    transformer_temperature: float = _DEFAULT_TRANSFORMER_TEMPERATURE
+    transformer_cache_dir: str = ""
 
     @classmethod
     def load(cls) -> "Settings":
@@ -63,6 +70,10 @@ class Settings:
             transformer_task=os.getenv("WORKER_TRANSFORMER_TASK", _DEFAULT_TRANSFORMER_TASK).strip().lower(),
             transformer_device=_get_int("WORKER_TRANSFORMER_DEVICE", _DEFAULT_TRANSFORMER_DEVICE),
             transformer_max_new_tokens=_get_int("WORKER_TRANSFORMER_MAX_NEW_TOKENS", _DEFAULT_TRANSFORMER_MAX_NEW_TOKENS),
+            transformer_max_input_tokens=_get_int("WORKER_TRANSFORMER_MAX_INPUT_TOKENS", _DEFAULT_TRANSFORMER_MAX_INPUT_TOKENS),
+            transformer_num_beams=_get_int("WORKER_TRANSFORMER_NUM_BEAMS", _DEFAULT_TRANSFORMER_NUM_BEAMS),
+            transformer_temperature=_get_float("WORKER_TRANSFORMER_TEMPERATURE", _DEFAULT_TRANSFORMER_TEMPERATURE),
+            transformer_cache_dir=os.getenv("WORKER_TRANSFORMER_CACHE_DIR", "").strip(),
         )
         settings.validate()
         return settings
@@ -94,6 +105,12 @@ class Settings:
             raise ValueError("WORKER_TRANSFORMER_MODEL must be set when WORKER_NLP_BACKEND=transformer")
         if self.transformer_max_new_tokens <= 0:
             raise ValueError("WORKER_TRANSFORMER_MAX_NEW_TOKENS must be positive")
+        if self.transformer_max_input_tokens <= 0:
+            raise ValueError("WORKER_TRANSFORMER_MAX_INPUT_TOKENS must be positive")
+        if self.transformer_num_beams <= 0:
+            raise ValueError("WORKER_TRANSFORMER_NUM_BEAMS must be positive")
+        if self.transformer_temperature < 0:
+            raise ValueError("WORKER_TRANSFORMER_TEMPERATURE must be zero or positive")
 
 
 def _get_int(name: str, fallback: int) -> int:
@@ -117,3 +134,14 @@ def _get_bool(name: str, fallback: bool) -> bool:
 def _get_csv(name: str) -> tuple[str, ...]:
     value = os.getenv(name, "")
     return tuple(part.strip() for part in value.split(",") if part.strip())
+
+
+def _get_float(name: str, fallback: float) -> float:
+    value = os.getenv(name)
+    if value is None:
+        return fallback
+
+    try:
+        return float(value)
+    except ValueError:
+        return fallback
