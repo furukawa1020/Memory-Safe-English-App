@@ -22,6 +22,18 @@ pub fn apply_standard_headers(
         HeaderName::from_static("referrer-policy"),
         HeaderValue::from_static("no-referrer"),
     );
+    headers.insert(
+        HeaderName::from_static("permissions-policy"),
+        HeaderValue::from_static("accelerometer=(), camera=(), geolocation=(), gyroscope=(), microphone=(), payment=(), usb=()"),
+    );
+    headers.insert(
+        HeaderName::from_static("cross-origin-resource-policy"),
+        HeaderValue::from_static("same-origin"),
+    );
+    headers.insert(
+        HeaderName::from_static("cross-origin-opener-policy"),
+        HeaderValue::from_static("same-origin"),
+    );
 }
 
 pub fn apply_upstream_header(headers: &mut HeaderMap, upstream_name: &'static str) {
@@ -46,6 +58,10 @@ mod tests {
         assert_eq!(headers.get("x-proxy-cache").unwrap(), "miss");
         assert_eq!(headers.get("x-content-type-options").unwrap(), "nosniff");
         assert_eq!(headers.get("x-frame-options").unwrap(), "DENY");
+        assert_eq!(
+            headers.get("cross-origin-resource-policy").unwrap(),
+            "same-origin"
+        );
     }
 
     #[test]
