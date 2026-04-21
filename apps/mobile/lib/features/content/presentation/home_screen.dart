@@ -17,13 +17,36 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _index = 0;
+  ContentCatalogController? _contentCatalogController;
+  AnalysisController? _analysisController;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final scope = AppScope.of(context);
+    _contentCatalogController ??=
+        ContentCatalogController(scope.contentRepository);
+    _analysisController ??= AnalysisController(scope.contentRepository);
+  }
 
   @override
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
+    final contentCatalogController = _contentCatalogController!;
+    final analysisController = _analysisController!;
     final pages = [
-      _ContentHomeTab(controller: ContentCatalogController(scope.contentRepository)),
-      _AnalysisTab(controller: AnalysisController(scope.contentRepository)),
+      _ContentHomeTab(
+        controller: contentCatalogController,
+        onOpenListening: () {
+          analysisController.setMode(AnalysisMode.listening);
+          setState(() => _index = 1);
+        },
+        onOpenSpeaking: () {
+          analysisController.setMode(AnalysisMode.speaking);
+          setState(() => _index = 1);
+        },
+      ),
+      _AnalysisTab(controller: analysisController),
       _SettingsTab(sessionController: scope.sessionController),
     ];
 
@@ -43,9 +66,15 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 class _ContentHomeTab extends StatefulWidget {
-  const _ContentHomeTab({required this.controller});
+  const _ContentHomeTab({
+    required this.controller,
+    required this.onOpenListening,
+    required this.onOpenSpeaking,
+  });
 
   final ContentCatalogController controller;
+  final VoidCallback onOpenListening;
+  final VoidCallback onOpenSpeaking;
 
   @override
   State<_ContentHomeTab> createState() => _ContentHomeTabState();
@@ -72,6 +101,11 @@ class _ContentHomeTabState extends State<_ContentHomeTab> {
                 const _HeroCard(
                   title: 'Chunk Reader',
                   subtitle: 'Keep the sentence stable by reading one meaning unit at a time instead of holding the whole line in memory.',
+                ),
+                const SizedBox(height: 18),
+                _PracticeDoorwaysPanel(
+                  onOpenListening: widget.onOpenListening,
+                  onOpenSpeaking: widget.onOpenSpeaking,
                 ),
                 const SizedBox(height: 18),
                 const _QuickStartPanel(),
@@ -295,6 +329,92 @@ class _ContentTile extends StatelessWidget {
                   _Pill(label: item.topic),
                   _Pill(label: item.contentType),
                 ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PracticeDoorwaysPanel extends StatelessWidget {
+  const _PracticeDoorwaysPanel({
+    required this.onOpenListening,
+    required this.onOpenSpeaking,
+  });
+
+  final VoidCallback onOpenListening;
+  final VoidCallback onOpenSpeaking;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Open a support mode directly', style: Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _DoorwayCard(
+                icon: Icons.hearing_outlined,
+                title: 'Listening plan',
+                subtitle: 'Open pause points and replay cues first.',
+                onTap: onOpenListening,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _DoorwayCard(
+                icon: Icons.record_voice_over_outlined,
+                title: 'Speaking plan',
+                subtitle: 'Open short speaking steps and rescue phrases.',
+                onTap: onOpenSpeaking,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _DoorwayCard extends StatelessWidget {
+  const _DoorwayCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(24),
+      onTap: onTap,
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, color: Theme.of(context).colorScheme.primary),
+              const SizedBox(height: 12),
+              Text(title, style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 8),
+              Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
+              const SizedBox(height: 16),
+              Text(
+                'Open now',
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
               ),
             ],
           ),

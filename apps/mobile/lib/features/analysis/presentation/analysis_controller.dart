@@ -38,10 +38,13 @@ class AnalysisController extends ChangeNotifier {
       switch (mode) {
         case AnalysisMode.chunks:
           chunkResult = await _repository.analyzeText(text);
+          break;
         case AnalysisMode.listening:
           listeningResult = await _repository.fetchListeningPlan(text);
+          break;
         case AnalysisMode.speaking:
           speakingResult = await _repository.fetchSpeakingPlan(text);
+          break;
       }
     } catch (_) {
       errorText = 'Analysis failed. Please try again.';
