@@ -10,9 +10,11 @@ use sha2::{Digest, Sha256};
 use crate::{
     cache::CachedResponse,
     client_ip::resolve_client_ip,
+    request_guard::{validate_request, GuardUpstream},
     rate_limit,
     request_id::resolve_request_id,
     response_headers::{apply_standard_headers, apply_upstream_header},
+    security_audit::log_event,
     state::AppState,
 };
 
@@ -49,12 +51,40 @@ async fn forward(state: AppState, request: Request<Body>, upstream: Upstream) ->
         .unwrap_or("/")
         .to_string();
 
+    if let Some(rejection) = validate_request(
+        upstream.guard_upstream(),
+        &method,
+        &path_and_query,
+        request.headers(),
+    ) {
+        log_event(
+            rejection.event,
+            request_id.to_str().unwrap_or("proxy-request-id"),
+            &client_ip,
+            &path_and_query,
+            rejection.message,
+        );
+        return error_response(
+            rejection.status,
+            rejection.message,
+            &request_id,
+            upstream.header_value(),
+        );
+    }
+
     if upstream == Upstream::Api && rate_limit::is_auth_path(&method, &path_and_query) {
         let decision = state
             .auth_rate_limiter
             .allow(&auth_rate_limit_key(&path_and_query, &client_ip))
             .await;
         if !decision.allowed {
+            log_event(
+                "proxy_auth_rate_limited",
+                request_id.to_str().unwrap_or("proxy-request-id"),
+                &client_ip,
+                &path_and_query,
+                "too many authentication attempts",
+            );
             return rate_limited_response(
                 &request_id,
                 Upstream::ProxyRateLimited.header_value(),
@@ -68,6 +98,13 @@ async fn forward(state: AppState, request: Request<Body>, upstream: Upstream) ->
     let body_bytes = match to_bytes(body, state.config.max_request_body_bytes).await {
         Ok(bytes) => bytes,
         Err(_) => {
+            log_event(
+                "proxy_body_too_large",
+                request_id.to_str().unwrap_or("proxy-request-id"),
+                &client_ip,
+                &path_and_query,
+                "request body exceeded proxy limit",
+            );
             return error_response(
                 StatusCode::PAYLOAD_TOO_LARGE,
                 "request body too large",
@@ -87,6 +124,13 @@ async fn forward(state: AppState, request: Request<Body>, upstream: Upstream) ->
     let upstream_url = match upstream_url(&state, &upstream, &path_and_query) {
         Ok(url) => url,
         Err(_) => {
+            log_event(
+                "proxy_upstream_path_rejected",
+                request_id.to_str().unwrap_or("proxy-request-id"),
+                &client_ip,
+                &path_and_query,
+                "request path could not be rewritten for upstream",
+            );
             return error_response(
                 StatusCode::BAD_REQUEST,
                 "invalid upstream request path",
@@ -108,6 +152,13 @@ async fn forward(state: AppState, request: Request<Body>, upstream: Upstream) ->
     {
         Ok(response) => response,
         Err(_) => {
+            log_event(
+                "proxy_upstream_failed",
+                request_id.to_str().unwrap_or("proxy-request-id"),
+                &client_ip,
+                &path_and_query,
+                "upstream request failed",
+            );
             return error_response(
                 StatusCode::BAD_GATEWAY,
                 "upstream request failed",
@@ -127,6 +178,13 @@ async fn forward(state: AppState, request: Request<Body>, upstream: Upstream) ->
     let response_body = match upstream_response.bytes().await {
         Ok(bytes) => bytes,
         Err(_) => {
+            log_event(
+                "proxy_upstream_read_failed",
+                request_id.to_str().unwrap_or("proxy-request-id"),
+                &client_ip,
+                &path_and_query,
+                "failed to read upstream response body",
+            );
             return error_response(
                 StatusCode::BAD_GATEWAY,
                 "failed to read upstream response",
@@ -329,6 +387,13 @@ enum Upstream {
 }
 
 impl Upstream {
+    fn guard_upstream(&self) -> GuardUpstream {
+        match self {
+            Self::Api | Self::ProxyRateLimited => GuardUpstream::Api,
+            Self::Worker => GuardUpstream::Worker,
+        }
+    }
+
     fn route_prefix(&self) -> &'static str {
         match self {
             Self::Api => "/api",
@@ -357,7 +422,7 @@ impl Upstream {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use http::HeaderValue;
+    use http::{header::CONTENT_TYPE, HeaderValue};
 
     #[test]
     fn only_worker_analysis_posts_are_cacheable() {
@@ -409,5 +474,16 @@ mod tests {
 
         assert_eq!(sanitized.get("x-forwarded-for").unwrap(), "198.51.100.10");
         assert_eq!(sanitized.get("x-real-ip").unwrap(), "198.51.100.10");
+    }
+
+    #[test]
+    fn sanitize_request_headers_keeps_json_content_type() {
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        let request_id = HeaderValue::from_static("request-123");
+
+        let sanitized = sanitize_request_headers(&headers, &request_id, "198.51.100.10");
+
+        assert_eq!(sanitized.get(CONTENT_TYPE).unwrap(), "application/json");
     }
 }
