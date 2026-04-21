@@ -302,6 +302,54 @@ class PracticeRecommendation:
 
 
 @dataclass(slots=True)
+class PracticeTask:
+    task_id: str
+    mode: str
+    title: str
+    prompt: str
+    expected_focus: str
+    support: str
+    difficulty: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(slots=True)
+class PracticeSection:
+    mode: str
+    goal: str
+    tasks: list[PracticeTask]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "mode": self.mode,
+            "goal": self.goal,
+            "tasks": [task.to_dict() for task in self.tasks],
+        }
+
+
+@dataclass(slots=True)
+class PracticeSetResult:
+    version: str
+    language: str
+    target_context: str
+    summary: str
+    suggested_order: list[str]
+    sections: list[PracticeSection]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "version": self.version,
+            "language": self.language,
+            "target_context": self.target_context,
+            "summary": self.summary,
+            "suggested_order": self.suggested_order,
+            "sections": [section.to_dict() for section in self.sections],
+        }
+
+
+@dataclass(slots=True)
 class AnalyticsSummaryResult:
     version: str
     language: str
