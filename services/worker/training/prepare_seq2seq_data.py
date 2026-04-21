@@ -20,15 +20,29 @@ def build_prompt(record: dict[str, object]) -> str:
     text = str(record["text"]).strip()
     language = str(record.get("language", "en")).strip() or "en"
     target_context = str(record.get("target_context", "general")).strip() or "general"
+    learner_profile = str(record.get("learner_profile", "working_memory_low")).strip() or "working_memory_low"
+    difficulty_focus = str(record.get("difficulty_focus", "")).strip()
+    problem_types = record.get("problem_types", [])
 
-    return (
-        "You are an English-learning accessibility assistant.\n"
-        f"Task: {task}\n"
-        f"Language: {language}\n"
-        f"Target context: {target_context}\n"
-        "Return strict JSON only.\n"
-        f"Text: {text}"
+    lines = [
+        "You are an English-learning accessibility assistant.",
+        f"Task: {task}",
+        f"Language: {language}",
+        f"Target context: {target_context}",
+        f"Learner profile: {learner_profile}",
+    ]
+    if difficulty_focus:
+        lines.append(f"Difficulty focus: {difficulty_focus}")
+    if isinstance(problem_types, list) and problem_types:
+        lines.append(f"Problem types: {', '.join(str(item) for item in problem_types)}")
+    lines.extend(
+        [
+            "Return strict JSON only.",
+            f"Text: {text}",
+        ]
     )
+
+    return "\n".join(lines)
 
 
 def normalize_record(record: dict[str, object]) -> dict[str, str]:
@@ -40,12 +54,39 @@ def normalize_record(record: dict[str, object]) -> dict[str, str]:
     text = str(record.get("text", "")).strip()
     if not text:
         raise ValueError("text is required")
+    _validate_output_shape(task, record["output"])
 
     return {
         "prompt": build_prompt(record),
         "target": json.dumps(record["output"], ensure_ascii=False, sort_keys=True),
         "task": task,
     }
+
+
+def _validate_output_shape(task: str, output: object) -> None:
+    if not isinstance(output, dict):
+        raise ValueError("output must be a JSON object")
+
+    if task == "chunking":
+        segments = output.get("segments")
+        if not isinstance(segments, list) or not segments:
+            raise ValueError("chunking output.segments must be a non-empty list")
+        return
+
+    if task == "summary":
+        summary = output.get("summary")
+        if not isinstance(summary, str) or not summary.strip():
+            raise ValueError("summary output.summary must be a non-empty string")
+        return
+
+    if task == "speaking_plan":
+        opener_options = output.get("opener_options")
+        steps = output.get("steps")
+        if not isinstance(opener_options, list) or not opener_options:
+            raise ValueError("speaking_plan output.opener_options must be a non-empty list")
+        if not isinstance(steps, list) or not steps:
+            raise ValueError("speaking_plan output.steps must be a non-empty list")
+        return
 
 
 def main() -> None:

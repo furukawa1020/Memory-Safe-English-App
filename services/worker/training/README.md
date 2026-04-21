@@ -43,6 +43,15 @@
 - `rescue_plan`
 
 まずは `chunking` と `summary` から始めるのが安全です。
+その次に伸びやすいのは `speaking_plan` です。
+特に次の 3 タイプは、ワーキングメモリ弱者向けに効きやすいです。
+
+- `opener_only`
+  最初の 1 文だけを先に出せるようにする
+- `short_unit`
+  長文を 1 呼吸で言える単位に分ける
+- `two_step_link`
+  2 つの短文を簡単な橋渡しでつなぐ
 
 ## 手順
 
@@ -59,6 +68,11 @@ python training/prepare_seq2seq_data.py ^
   --input data/train_raw.jsonl ^
   --output data/train_prepared.jsonl
 ```
+
+リポジトリには最小サンプルとして次を置いています。
+
+- `training/sample_train_raw.jsonl`
+- `training/sample_eval_raw.jsonl`
 
 3. LoRA で学習する
 
@@ -81,6 +95,7 @@ python -m app.server
 ## 学習方針
 
 - 最初は `chunking` と `summary` に絞る
+- 次に `speaking_plan` の `opener_only / short_unit / two_step_link` を増やす
 - JSON 以外の自由文を target に混ぜすぎない
 - 1 サンプル 1 意図にする
 - `research / meeting / self_intro / daily` を混ぜて context 一般化を作る
