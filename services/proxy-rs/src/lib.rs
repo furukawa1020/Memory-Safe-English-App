@@ -8,6 +8,7 @@ pub mod http_response;
 pub mod proxy;
 pub mod rate_limit;
 pub mod readiness;
+pub mod request_guard;
 pub mod request_id;
 pub mod response_headers;
 pub mod routes;
