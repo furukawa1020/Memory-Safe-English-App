@@ -99,7 +99,7 @@ def main() -> None:
     output_path = Path(args.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    with input_path.open("r", encoding="utf-8") as source, output_path.open("w", encoding="utf-8") as target:
+    with input_path.open("r", encoding="utf-8-sig") as source, output_path.open("w", encoding="utf-8") as target:
         for line_number, line in enumerate(source, start=1):
             raw = line.strip()
             if not raw:
