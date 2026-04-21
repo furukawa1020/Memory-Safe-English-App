@@ -29,6 +29,15 @@ static HOP_BY_HOP_HEADERS: &[&str] = &[
     "upgrade",
 ];
 
+static RESPONSE_HEADERS_TO_STRIP: &[&str] = &[
+    "server",
+    "x-powered-by",
+    "via",
+    "alt-svc",
+    "x-aspnet-version",
+    "x-aspnetmvc-version",
+];
+
 pub async fn proxy_to_api(State(state): State<AppState>, request: Request<Body>) -> Response<Body> {
     forward(state, request, Upstream::Api).await
 }
@@ -273,6 +282,11 @@ fn sanitize_request_headers(
             || name.as_str().eq_ignore_ascii_case("host")
             || name.as_str().eq_ignore_ascii_case("x-forwarded-for")
             || name.as_str().eq_ignore_ascii_case("x-real-ip")
+            || name.as_str().eq_ignore_ascii_case("forwarded")
+            || name.as_str().eq_ignore_ascii_case("true-client-ip")
+            || name.as_str().eq_ignore_ascii_case("cf-connecting-ip")
+            || name.as_str().eq_ignore_ascii_case("x-client-ip")
+            || name.as_str().eq_ignore_ascii_case("x-cluster-client-ip")
         {
             continue;
         }
@@ -302,7 +316,7 @@ fn sanitize_response_headers(
 ) -> HeaderMap {
     let mut sanitized = HeaderMap::new();
     for (name, value) in headers {
-        if should_skip_header(name.as_str()) {
+        if should_skip_header(name.as_str()) || should_strip_response_header(name.as_str()) {
             continue;
         }
         sanitized.insert(name.clone(), value.clone());
@@ -375,6 +389,12 @@ fn auth_rate_limit_key(path_and_query: &str, client_ip: &str) -> String {
 
 fn should_skip_header(header_name: &str) -> bool {
     HOP_BY_HOP_HEADERS
+        .iter()
+        .any(|value| value.eq_ignore_ascii_case(header_name))
+}
+
+fn should_strip_response_header(header_name: &str) -> bool {
+    RESPONSE_HEADERS_TO_STRIP
         .iter()
         .any(|value| value.eq_ignore_ascii_case(header_name))
 }
@@ -484,6 +504,35 @@ mod tests {
 
         let sanitized = sanitize_request_headers(&headers, &request_id, "198.51.100.10");
 
+        assert_eq!(sanitized.get(CONTENT_TYPE).unwrap(), "application/json");
+    }
+
+    #[test]
+    fn sanitize_request_headers_strips_untrusted_client_ip_headers() {
+        let mut headers = HeaderMap::new();
+        headers.insert("forwarded", HeaderValue::from_static("for=203.0.113.10"));
+        headers.insert("cf-connecting-ip", HeaderValue::from_static("203.0.113.10"));
+        let request_id = HeaderValue::from_static("request-123");
+
+        let sanitized = sanitize_request_headers(&headers, &request_id, "198.51.100.10");
+
+        assert!(sanitized.get("forwarded").is_none());
+        assert!(sanitized.get("cf-connecting-ip").is_none());
+        assert_eq!(sanitized.get("x-forwarded-for").unwrap(), "198.51.100.10");
+    }
+
+    #[test]
+    fn sanitize_response_headers_strips_server_fingerprint_headers() {
+        let mut upstream = reqwest::header::HeaderMap::new();
+        upstream.insert("server", HeaderValue::from_static("nginx"));
+        upstream.insert("x-powered-by", HeaderValue::from_static("express"));
+        upstream.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        let request_id = HeaderValue::from_static("request-123");
+
+        let sanitized = sanitize_response_headers(&upstream, &request_id, "api");
+
+        assert!(sanitized.get("server").is_none());
+        assert!(sanitized.get("x-powered-by").is_none());
         assert_eq!(sanitized.get(CONTENT_TYPE).unwrap(), "application/json");
     }
 }
