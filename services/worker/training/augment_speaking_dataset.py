@@ -36,7 +36,7 @@ class Seq2SeqGenerator:
         self._model = AutoModelForSeq2SeqLM.from_pretrained(self.model_name, **model_kwargs)
         self._model.eval()
 
-    def generate_json(self, prompt: str) -> dict[str, Any]:
+    def generate_text(self, prompt: str) -> str:
         inputs = self._tokenizer(
             prompt,
             return_tensors="pt",
@@ -50,10 +50,13 @@ class Seq2SeqGenerator:
             "temperature": self.temperature if self.temperature > 0 else None,
         }
         generation_kwargs = {key: value for key, value in generation_kwargs.items() if value is not None}
+
         with self._torch.no_grad():
             output_ids = self._model.generate(**inputs, **generation_kwargs)
-        text = self._tokenizer.decode(output_ids[0], skip_special_tokens=True)
-        return parse_json_payload(text)
+        return self._tokenizer.decode(output_ids[0], skip_special_tokens=True)
+
+    def generate_json(self, prompt: str) -> dict[str, Any]:
+        return parse_json_payload(self.generate_text(prompt))
 
 
 def parse_json_payload(text: str) -> dict[str, Any]:
@@ -108,8 +111,77 @@ def build_prompt(record: dict[str, Any], variant_index: int) -> str:
     )
 
 
+def build_summary_prompt(record: dict[str, Any], variant_index: int) -> str:
+    return (
+        "Rewrite the summary for a learner with low working memory.\n"
+        "Keep it to one short natural sentence.\n"
+        f"Target context: {record.get('target_context', 'general')}\n"
+        f"Variant index: {variant_index}\n"
+        f"Input text: {record['text']}\n"
+        f"Current summary: {record['output'].get('summary', '')}"
+    )
+
+
+def build_openers_prompt(record: dict[str, Any], variant_index: int) -> str:
+    return (
+        "Write two short natural opener sentences for a learner with low working memory.\n"
+        "Return exactly two lines, one opener per line.\n"
+        f"Target context: {record.get('target_context', 'general')}\n"
+        f"Variant index: {variant_index}\n"
+        f"Input text: {record['text']}\n"
+        f"Current openers: {json.dumps(record['output'].get('opener_options', []), ensure_ascii=False)}"
+    )
+
+
+def build_steps_prompt(record: dict[str, Any], variant_index: int) -> str:
+    steps = record["output"].get("steps", [])
+    return (
+        "Rewrite the speaking steps for a learner with low working memory.\n"
+        "Keep the number of steps the same and make each step short and speakable.\n"
+        "Return one line per step.\n"
+        f"Target context: {record.get('target_context', 'general')}\n"
+        f"Variant index: {variant_index}\n"
+        f"Input text: {record['text']}\n"
+        f"Current steps: {json.dumps(steps, ensure_ascii=False)}"
+    )
+
+
 def augment_record(generator: Seq2SeqGenerator, record: dict[str, Any], variant_index: int) -> dict[str, Any] | None:
-    payload = generator.generate_json(build_prompt(record, variant_index))
+    output = record["output"]
+    summary_text = _normalize_single_line(
+        generator.generate_text(build_summary_prompt(record, variant_index)),
+        fallback=str(output.get("summary", "")),
+    )
+    opener_options = _normalize_openers(
+        generator.generate_text(build_openers_prompt(record, variant_index)),
+        fallback=[str(item) for item in output.get("opener_options", [])],
+        limit=2,
+    )
+    step_lines = _normalize_step_lines(
+        generator.generate_text(build_steps_prompt(record, variant_index)),
+        fallback=[str(step.get("text", "")) for step in output.get("steps", []) if isinstance(step, dict)],
+        limit=len(output.get("steps", [])) or 2,
+    )
+    base_steps = output.get("steps", [])
+    rewritten_steps = []
+    for index, base_step in enumerate(base_steps):
+        if not isinstance(base_step, dict):
+            continue
+        rewritten_steps.append(
+            {
+                "step": base_step.get("step", index + 1),
+                "text": step_lines[index] if index < len(step_lines) else str(base_step.get("text", "")),
+                "purpose": base_step.get("purpose", "support"),
+            }
+        )
+
+    payload = {
+        "summary": summary_text,
+        "opener_options": opener_options,
+        "bridge_phrases": output.get("bridge_phrases", []),
+        "steps": rewritten_steps,
+        "rescue_phrases": output.get("rescue_phrases", []),
+    }
     if not validate_speaking_output(payload):
         return None
 
@@ -119,6 +191,94 @@ def augment_record(generator: Seq2SeqGenerator, record: dict[str, Any], variant_
         "meta_source": record.get("meta_id", "seed"),
         "meta_variant": variant_index,
     }
+
+
+def _normalize_single_line(text: str, *, fallback: str) -> str:
+    lines = _extract_lines(text)
+    candidate = lines[0] if lines else fallback
+    return candidate.strip().strip("- ").strip()
+
+
+def _normalize_lines(text: str, *, fallback: list[str], limit: int) -> list[str]:
+    lines = _extract_lines(text)
+    cleaned = [line.strip().strip("- ").strip() for line in lines if line.strip()]
+    if not cleaned:
+        cleaned = fallback
+    return cleaned[:limit]
+
+
+def _normalize_openers(text: str, *, fallback: list[str], limit: int) -> list[str]:
+    parsed = _try_parse_list_literal(text)
+    if parsed:
+        cleaned = [_clean_sentence(item) for item in parsed if _looks_like_clean_sentence(item)]
+        if cleaned:
+            return cleaned[:limit]
+
+    lines = [_clean_sentence(line) for line in _extract_lines(text)]
+    lines = [line for line in lines if _looks_like_clean_sentence(line)]
+    if not lines:
+        lines = [_clean_sentence(line) for line in fallback if _looks_like_clean_sentence(line)]
+    return lines[:limit]
+
+
+def _normalize_step_lines(text: str, *, fallback: list[str], limit: int) -> list[str]:
+    lines = [_clean_sentence(line) for line in _extract_lines(text)]
+    valid = [line for line in lines if _looks_like_clean_step(line)]
+    if not valid:
+        valid = [_clean_sentence(line) for line in fallback if _looks_like_clean_step(line)]
+    if len(valid) < limit:
+        fallback_clean = [_clean_sentence(line) for line in fallback if _looks_like_clean_step(line)]
+        for item in fallback_clean:
+            if len(valid) >= limit:
+                break
+            if item not in valid:
+                valid.append(item)
+    return valid[:limit]
+
+
+def _extract_lines(text: str) -> list[str]:
+    raw_lines = [line.strip() for line in text.splitlines() if line.strip()]
+    if raw_lines:
+        return raw_lines
+    return [part.strip() for part in text.split("||") if part.strip()]
+
+
+def _try_parse_list_literal(text: str) -> list[str]:
+    stripped = text.strip()
+    if not stripped:
+        return []
+    try:
+        payload = json.loads(stripped)
+    except json.JSONDecodeError:
+        return []
+    if isinstance(payload, list):
+        return [str(item) for item in payload if isinstance(item, str)]
+    return []
+
+
+def _clean_sentence(text: str) -> str:
+    cleaned = text.strip().strip('"').strip("'").strip()
+    cleaned = re.sub(r"\s+", " ", cleaned)
+    cleaned = cleaned.removeprefix("Step1:").removeprefix("step 1:").strip()
+    return cleaned
+
+
+def _looks_like_clean_sentence(text: str) -> bool:
+    if not text or len(text) > 120:
+        return False
+    bad_markers = ['{"', '["', '"]', 'step 1:', '"purpose"', '"step"']
+    lowered = text.lower()
+    return not any(marker in lowered for marker in bad_markers)
+
+
+def _looks_like_clean_step(text: str) -> bool:
+    if not _looks_like_clean_sentence(text):
+        return False
+    if len(text.split()) > 16:
+        return False
+    if text.count(":") > 1:
+        return False
+    return True
 
 
 def main() -> None:
