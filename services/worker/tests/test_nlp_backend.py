@@ -1,5 +1,6 @@
 from app.chunking import ChunkingService
 from app.config import Settings
+from app.nlp_backend.transformer import TransformerChunkBackend
 
 
 class FakeChunkBackend:
@@ -45,3 +46,29 @@ def test_settings_accept_transformer_backend_when_model_is_set() -> None:
     )
 
     settings.validate()
+
+
+class FakeTransformerBackend(TransformerChunkBackend):
+    def __init__(self) -> None:
+        super().__init__(model_name="example/model")
+        self.prompts: list[str] = []
+
+    def _ensure_model_loaded(self):  # type: ignore[override]
+        raise AssertionError("model loading should not be called in this fake backend")
+
+    def _generate_text(self, prompt: str) -> str:  # type: ignore[override]
+        self.prompts.append(prompt)
+        if '"segments"' in prompt:
+            return '{"segments":["We propose","a safer interface"]}'
+        return '{"summary":"proposal summary"}'
+
+
+def test_transformer_backend_parses_generated_segments_and_summary() -> None:
+    backend = FakeTransformerBackend()
+
+    segments = backend.chunk("We propose a safer interface.", language="en", max_words_per_chunk=4)
+    summary = backend.summarize(segments, language="en")
+
+    assert segments == ["We propose", "a safer interface"]
+    assert summary == "proposal summary"
+    assert "low working memory" in backend.prompts[0]

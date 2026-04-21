@@ -140,9 +140,22 @@ Deep Learning / Transformer を使う場合は、worker 起動時に backend を
 - `WORKER_TRANSFORMER_TASK=text2text-generation`
 - `WORKER_TRANSFORMER_DEVICE=-1`
 - `WORKER_TRANSFORMER_MAX_NEW_TOKENS=256`
+- `WORKER_TRANSFORMER_MAX_INPUT_TOKENS=512`
+- `WORKER_TRANSFORMER_NUM_BEAMS=4`
+- `WORKER_TRANSFORMER_TEMPERATURE=0.0`
+- `WORKER_TRANSFORMER_CACHE_DIR=<optional cache dir>`
 
 `transformer` backend を選んだのに `WORKER_TRANSFORMER_MODEL` が無い場合、worker は起動しません。
 既定値は `heuristic` のままなので、明示しない限り重い依存は使いません。
+
+実装は `transformers.pipeline` ではなく、`AutoTokenizer` と `AutoModelForSeq2SeqLM` を直接ロードして生成します。
+chunking と summary は JSON 形式の制約付き prompt で生成します。
+
+最初の候補としては、次のような seq2seq モデルが扱いやすいです。
+
+- `google/flan-t5-base`
+- `google/flan-t5-large`
+- ローカルに配置した fine-tuned T5 / FLAN 系モデル
 
 依存は optional dependency として切ってあります。
 

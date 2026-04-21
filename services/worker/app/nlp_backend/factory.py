@@ -13,5 +13,9 @@ def build_chunk_backend(settings: Settings) -> ChunkBackend:
             task=settings.transformer_task,
             device=settings.transformer_device,
             max_new_tokens=settings.transformer_max_new_tokens,
+            max_input_tokens=settings.transformer_max_input_tokens,
+            num_beams=settings.transformer_num_beams,
+            temperature=settings.transformer_temperature,
+            cache_dir=settings.transformer_cache_dir,
         )
     return HeuristicChunkBackend()
