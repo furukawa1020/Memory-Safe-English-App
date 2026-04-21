@@ -229,3 +229,21 @@ def test_analytics_summary_endpoint() -> None:
         assert payload["assessment"]
         assert payload["collapse_patterns"]
         assert payload["recommendations"]
+
+
+def test_practice_set_endpoint() -> None:
+    with running_server(make_settings()) as server:
+        body = {
+            "text": "In this study, we propose a memory safe interface that reduces overload during reading.",
+            "target_context": "research",
+            "self_reported_difficulties": ["sentence_integration", "audio_tracking"],
+            "fatigue_level": "medium",
+        }
+        body_text = json.dumps(body)
+        response, payload = post_json(server.server_port, "/analyze/practice-set", body, signed_headers(body_text))
+
+        assert response.status == HTTPStatus.OK
+        assert payload["summary"]
+        assert payload["suggested_order"]
+        assert payload["sections"]
+        assert payload["sections"][0]["tasks"]
