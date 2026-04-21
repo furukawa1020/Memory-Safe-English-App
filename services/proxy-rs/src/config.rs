@@ -4,8 +4,15 @@ use std::{
     time::Duration,
 };
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum RuntimeEnvironment {
+    Development,
+    Production,
+}
+
 #[derive(Clone, Debug)]
 pub struct Config {
+    pub runtime_environment: RuntimeEnvironment,
     pub http_addr: SocketAddr,
     pub api_base_url: String,
     pub worker_base_url: String,
@@ -26,6 +33,7 @@ pub struct Config {
 impl Config {
     pub fn from_env() -> Result<Self, ConfigError> {
         let config = Self {
+            runtime_environment: parse_runtime_environment("PROXY_RUNTIME_ENV", "development")?,
             http_addr: parse_env("PROXY_HTTP_ADDR", "127.0.0.1:8070")?,
             api_base_url: parse_url("PROXY_API_BASE_URL", "http://127.0.0.1:8080"),
             worker_base_url: parse_url("PROXY_WORKER_BASE_URL", "http://127.0.0.1:8090"),
@@ -118,6 +126,38 @@ impl Config {
                 ));
             }
         }
+        if self.runtime_environment == RuntimeEnvironment::Production {
+            if self.admin_token.is_none() {
+                return Err(ConfigError::MissingRequired(
+                    "PROXY_ADMIN_TOKEN".to_string(),
+                    "production requires an admin token".to_string(),
+                ));
+            }
+            if self.admin_allowed_ips.is_empty() {
+                return Err(ConfigError::MissingRequired(
+                    "PROXY_ADMIN_ALLOWED_IPS".to_string(),
+                    "production requires an explicit admin IP allowlist".to_string(),
+                ));
+            }
+            if self.trusted_proxy_ips.is_empty() {
+                return Err(ConfigError::MissingRequired(
+                    "PROXY_TRUSTED_PROXY_IPS".to_string(),
+                    "production requires explicit trusted proxy peers".to_string(),
+                ));
+            }
+            if self.auth_rate_limit_max_requests > 100 {
+                return Err(ConfigError::InvalidValue(
+                    "PROXY_AUTH_RATE_LIMIT_MAX_REQUESTS".to_string(),
+                    self.auth_rate_limit_max_requests.to_string(),
+                ));
+            }
+            if self.admin_rate_limit_max_requests > 60 {
+                return Err(ConfigError::InvalidValue(
+                    "PROXY_ADMIN_RATE_LIMIT_MAX_REQUESTS".to_string(),
+                    self.admin_rate_limit_max_requests.to_string(),
+                ));
+            }
+        }
         Ok(())
     }
 }
@@ -165,10 +205,21 @@ where
         .map_err(|_| ConfigError::InvalidValue(key.to_string(), raw))
 }
 
+fn parse_runtime_environment(key: &str, default_value: &str) -> Result<RuntimeEnvironment, ConfigError> {
+    let raw = env::var(key).unwrap_or_else(|_| default_value.to_string());
+    match raw.trim().to_ascii_lowercase().as_str() {
+        "development" | "dev" => Ok(RuntimeEnvironment::Development),
+        "production" | "prod" => Ok(RuntimeEnvironment::Production),
+        _ => Err(ConfigError::InvalidValue(key.to_string(), raw)),
+    }
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum ConfigError {
     #[error("invalid configuration value for {0}: {1}")]
     InvalidValue(String, String),
+    #[error("missing required configuration {0}: {1}")]
+    MissingRequired(String, String),
 }
 
 #[cfg(test)]
@@ -178,6 +229,7 @@ mod tests {
     #[test]
     fn validate_rejects_short_admin_token() {
         let config = Config {
+            runtime_environment: RuntimeEnvironment::Development,
             http_addr: "127.0.0.1:8070".parse().unwrap(),
             api_base_url: "http://127.0.0.1:8080".to_string(),
             worker_base_url: "http://127.0.0.1:8090".to_string(),
@@ -198,6 +250,33 @@ mod tests {
         assert!(matches!(
             config.validate(),
             Err(ConfigError::InvalidValue(key, _)) if key == "PROXY_ADMIN_TOKEN"
+        ));
+    }
+
+    #[test]
+    fn production_requires_admin_allowlist_and_trusted_proxies() {
+        let config = Config {
+            runtime_environment: RuntimeEnvironment::Production,
+            http_addr: "0.0.0.0:8070".parse().unwrap(),
+            api_base_url: "http://api.internal:8080".to_string(),
+            worker_base_url: "http://worker.internal:8090".to_string(),
+            admin_token: Some("0123456789abcdef".to_string()),
+            trusted_proxy_ips: Vec::new(),
+            admin_allowed_ips: Vec::new(),
+            admin_rate_limit_max_requests: 30,
+            admin_rate_limit_window: Duration::from_secs(60),
+            auth_rate_limit_max_requests: 20,
+            auth_rate_limit_window: Duration::from_secs(60),
+            upstream_timeout: Duration::from_secs(10),
+            cache_ttl: Duration::from_secs(300),
+            gc_interval: Duration::from_secs(60),
+            cache_max_entries: 1024,
+            max_request_body_bytes: 262144,
+        };
+
+        assert!(matches!(
+            config.validate(),
+            Err(ConfigError::MissingRequired(key, _)) if key == "PROXY_ADMIN_ALLOWED_IPS"
         ));
     }
 }
