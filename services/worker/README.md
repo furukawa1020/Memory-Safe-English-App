@@ -8,6 +8,13 @@
 - 入力テキストを、読みやすい単位や話しやすい単位に変換する
 - その人の崩れやすさに合わせて、次に出す練習や支援を決める
 
+NLP backend は 2 系統あります。
+
+- `heuristic`
+  既定値です。ルールベースで高速に動きます。
+- `transformer`
+  明示設定時のみ使います。chunking と summary の入口を transformer に差し替えます。
+
 ## ディレクトリ構成
 
 ```text
@@ -123,6 +130,25 @@ services/worker
 - request timeout
 - rate limiting
 - audit logging
+
+## Transformer backend
+
+Deep Learning / Transformer を使う場合は、worker 起動時に backend を切り替えます。
+
+- `WORKER_NLP_BACKEND=transformer`
+- `WORKER_TRANSFORMER_MODEL=<huggingface model name or local path>`
+- `WORKER_TRANSFORMER_TASK=text2text-generation`
+- `WORKER_TRANSFORMER_DEVICE=-1`
+- `WORKER_TRANSFORMER_MAX_NEW_TOKENS=256`
+
+`transformer` backend を選んだのに `WORKER_TRANSFORMER_MODEL` が無い場合、worker は起動しません。
+既定値は `heuristic` のままなので、明示しない限り重い依存は使いません。
+
+依存は optional dependency として切ってあります。
+
+```bash
+pip install .[transformer]
+```
 
 ## 起動
 
