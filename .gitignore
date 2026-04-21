@@ -54,6 +54,14 @@ pip-wheel-metadata/
 .coverage
 .coverage.*
 htmlcov/
+services/worker/data/
+services/worker/checkpoints/
+services/worker/outputs/
+services/worker/training/artifacts/
+services/worker/training/cache/
+*.safetensors
+adapter_config.json
+adapter_model.bin
 
 # Rust
 target/

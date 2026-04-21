@@ -1,0 +1,2 @@
+{"task":"chunking","text":"In this study, we propose a memory safe interface that reduces overload during reading.","language":"en","target_context":"research","output":{"segments":["In this study, we propose a","memory safe interface","that reduces overload during reading."]}}
+{"task":"summary","text":"In this study, we propose a memory safe interface that reduces overload during reading.","language":"en","target_context":"research","output":{"summary":"We propose a memory safe interface."}}
