@@ -28,6 +28,14 @@ class ContentRepository {
     return SkeletonResult.fromJson(response);
   }
 
+  Future<ReaderPlanResult> fetchReaderPlan(String text) async {
+    final response = await _apiClient.post(
+      '/analysis/reader-plan',
+      body: <String, dynamic>{'text': text, 'language': 'en'},
+    );
+    return ReaderPlanResult.fromJson(response);
+  }
+
   Future<ChunkingResult> analyzeText(String text) async {
     final response = await _apiClient.post(
       '/analysis/chunks',

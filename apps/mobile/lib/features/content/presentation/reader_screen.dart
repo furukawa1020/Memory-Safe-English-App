@@ -22,6 +22,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
   ContentItem? _content;
   ChunkingResult? _chunks;
   SkeletonResult? _skeleton;
+  ReaderPlanResult? _readerPlan;
   bool _isLoading = true;
   String? _errorText;
   ReaderMode _mode = ReaderMode.chunk;
@@ -44,6 +45,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
       final content = await repository.fetchContent(widget.contentId);
       final chunks = await repository.fetchChunks(widget.contentId);
       final skeleton = await repository.fetchSkeleton(widget.contentId);
+      final readerPlan = await repository.fetchReaderPlan(content.rawText);
       if (!mounted) {
         return;
       }
@@ -52,6 +54,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
         _content = content;
         _chunks = chunks;
         _skeleton = skeleton;
+        _readerPlan = readerPlan;
         _focusIndex = 0;
       });
     } catch (_) {
@@ -70,6 +73,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
     final content = _content;
     final chunks = _chunks;
     final skeleton = _skeleton;
+    final readerPlan = _readerPlan;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Chunk Reader')),
@@ -80,7 +84,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
               ? const Center(child: CircularProgressIndicator())
               : _errorText != null
                   ? Center(child: Text(_errorText!))
-                  : content == null || chunks == null || skeleton == null
+                  : content == null || chunks == null || skeleton == null || readerPlan == null
                       ? const Center(child: Text('No content'))
                       : Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -102,8 +106,12 @@ class _ReaderScreenState extends State<ReaderScreen> {
                                 if (chunks.version.isNotEmpty)
                                   _MetaChip(label: 'chunks ${chunks.version}'),
                                 if (skeleton.version.isNotEmpty)
+                                _MetaChip(
+                                  label: 'skeleton ${skeleton.version}',
+                                ),
+                                if (readerPlan.version.isNotEmpty)
                                   _MetaChip(
-                                    label: 'skeleton ${skeleton.version}',
+                                    label: 'plan ${readerPlan.version}',
                                   ),
                               ],
                             ),
@@ -140,17 +148,12 @@ class _ReaderScreenState extends State<ReaderScreen> {
                                 _mode == ReaderMode.skeleton) ...[
                               _ReaderStepper(
                                 currentIndex: _focusIndex,
-                                totalCount: _mode == ReaderMode.skeleton
-                                    ? skeleton.parts.length
-                                    : chunks.chunks.length,
+                                totalCount: _resolveStepCount(chunks, skeleton, readerPlan),
                                 onPrevious: _focusIndex > 0
                                     ? () => setState(() => _focusIndex -= 1)
                                     : null,
                                 onNext: _focusIndex <
-                                        ((_mode == ReaderMode.skeleton
-                                                ? skeleton.parts.length
-                                                : chunks.chunks.length) -
-                                            1)
+                                        (_resolveStepCount(chunks, skeleton, readerPlan) - 1)
                                     ? () => setState(() => _focusIndex += 1)
                                     : null,
                               ),
@@ -158,7 +161,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                             ],
                             Expanded(
                               child: SingleChildScrollView(
-                                child: _buildModeView(content, chunks, skeleton),
+                                child: _buildModeView(content, chunks, skeleton, readerPlan),
                               ),
                             ),
                           ],
@@ -168,10 +171,29 @@ class _ReaderScreenState extends State<ReaderScreen> {
     );
   }
 
+  int _resolveStepCount(
+    ChunkingResult chunks,
+    SkeletonResult skeleton,
+    ReaderPlanResult readerPlan,
+  ) {
+    switch (_mode) {
+      case ReaderMode.skeleton:
+        return skeleton.parts.length;
+      case ReaderMode.chunk:
+      case ReaderMode.assisted:
+        return readerPlan.focusSteps.isNotEmpty
+            ? readerPlan.focusSteps.length
+            : chunks.chunks.length;
+      case ReaderMode.normal:
+        return 1;
+    }
+  }
+
   Widget _buildModeView(
     ContentItem content,
     ChunkingResult chunks,
     SkeletonResult skeleton,
+    ReaderPlanResult readerPlan,
   ) {
     switch (_mode) {
       case ReaderMode.normal:
@@ -180,11 +202,22 @@ class _ReaderScreenState extends State<ReaderScreen> {
           body: content.rawText,
         );
       case ReaderMode.chunk:
-        return _ChunkListView(
-          chunks: chunks.chunks,
-          dimSupport: false,
-          onlyCore: false,
-          focusIndex: _focusIndex,
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _ReaderPlanPanel(
+              plan: readerPlan,
+              focusIndex: _focusIndex,
+            ),
+            const SizedBox(height: 12),
+            _ChunkListView(
+              chunks: chunks.chunks,
+              dimSupport: false,
+              onlyCore: false,
+              focusIndex: _focusIndex,
+              focusedChunkOrder: _focusedChunkOrder(readerPlan),
+            ),
+          ],
         );
       case ReaderMode.skeleton:
         return _SkeletonListView(parts: skeleton.parts, focusIndex: _focusIndex);
@@ -192,6 +225,11 @@ class _ReaderScreenState extends State<ReaderScreen> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            _ReaderPlanPanel(
+              plan: readerPlan,
+              focusIndex: _focusIndex,
+            ),
+            const SizedBox(height: 12),
             _TextCard(title: 'Skeleton Summary', body: skeleton.summary),
             const SizedBox(height: 12),
             _ChunkListView(
@@ -199,10 +237,20 @@ class _ReaderScreenState extends State<ReaderScreen> {
               dimSupport: true,
               onlyCore: false,
               focusIndex: _focusIndex,
+              focusedChunkOrder: _focusedChunkOrder(readerPlan),
             ),
           ],
         );
     }
+  }
+
+  int? _focusedChunkOrder(ReaderPlanResult readerPlan) {
+    if (readerPlan.focusSteps.isEmpty) {
+      return null;
+    }
+    final clampedIndex =
+        _focusIndex.clamp(0, readerPlan.focusSteps.length - 1).toInt();
+    return readerPlan.focusSteps[clampedIndex].chunkOrder;
   }
 }
 
@@ -212,12 +260,14 @@ class _ChunkListView extends StatelessWidget {
     required this.dimSupport,
     required this.onlyCore,
     required this.focusIndex,
+    required this.focusedChunkOrder,
   });
 
   final List<ChunkItem> chunks;
   final bool dimSupport;
   final bool onlyCore;
   final int focusIndex;
+  final int? focusedChunkOrder;
 
   @override
   Widget build(BuildContext context) {
@@ -231,10 +281,10 @@ class _ChunkListView extends StatelessWidget {
           Opacity(
             opacity: _resolveOpacity(index, chunk),
             child: Card(
-              elevation: index == focusIndex ? 3 : 0,
+              elevation: chunk.order == focusedChunkOrder ? 3 : 0,
               shape: RoundedRectangleBorder(
                 side: BorderSide(
-                  color: index == focusIndex
+                  color: chunk.order == focusedChunkOrder
                       ? Theme.of(context).colorScheme.primary
                       : Colors.transparent,
                   width: 1.4,
@@ -290,7 +340,7 @@ class _ChunkListView extends StatelessWidget {
   }
 
   double _resolveOpacity(int index, ChunkItem chunk) {
-    if (index == focusIndex) {
+    if (chunk.order == focusedChunkOrder) {
       return 1;
     }
     if (dimSupport && !chunk.isCore) {
@@ -300,6 +350,100 @@ class _ChunkListView extends StatelessWidget {
       return 0.74;
     }
     return 0.42;
+  }
+}
+
+class _ReaderPlanPanel extends StatelessWidget {
+  const _ReaderPlanPanel({
+    required this.plan,
+    required this.focusIndex,
+  });
+
+  final ReaderPlanResult plan;
+  final int focusIndex;
+
+  @override
+  Widget build(BuildContext context) {
+    final step = plan.focusSteps.isEmpty
+        ? null
+        : plan.focusSteps[
+            focusIndex.clamp(0, plan.focusSteps.length - 1).toInt()
+          ];
+    final hotspot = plan.hotspots.isEmpty ? null : plan.hotspots.first;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Reader Plan',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+                _MetaChip(label: plan.displayStrategy),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              plan.summary,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            if (step != null) ...[
+              const SizedBox(height: 14),
+              Text(
+                'Now focus on',
+                style: Theme.of(context).textTheme.labelLarge,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                step.text,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 8),
+              Text(step.guidanceJa),
+              const SizedBox(height: 8),
+              Text(
+                'Support density: ${step.supportDensity} • Risk: ${step.overloadRisk}',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                step.presentationHint,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+            if (hotspot != null) ...[
+              const SizedBox(height: 14),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.secondaryContainer,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Hotspot',
+                        style: Theme.of(context).textTheme.labelLarge,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(hotspot.reason),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 }
 
