@@ -305,11 +305,14 @@ class PracticeRecommendation:
 class PracticeTask:
     task_id: str
     mode: str
+    problem_type: str
     title: str
     prompt: str
     expected_focus: str
     support: str
     difficulty: str
+    wm_support: str
+    success_check: str
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -319,12 +322,14 @@ class PracticeTask:
 class PracticeSection:
     mode: str
     goal: str
+    why_this_works: str
     tasks: list[PracticeTask]
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "mode": self.mode,
             "goal": self.goal,
+            "why_this_works": self.why_this_works,
             "tasks": [task.to_dict() for task in self.tasks],
         }
 
@@ -336,6 +341,7 @@ class PracticeSetResult:
     target_context: str
     summary: str
     suggested_order: list[str]
+    profile_note: str
     sections: list[PracticeSection]
 
     def to_dict(self) -> dict[str, Any]:
@@ -345,6 +351,7 @@ class PracticeSetResult:
             "target_context": self.target_context,
             "summary": self.summary,
             "suggested_order": self.suggested_order,
+            "profile_note": self.profile_note,
             "sections": [section.to_dict() for section in self.sections],
         }
 
