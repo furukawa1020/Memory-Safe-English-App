@@ -27,10 +27,16 @@ def test_practice_set_builds_multi_mode_tasks() -> None:
 
     assert result.summary
     assert result.suggested_order
+    assert result.profile_note
     assert len(result.sections) == 4
     assert result.sections[0].mode == "reading"
+    assert result.sections[0].why_this_works
     assert result.sections[0].tasks
     assert result.sections[1].mode == "listening"
     assert result.sections[2].mode == "speaking"
     assert result.sections[3].mode == "rescue"
     assert all(section.tasks for section in result.sections)
+    first_task = result.sections[0].tasks[0]
+    assert first_task.problem_type
+    assert first_task.wm_support
+    assert first_task.success_check

@@ -101,6 +101,7 @@ services/worker
   診断結果と崩れ方をまとめ、次に何を優先すべきかを返します。
 - `practice-set`
   1 本の英文から、読む・聞く・話す・レスキューの小さな練習タスク群を返します。
+  各 task には `problem_type`、`wm_support`、`success_check` が付き、何を伸ばす問題かを明示します。
 
 ## `target_context`
 
