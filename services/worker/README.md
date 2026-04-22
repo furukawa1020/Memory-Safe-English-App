@@ -164,6 +164,21 @@ chunking と summary は JSON 形式の制約付き prompt で生成します。
 pip install .[transformer]
 ```
 
+## 学習データ作成
+
+公開データセットを使って、WM 特化の学習データを作る流れも用意しています。
+
+1. `training/import_public_corpora.py`
+   SQuAD v2 や CommonLit CLEAR を canonical corpus JSONL に変換します。
+2. `training/build_wm_training_corpus.py`
+   canonical corpus から `chunking / summary / reader_plan / listening_plan / speaking_plan / rescue_plan / practice_set` の raw training JSONL を作ります。
+3. `training/prepare_seq2seq_data.py`
+   prompt / target 形式へ整形します。
+4. `training/train_seq2seq_lora.py`
+   LoRA 学習を回します。
+
+詳細は [training/README.md](./training/README.md) を見てください。
+
 ## 起動
 
 ```bash

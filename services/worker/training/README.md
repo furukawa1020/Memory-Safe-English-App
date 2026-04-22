@@ -1,102 +1,129 @@
-# Worker 学習基盤
+# Training ワークフロー
 
-このディレクトリは、worker の `chunking / summary / practice-set` 系を自分で fine-tune するための土台です。
+このディレクトリは、worker の `chunking / summary / reader_plan / listening_plan / speaking_plan / rescue_plan / practice_set` を fine-tune したり、教師データを整形したりするための場所です。
 
-## 推奨モデル
+## 方針
 
-今の worker 構成に最もつなぎやすい標準モデルは `google/flan-t5-large` です。
+- まずは `公開データセット` を土台に使う
+- その上に `ワーキングメモリ弱めの学習者向けラベル` を重ねる
+- 雑な自動 augmentation を主力にしない
+- `speaking_plan` は `opener_only / short_unit / two_step_link` を特に重視する
 
-- `google/flan-t5-large`
-  まず最初に試す標準候補
-- `google/flan-t5-xl`
-  さらに強いが、学習コストも上がる
-- `Qwen/Qwen2.5-7B-Instruct`
-  かなり強いが、worker 側を causal LM 前提に寄せる追加改修が必要
+## 使うデータの考え方
 
-## データ形式
+### 1. 土台データ
 
-学習元データは JSONL を想定しています。
+- `SQuAD v2`
+  - 読解 passage と QA の土台
+  - 公式配布は CC BY-SA 4.0
+- `CommonLit CLEAR`
+  - 難度つきの reading passage
+  - 行ごとに license を確認する必要あり
+
+TOEIC そのものの問題文は著作権・利用条件の制約が強いため、ここでは `TOEIC 風の難度帯` を公開データから再構成する前提にしています。
+
+### 2. WM 特化ラベル
+
+- `sentence_integration`
+- `audio_tracking`
+- `sentence_holding`
+- `overload_recovery`
+
+### 3. 問題タイプ
+
+- `core_lock`
+- `support_attach`
+- `pause_recall`
+- `meaning_hold`
+- `opener_only`
+- `short_unit`
+- `two_step_link`
+- `rescue_phrase`
+
+## 公開コーパスの取り込み
+
+公開データセットを canonical corpus JSONL へ変換します。
+
+### SQuAD v2
+
+```bash
+python training/import_public_corpora.py squad ^
+  --input data/train-v2.0.json ^
+  --output training/artifacts/squad_corpus.jsonl ^
+  --target-context general
+```
+
+### CommonLit CLEAR
+
+```bash
+python training/import_public_corpora.py clear ^
+  --input data/CLEARCorpus.csv ^
+  --output training/artifacts/clear_corpus.jsonl ^
+  --target-context general
+```
+
+既定では `open license` と判定できる行だけを取り込みます。制限付きライセンスも含めたい場合だけ `--include-restricted-license` を付けてください。
+
+## WM 特化の raw training JSONL 生成
+
+canonical corpus JSONL から worker の teacher output を使って raw training JSONL を作ります。
+
+```bash
+python training/build_wm_training_corpus.py ^
+  --input training/artifacts/squad_corpus.jsonl ^
+  --output training/artifacts/squad_wm_raw.jsonl ^
+  --tasks chunking,summary,reader_plan,listening_plan,speaking_plan,rescue_plan,practice_set
+```
+
+この段階で、各レコードは次のような形になります。
 
 ```json
 {
-  "task": "chunking",
+  "task": "speaking_plan",
   "text": "In this study, we propose a memory safe interface that reduces overload during reading.",
   "language": "en",
-  "target_context": "research",
+  "target_context": "general",
+  "learner_profile": "working_memory_low",
+  "difficulty_focus": "sentence_holding",
+  "problem_types": ["opener_only", "short_unit", "two_step_link"],
+  "source_record_id": "squad-1-1",
+  "source": "squad_v2",
+  "difficulty_band": "intermediate",
   "output": {
-    "segments": [
-      "In this study, we propose a",
-      "memory safe interface",
-      "that reduces overload during reading."
-    ]
+    "summary": "In this study, we propose a / that reduces overload during reading",
+    "recommended_style": "short-linked-sentences",
+    "opener_options": ["In this study: In this study, we propose a memory safe interface."],
+    "bridge_phrases": ["First,", "Next,", "Also,", "The main point is,"],
+    "steps": [
+      {"step": 1, "text": "In this study, we propose a.", "purpose": "opener", "risk_level": "low", "delivery_tip_ja": "...", "delivery_tip_en": "..."}
+    ],
+    "rescue_phrases": ["Let me say that in a shorter way."]
   }
 }
 ```
 
-`task` は次を想定しています。
-
-- `chunking`
-- `summary`
-- `reader_plan`
-- `listening_plan`
-- `speaking_plan`
-- `rescue_plan`
-
-まずは `chunking` と `summary` から始めるのが安全です。
-その次に伸びやすいのは `speaking_plan` です。
-特に次の 3 タイプは、ワーキングメモリ弱者向けに効きやすいです。
-
-- `opener_only`
-  最初の 1 文だけを先に出せるようにする
-- `short_unit`
-  長文を 1 呼吸で言える単位に分ける
-- `two_step_link`
-  2 つの短文を簡単な橋渡しでつなぐ
-
-## 手順
-
-1. optional dependency を入れる
-
-```bash
-pip install .[training]
-```
-
-2. JSONL を学習用 prompt/target 形式に変換する
+## 学習用 prompt/target へ整形
 
 ```bash
 python training/prepare_seq2seq_data.py ^
-  --input data/train_raw.jsonl ^
-  --output data/train_prepared.jsonl
+  --input training/artifacts/squad_wm_raw.jsonl ^
+  --output training/artifacts/squad_wm_prepared.jsonl
 ```
 
-リポジトリには最小サンプルとして次を置いています。
-
-- `training/sample_train_raw.jsonl`
-- `training/sample_eval_raw.jsonl`
-
-3. LoRA で学習する
+## LoRA 学習
 
 ```bash
+pip install .[training]
+
 python training/train_seq2seq_lora.py ^
-  --train-file data/train_prepared.jsonl ^
-  --eval-file data/eval_prepared.jsonl ^
+  --train-file training/artifacts/squad_wm_prepared.jsonl ^
+  --eval-file training/artifacts/sample_eval_prepared.jsonl ^
   --model-name google/flan-t5-large ^
   --output-dir checkpoints/flan-t5-large-lora
 ```
 
-4. 学習済み adapter を worker の transformer backend で使う
+## 補足
 
-```powershell
-$env:WORKER_NLP_BACKEND='transformer'
-$env:WORKER_TRANSFORMER_MODEL='checkpoints/flan-t5-large-lora'
-python -m app.server
-```
-
-## 学習方針
-
-- 最初は `chunking` と `summary` に絞る
-- 次に `speaking_plan` の `opener_only / short_unit / two_step_link` を増やす
-- JSON 以外の自由文を target に混ぜすぎない
-- 1 サンプル 1 意図にする
-- `research / meeting / self_intro / daily` を混ぜて context 一般化を作る
-- validation では JSON parse 成功率と、期待キーの一致率も見る
+- `sample_train_raw.jsonl` と `sample_eval_raw.jsonl` は最小の手元検証用です
+- `generated_speaking_1000.jsonl` のようなテンプレート大量生成は、補助データとしては使えますが主力教師データには向きません
+- 実用優先なら `公開コーパス + 高品質の WM 特化ラベル` を主軸にしてください
