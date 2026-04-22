@@ -40,13 +40,16 @@ Android だけ先に整える場合:
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap-mobile.ps1 `
   -AndroidOnly `
+  -SkipPubGet `
   -FlutterPath "C:\Users\hatake\Downloads\flutter_windows_3.38.5-stable\flutter\packages\flutter_tools\gradle\build\classes\kotlin\main\com\flutter"
 ```
 
 これで次を実行します。
 
 - `flutter create . --platforms android`
-- `flutter pub get`
+- 必要なら `flutter pub get`
+
+初回の Flutter 環境によっては `pub get` がかなり時間がかかるので、まず platform 生成だけ先に通したいときは `-SkipPubGet` を付けると切り分けしやすいです。
 
 ## エミュレーター起動
 

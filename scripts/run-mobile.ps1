@@ -4,7 +4,8 @@ param(
     [switch]$StartEmulator,
     [string]$AvdName,
     [string]$FlutterPath,
-    [string]$AndroidSdkRoot
+    [string]$AndroidSdkRoot,
+    [switch]$SkipPubGet
 )
 
 $ErrorActionPreference = "Stop"
@@ -35,7 +36,7 @@ Push-Location $mobileRoot
 try {
     if (-not (Test-Path ".\android")) {
         Write-Host "Android platform files are missing. Running bootstrap first..."
-        & $bootstrapScript -ApiBaseUrl $ApiBaseUrl -AndroidOnly -FlutterPath $FlutterPath
+        & $bootstrapScript -ApiBaseUrl $ApiBaseUrl -AndroidOnly -FlutterPath $FlutterPath -AndroidSdkRoot $AndroidSdkRoot -SkipPubGet:$SkipPubGet
         if ($LASTEXITCODE -ne 0) {
             throw "Mobile bootstrap failed."
         }
@@ -53,7 +54,7 @@ try {
     }
 
     Write-Host "Running Flutter app against $ApiBaseUrl"
-    & $flutterExecutable run "--dart-define=API_BASE_URL=$ApiBaseUrl"
+    Invoke-FlutterCommand -FlutterExecutable $flutterExecutable -AndroidSdkRoot $AndroidSdkRoot -Arguments @("run", "--dart-define=API_BASE_URL=$ApiBaseUrl")
     if ($LASTEXITCODE -ne 0) {
         throw "flutter run failed."
     }

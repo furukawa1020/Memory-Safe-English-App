@@ -1,7 +1,9 @@
 param(
     [string]$ApiBaseUrl = "http://10.0.2.2:8070",
     [switch]$AndroidOnly,
-    [string]$FlutterPath
+    [string]$FlutterPath,
+    [string]$AndroidSdkRoot,
+    [switch]$SkipPubGet
 )
 
 $ErrorActionPreference = "Stop"
@@ -21,11 +23,13 @@ try {
 
     if (-not (Test-Path ".\\android")) {
         Write-Host "Creating Flutter platform scaffolding..."
-        & $flutterExecutable create . --platforms $platforms
+        Invoke-FlutterCommand -FlutterExecutable $flutterExecutable -AndroidSdkRoot $AndroidSdkRoot -Arguments @("create", ".", "--platforms", $platforms)
     }
 
-    Write-Host "Fetching Flutter dependencies..."
-    & $flutterExecutable pub get
+    if (-not $SkipPubGet) {
+        Write-Host "Fetching Flutter dependencies..."
+        Invoke-FlutterCommand -FlutterExecutable $flutterExecutable -AndroidSdkRoot $AndroidSdkRoot -Arguments @("pub", "get")
+    }
 
     Write-Host ""
     Write-Host "Next step:"

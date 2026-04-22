@@ -50,6 +50,8 @@ $flutterDetails = if ($flutterInstalled) {
 $results.Add((Get-CheckResult -Name "flutter_sdk" -Passed $flutterInstalled -Details $flutterDetails))
 
 $resolvedAndroidSdkRoot = Resolve-AndroidSdkRoot -AndroidSdkRoot $AndroidSdkRoot
+$androidSdkDetails = if ($resolvedAndroidSdkRoot) { "Android SDK root resolved to $resolvedAndroidSdkRoot" } else { "Android SDK root could not be resolved automatically." }
+$results.Add((Get-CheckResult -Name "android_sdk_root" -Passed (-not [string]::IsNullOrWhiteSpace($resolvedAndroidSdkRoot)) -Details $androidSdkDetails))
 $adbExecutable = Resolve-AdbExecutable -AndroidSdkRoot $resolvedAndroidSdkRoot
 $adbInstalled = -not [string]::IsNullOrWhiteSpace($adbExecutable)
 $adbDetails = if ($adbInstalled) { "Android Debug Bridge found: $adbExecutable" } else { "Install Android platform tools or Android Studio, or pass -AndroidSdkRoot." }

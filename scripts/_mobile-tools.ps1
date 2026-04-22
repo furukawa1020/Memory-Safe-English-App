@@ -29,6 +29,31 @@ function Resolve-FlutterExecutable {
     return $null
 }
 
+function Get-DefaultAndroidSdkRoots {
+    $candidates = New-Object System.Collections.Generic.List[string]
+
+    if ($env:LOCALAPPDATA) {
+        $candidates.Add((Join-Path $env:LOCALAPPDATA "Android\Sdk"))
+    }
+    if ($env:USERPROFILE) {
+        $candidates.Add((Join-Path $env:USERPROFILE "AppData\Local\Android\Sdk"))
+        $candidates.Add((Join-Path $env:USERPROFILE "Android\Sdk"))
+    }
+
+    $resolved = New-Object System.Collections.Generic.List[string]
+    foreach ($candidate in $candidates) {
+        try {
+            if (Test-Path $candidate) {
+                $resolved.Add($candidate)
+            }
+        } catch {
+            continue
+        }
+    }
+
+    return @($resolved | Select-Object -Unique)
+}
+
 function Resolve-FlutterCandidate {
     param(
         [string]$Candidate
@@ -114,6 +139,9 @@ function Resolve-AndroidSdkRoot {
     if ($env:ANDROID_HOME -and (Test-Path $env:ANDROID_HOME)) {
         return (Get-Item $env:ANDROID_HOME).FullName
     }
+    foreach ($candidate in Get-DefaultAndroidSdkRoots) {
+        return (Get-Item $candidate).FullName
+    }
     return $null
 }
 
@@ -161,4 +189,32 @@ function Resolve-EmulatorExecutable {
     }
 
     return $null
+}
+
+function Invoke-FlutterCommand {
+    param(
+        [string]$FlutterExecutable,
+        [string[]]$Arguments,
+        [string]$AndroidSdkRoot
+    )
+
+    if ([string]::IsNullOrWhiteSpace($FlutterExecutable)) {
+        throw "Flutter executable is required."
+    }
+
+    $resolvedAndroidSdkRoot = Resolve-AndroidSdkRoot -AndroidSdkRoot $AndroidSdkRoot
+
+    if ($resolvedAndroidSdkRoot) {
+        $env:ANDROID_SDK_ROOT = $resolvedAndroidSdkRoot
+        if (-not $env:ANDROID_HOME) {
+            $env:ANDROID_HOME = $resolvedAndroidSdkRoot
+        }
+    }
+
+    if (-not $env:CI) {
+        $env:CI = "true"
+    }
+
+    $finalArguments = @("--suppress-analytics") + $Arguments
+    & $FlutterExecutable @finalArguments
 }
