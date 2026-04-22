@@ -1,13 +1,15 @@
 param(
     [string]$ApiBaseUrl = "http://10.0.2.2:8070",
-    [switch]$AndroidOnly
+    [switch]$AndroidOnly,
+    [string]$FlutterPath
 )
 
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "_mobile-tools.ps1")
 
-$flutter = Get-Command flutter -ErrorAction SilentlyContinue
-if (-not $flutter) {
-    throw "Flutter SDK was not found in PATH. Install Flutter first, then rerun this script."
+$flutterExecutable = Resolve-FlutterExecutable -FlutterPath $FlutterPath
+if (-not $flutterExecutable) {
+    throw "Flutter SDK was not found. Add it to PATH or pass -FlutterPath."
 }
 
 $mobileRoot = Join-Path $PSScriptRoot "..\\apps\\mobile"
@@ -19,15 +21,15 @@ try {
 
     if (-not (Test-Path ".\\android")) {
         Write-Host "Creating Flutter platform scaffolding..."
-        flutter create . --platforms $platforms
+        & $flutterExecutable create . --platforms $platforms
     }
 
     Write-Host "Fetching Flutter dependencies..."
-    flutter pub get
+    & $flutterExecutable pub get
 
     Write-Host ""
     Write-Host "Next step:"
-    Write-Host "flutter run --dart-define=API_BASE_URL=$ApiBaseUrl"
+    Write-Host "$flutterExecutable run --dart-define=API_BASE_URL=$ApiBaseUrl"
 } finally {
     Pop-Location
 }

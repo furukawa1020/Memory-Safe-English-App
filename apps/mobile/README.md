@@ -2,96 +2,106 @@
 
 `apps/mobile` は Memory Safe English の Flutter クライアントです。
 
-現時点のモバイル実装は、主に次を対象にしています。
+このアプリは、英語をそのまま大量に見せるのではなく、ワーキングメモリ負荷を下げる表示と導線を優先しています。
 
-- メールアドレスとパスワードによる認証
-- コンテンツ一覧表示
-- `Normal` `Chunk` `Skeleton` `Assisted` の Reader モード
-- 自由入力テキストの chunk 分析
+## 今できること
 
-## 構成
+- メール認証ベースのログイン導線
+- コンテンツ一覧と Reader 画面
+- `Normal / Chunk / Skeleton / Assisted` の切り替え
+- `reader-plan` を使った focus step 表示
+- `listening-plan` と `speaking-plan` の分析表示
+- proxy の `/bootstrap/mobile` と `/ready` を使った起動確認
 
-```text
-apps/mobile
-|- lib/
-|  |- app/
-|  |- config/
-|  |- core/
-|  `- features/
-|- analysis_options.yaml
-|- pubspec.yaml
-`- README.md
-```
+## 前提
 
-## 前提条件
+- Flutter SDK が使えること
+- Android SDK と emulator / adb が使えること
+- backend stack が `http://127.0.0.1:8070` の Rust proxy 経由で起動していること
 
-- Flutter SDK が `PATH` に入っていること
-- Android Studio などで Android エミュレーターが使えること
-- バックエンドスタックが `http://127.0.0.1:8070` の Rust proxy 経由で起動していること
-
-確認には、リポジトリルートから次を使えます。
+Flutter が `PATH` に無くても、スクリプトへ `-FlutterPath` を渡せます。
+深いパスでも大丈夫で、たとえば次のような指定から自動で SDK root を解決します。
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\dev-doctor.ps1
+-FlutterPath "C:\Users\hatake\Downloads\flutter_windows_3.38.5-stable\flutter\packages\flutter_tools\gradle\build\classes\kotlin\main\com\flutter"
+```
+
+## まず確認
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\dev-doctor.ps1 `
+  -FlutterPath "C:\Users\hatake\Downloads\flutter_windows_3.38.5-stable\flutter\packages\flutter_tools\gradle\build\classes\kotlin\main\com\flutter"
 ```
 
 ## bootstrap
 
-リポジトリルートから次を実行します。
+Android だけ先に整える場合:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap-mobile.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap-mobile.ps1 `
+  -AndroidOnly `
+  -FlutterPath "C:\Users\hatake\Downloads\flutter_windows_3.38.5-stable\flutter\packages\flutter_tools\gradle\build\classes\kotlin\main\com\flutter"
 ```
 
-このスクリプトは次を行います。
+これで次を実行します。
 
-- Flutter の存在確認
-- `flutter create .` による platform ファイル生成
+- `flutter create . --platforms android`
 - `flutter pub get`
 
-Android だけ必要なら:
+## エミュレーター起動
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap-mobile.ps1 -AndroidOnly
+powershell -ExecutionPolicy Bypass -File .\scripts\start-android-emulator.ps1
 ```
 
-## 実行
+Android SDK が `PATH` に無い場合は `-AndroidSdkRoot` を渡せます。
 
-Android エミュレーター向けに手動で起動する場合:
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\start-android-emulator.ps1 `
+  -AndroidSdkRoot "C:\Users\hatake\AppData\Local\Android\Sdk"
+```
+
+## アプリ起動
+
+最小の実行コマンド:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run-mobile.ps1 `
+  -FlutterPath "C:\Users\hatake\Downloads\flutter_windows_3.38.5-stable\flutter\packages\flutter_tools\gradle\build\classes\kotlin\main\com\flutter"
+```
+
+backend と emulator もまとめて起動したい場合:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run-mobile.ps1 `
+  -StartStack `
+  -StartEmulator `
+  -FlutterPath "C:\Users\hatake\Downloads\flutter_windows_3.38.5-stable\flutter\packages\flutter_tools\gradle\build\classes\kotlin\main\com\flutter"
+```
+
+内部では次と同等です。
 
 ```bash
 flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8070
 ```
 
-`10.0.2.2` はエミュレーターからホストへ戻るためのアドレスで、`8070` は Rust proxy を指します。
+`10.0.2.2` は Android emulator からホスト PC へ戻るためのアドレスです。
 
-## 補助スクリプト
+## 主な接続先
 
-リポジトリルートから、次の補助スクリプトも使えます。
+mobile は Go API を直接叩かず、Rust proxy を入口に使います。
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\start-android-emulator.ps1
-powershell -ExecutionPolicy Bypass -File .\scripts\run-mobile.ps1 -StartEmulator
-```
-
-`run-mobile.ps1` は必要に応じて bootstrap を先に行い、その後 `flutter run` を実行します。
-
-## 接続先
-
-Flutter クライアントは、Go API を直接ではなく Rust proxy に向けます。
-
-主に使う route:
-
+- `/ready`
+- `/bootstrap/mobile`
 - `/auth/login`
 - `/auth/refresh`
 - `/contents`
 - `/analysis/chunks`
-- `/ready`
-- `/bootstrap/mobile`
+- `/analysis/reader-plan`
+- `/analysis/listening-plan`
+- `/analysis/speaking-plan`
 
-起動時には `/bootstrap/mobile` を読んで readiness を確認し、認証済みなら `/auth/refresh` も使って access token を更新します。
+## 補足
 
-## 注意
-
-- `android/` や `ios/` は、`flutter create .` 実行前は存在しません
-- ローカル開発では proxy 経由にしておくと、readiness と認証まわりの挙動がアプリと揃います
+- `android/` が無い場合でも `bootstrap-mobile.ps1` が自動で生成できます
+- 起動前に `dev-doctor.ps1` を通すと、足りないのが `Docker / Flutter / adb / emulator / AVD` のどれかすぐ分かります

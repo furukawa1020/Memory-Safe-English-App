@@ -1,60 +1,14 @@
 param(
     [string]$AvdName,
-    [int]$BootTimeoutSeconds = 180
+    [int]$BootTimeoutSeconds = 180,
+    [string]$AndroidSdkRoot
 )
 
 $ErrorActionPreference = "Stop"
 if (Test-Path variable:PSNativeCommandUseErrorActionPreference) {
     $PSNativeCommandUseErrorActionPreference = $false
 }
-
-function Get-AndroidSdkRoot {
-    if ($env:ANDROID_SDK_ROOT) {
-        return $env:ANDROID_SDK_ROOT
-    }
-    if ($env:ANDROID_HOME) {
-        return $env:ANDROID_HOME
-    }
-    return $null
-}
-
-function Get-EmulatorCommand {
-    $command = Get-Command emulator -ErrorAction SilentlyContinue
-    if ($command) {
-        return $command.Source
-    }
-
-    $sdkRoot = Get-AndroidSdkRoot
-    if (-not $sdkRoot) {
-        return $null
-    }
-
-    $candidate = Join-Path $sdkRoot "emulator\emulator.exe"
-    if (Test-Path $candidate) {
-        return $candidate
-    }
-
-    return $null
-}
-
-function Get-AdbCommand {
-    $command = Get-Command adb -ErrorAction SilentlyContinue
-    if ($command) {
-        return $command.Source
-    }
-
-    $sdkRoot = Get-AndroidSdkRoot
-    if (-not $sdkRoot) {
-        return $null
-    }
-
-    $candidate = Join-Path $sdkRoot "platform-tools\adb.exe"
-    if (Test-Path $candidate) {
-        return $candidate
-    }
-
-    return $null
-}
+. (Join-Path $PSScriptRoot "_mobile-tools.ps1")
 
 function Get-AvailableAvds {
     param([string]$EmulatorPath)
@@ -86,12 +40,12 @@ function Wait-ForEmulatorBoot {
     throw "Timed out while waiting for the Android emulator to finish booting."
 }
 
-$emulatorPath = Get-EmulatorCommand
+$emulatorPath = Resolve-EmulatorExecutable -AndroidSdkRoot $AndroidSdkRoot
 if (-not $emulatorPath) {
     throw "Android emulator command was not found. Install Android Studio or Android SDK emulator tools first."
 }
 
-$adbPath = Get-AdbCommand
+$adbPath = Resolve-AdbExecutable -AndroidSdkRoot $AndroidSdkRoot
 if (-not $adbPath) {
     throw "adb was not found. Install Android platform tools first."
 }

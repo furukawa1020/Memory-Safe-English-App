@@ -1,5 +1,7 @@
 param(
-    [string]$ProxyBaseUrl = "http://127.0.0.1:8070"
+    [string]$ProxyBaseUrl = "http://127.0.0.1:8070",
+    [string]$FlutterPath,
+    [string]$AndroidSdkRoot
 )
 
 $ErrorActionPreference = "Stop"
@@ -7,10 +9,7 @@ if (Test-Path variable:PSNativeCommandUseErrorActionPreference) {
     $PSNativeCommandUseErrorActionPreference = $false
 }
 
-function Test-CommandAvailable {
-    param([string]$CommandName)
-    [bool](Get-Command $CommandName -ErrorAction SilentlyContinue)
-}
+. (Join-Path $PSScriptRoot "_mobile-tools.ps1")
 
 function Get-CheckResult {
     param(
@@ -26,38 +25,9 @@ function Get-CheckResult {
     }
 }
 
-function Get-AndroidSdkRoot {
-    if ($env:ANDROID_SDK_ROOT) {
-        return $env:ANDROID_SDK_ROOT
-    }
-    if ($env:ANDROID_HOME) {
-        return $env:ANDROID_HOME
-    }
-    return $null
-}
-
-function Get-EmulatorExecutable {
-    $command = Get-Command emulator -ErrorAction SilentlyContinue
-    if ($command) {
-        return $command.Source
-    }
-
-    $sdkRoot = Get-AndroidSdkRoot
-    if (-not $sdkRoot) {
-        return $null
-    }
-
-    $candidate = Join-Path $sdkRoot "emulator\emulator.exe"
-    if (Test-Path $candidate) {
-        return $candidate
-    }
-
-    return $null
-}
-
 $results = New-Object System.Collections.Generic.List[object]
 
-$dockerInstalled = Test-CommandAvailable -CommandName "docker"
+$dockerInstalled = [bool](Get-Command docker -ErrorAction SilentlyContinue)
 $dockerCliDetails = if ($dockerInstalled) { "Docker CLI found in PATH." } else { "Install Docker Desktop or Docker CLI." }
 $results.Add((Get-CheckResult -Name "docker_cli" -Passed $dockerInstalled -Details $dockerCliDetails))
 
@@ -69,18 +39,30 @@ if ($dockerInstalled) {
 $dockerDaemonDetails = if ($dockerDaemonReady) { "Docker daemon is reachable." } else { "Start Docker Desktop or the Docker service." }
 $results.Add((Get-CheckResult -Name "docker_daemon" -Passed $dockerDaemonReady -Details $dockerDaemonDetails))
 
-$flutterInstalled = Test-CommandAvailable -CommandName "flutter"
-$flutterDetails = if ($flutterInstalled) { "Flutter SDK found in PATH." } else { "Install Flutter and add it to PATH." }
+$flutterExecutable = Resolve-FlutterExecutable -FlutterPath $FlutterPath
+$flutterInstalled = -not [string]::IsNullOrWhiteSpace($flutterExecutable)
+$flutterRoot = Resolve-FlutterRoot -FlutterExecutable $flutterExecutable
+$flutterDetails = if ($flutterInstalled) {
+    "Flutter SDK found: $flutterExecutable"
+} else {
+    "Install Flutter, add it to PATH, or pass -FlutterPath."
+}
 $results.Add((Get-CheckResult -Name "flutter_sdk" -Passed $flutterInstalled -Details $flutterDetails))
 
-$adbInstalled = Test-CommandAvailable -CommandName "adb"
-$adbDetails = if ($adbInstalled) { "Android Debug Bridge found in PATH." } else { "Install Android platform tools or Android Studio." }
+$resolvedAndroidSdkRoot = Resolve-AndroidSdkRoot -AndroidSdkRoot $AndroidSdkRoot
+$adbExecutable = Resolve-AdbExecutable -AndroidSdkRoot $resolvedAndroidSdkRoot
+$adbInstalled = -not [string]::IsNullOrWhiteSpace($adbExecutable)
+$adbDetails = if ($adbInstalled) { "Android Debug Bridge found: $adbExecutable" } else { "Install Android platform tools or Android Studio, or pass -AndroidSdkRoot." }
 $results.Add((Get-CheckResult -Name "adb" -Passed $adbInstalled -Details $adbDetails))
 
-$emulatorExecutable = Get-EmulatorExecutable
+$emulatorExecutable = Resolve-EmulatorExecutable -AndroidSdkRoot $resolvedAndroidSdkRoot
 $emulatorInstalled = -not [string]::IsNullOrWhiteSpace($emulatorExecutable)
-$emulatorDetails = if ($emulatorInstalled) { "Android emulator command was found." } else { "Install Android emulator tools or Android Studio." }
+$emulatorDetails = if ($emulatorInstalled) { "Android emulator command was found: $emulatorExecutable" } else { "Install Android emulator tools or Android Studio, or pass -AndroidSdkRoot." }
 $results.Add((Get-CheckResult -Name "android_emulator" -Passed $emulatorInstalled -Details $emulatorDetails))
+
+if ($flutterInstalled -and $flutterRoot) {
+    $results.Add((Get-CheckResult -Name "flutter_root" -Passed $true -Details "Flutter root resolved to $flutterRoot"))
+}
 
 $avdAvailable = $false
 $avdDetails = "No Android Virtual Device found."
