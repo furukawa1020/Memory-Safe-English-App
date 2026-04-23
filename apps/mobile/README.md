@@ -26,6 +26,16 @@ Flutter が `PATH` に無くても、スクリプトへ `-FlutterPath` を渡せ
 -FlutterPath "C:\Users\hatake\Downloads\flutter_windows_3.38.5-stable\flutter\packages\flutter_tools\gradle\build\classes\kotlin\main\com\flutter"
 ```
 
+毎回長いパスを渡したくない場合は、一度だけ保存できます。
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\save-mobile-config.ps1 `
+  -FlutterPath "C:\Users\hatake\Downloads\flutter_windows_3.38.5-stable\flutter\packages\flutter_tools\gradle\build\classes\kotlin\main\com\flutter" `
+  -AndroidSdkRoot "C:\Users\hatake\AppData\Local\Android\Sdk"
+```
+
+これで以後は `-FlutterPath` や `-AndroidSdkRoot` を省略できます。
+
 ## まず確認
 
 ```powershell
