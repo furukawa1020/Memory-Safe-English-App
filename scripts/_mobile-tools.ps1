@@ -1,3 +1,39 @@
+function Get-MobileConfigPath {
+    $repoRoot = Split-Path $PSScriptRoot -Parent
+    return Join-Path $repoRoot ".mobile-local.json"
+}
+
+function Read-MobileConfig {
+    $configPath = Get-MobileConfigPath
+    if (-not (Test-Path $configPath)) {
+        return @{}
+    }
+
+    try {
+        $raw = Get-Content $configPath -Raw -Encoding UTF8
+        $parsed = $raw | ConvertFrom-Json -AsHashtable
+        if ($parsed) {
+            return $parsed
+        }
+    } catch {
+        return @{}
+    }
+
+    return @{}
+}
+
+function Get-MobileConfigValue {
+    param(
+        [string]$Key
+    )
+
+    $config = Read-MobileConfig
+    if ($config.ContainsKey($Key) -and -not [string]::IsNullOrWhiteSpace([string]$config[$Key])) {
+        return [string]$config[$Key]
+    }
+    return $null
+}
+
 function Resolve-FlutterExecutable {
     param(
         [string]$FlutterPath
@@ -6,6 +42,10 @@ function Resolve-FlutterExecutable {
     $candidates = @()
     if (-not [string]::IsNullOrWhiteSpace($FlutterPath)) {
         $candidates += $FlutterPath
+    }
+    $configFlutterPath = Get-MobileConfigValue -Key "flutter_path"
+    if ($configFlutterPath) {
+        $candidates += $configFlutterPath
     }
     if ($env:FLUTTER_BIN) {
         $candidates += $env:FLUTTER_BIN
@@ -132,6 +172,10 @@ function Resolve-AndroidSdkRoot {
 
     if (-not [string]::IsNullOrWhiteSpace($AndroidSdkRoot) -and (Test-Path $AndroidSdkRoot)) {
         return (Get-Item $AndroidSdkRoot).FullName
+    }
+    $configAndroidSdkRoot = Get-MobileConfigValue -Key "android_sdk_root"
+    if ($configAndroidSdkRoot -and (Test-Path $configAndroidSdkRoot)) {
+        return (Get-Item $configAndroidSdkRoot).FullName
     }
     if ($env:ANDROID_SDK_ROOT -and (Test-Path $env:ANDROID_SDK_ROOT)) {
         return (Get-Item $env:ANDROID_SDK_ROOT).FullName
