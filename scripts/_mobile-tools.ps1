@@ -48,9 +48,13 @@ function Read-MobileConfig {
 
     try {
         $raw = Get-Content $configPath -Raw -Encoding UTF8
-        $parsed = $raw | ConvertFrom-Json -AsHashtable
+        $parsed = $raw | ConvertFrom-Json
         if ($parsed) {
-            return $parsed
+            $config = @{}
+            foreach ($property in $parsed.PSObject.Properties) {
+                $config[$property.Name] = [string]$property.Value
+            }
+            return $config
         }
     } catch {
         return @{}
@@ -267,6 +271,11 @@ function Resolve-EmulatorExecutable {
     $candidate = Join-Path $sdkRoot "emulator\emulator.exe"
     if (Test-Path $candidate) {
         return $candidate
+    }
+
+    $legacyCandidate = Join-Path $sdkRoot "tools\emulator.exe"
+    if (Test-Path $legacyCandidate) {
+        return $legacyCandidate
     }
 
     return $null
