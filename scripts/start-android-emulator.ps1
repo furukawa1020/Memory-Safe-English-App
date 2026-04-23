@@ -57,6 +57,9 @@ if (-not $availableAvds -or $availableAvds.Count -eq 0) {
 
 $selectedAvd = $AvdName
 if (-not $selectedAvd) {
+    $selectedAvd = Get-MobileConfigValue -Key "avd_name"
+}
+if (-not $selectedAvd) {
     if ($availableAvds.Count -eq 1) {
         $selectedAvd = $availableAvds[0]
     } else {
