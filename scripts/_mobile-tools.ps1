@@ -1,5 +1,42 @@
+function Resolve-RepoRoot {
+    $candidates = @()
+    if ($env:MEMORY_SAFE_ENGLISH_ROOT) {
+        $candidates += $env:MEMORY_SAFE_ENGLISH_ROOT
+    }
+    try {
+        $candidates += (Get-Location).Path
+    } catch {
+    }
+    $candidates += (Split-Path $PSScriptRoot -Parent)
+
+    foreach ($candidate in $candidates) {
+        if ([string]::IsNullOrWhiteSpace($candidate)) {
+            continue
+        }
+
+        $current = $candidate
+        for ($i = 0; $i -lt 6; $i++) {
+            if (
+                (Test-Path (Join-Path $current "scripts")) -and
+                (Test-Path (Join-Path $current "apps")) -and
+                (Test-Path (Join-Path $current "services"))
+            ) {
+                return (Get-Item $current).FullName
+            }
+
+            $parent = Split-Path $current -Parent
+            if ([string]::IsNullOrWhiteSpace($parent) -or $parent -eq $current) {
+                break
+            }
+            $current = $parent
+        }
+    }
+
+    return (Split-Path $PSScriptRoot -Parent)
+}
+
 function Get-MobileConfigPath {
-    $repoRoot = Split-Path $PSScriptRoot -Parent
+    $repoRoot = Resolve-RepoRoot
     return Join-Path $repoRoot ".mobile-local.json"
 }
 
