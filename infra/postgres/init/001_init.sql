@@ -143,7 +143,7 @@ CREATE TABLE IF NOT EXISTS analytics_snapshots (
 );
 
 CREATE TABLE IF NOT EXISTS rescue_phrases (
-    id TEXT PRIMARY KEY,
+    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
     category TEXT NOT NULL,
     phrase_en TEXT NOT NULL,
     phrase_ja TEXT,
