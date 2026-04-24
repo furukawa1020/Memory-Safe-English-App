@@ -75,10 +75,21 @@ if ($emulatorInstalled) {
             $avdAvailable = $true
             $avdDetails = "Available AVDs: $($avdList -join ', ')"
         } else {
-            $avdDetails = "Android emulator is installed, but no AVD is configured."
+            $configuredAvdName = Get-MobileConfigValue -Key "avd_name"
+            if ($configuredAvdName) {
+                $avdDetails = "No AVD was listed directly, but mobile config points to '$configuredAvdName'."
+            } else {
+                $avdDetails = "Android emulator is installed, but no AVD is configured."
+            }
         }
     } catch {
-        $avdDetails = "Failed to query AVDs. Check Android SDK setup."
+        $configuredAvdName = Get-MobileConfigValue -Key "avd_name"
+        if ($configuredAvdName) {
+            $avdAvailable = $true
+            $avdDetails = "AVD query failed in this shell, but mobile config points to '$configuredAvdName'."
+        } else {
+            $avdDetails = "Failed to query AVDs. Check Android SDK setup."
+        }
     }
 }
 $results.Add((Get-CheckResult -Name "android_avd" -Passed $avdAvailable -Details $avdDetails))
