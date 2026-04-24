@@ -323,9 +323,13 @@ function Invoke-AndroidSdkManager {
 
     $startInfo = New-Object System.Diagnostics.ProcessStartInfo
     $startInfo.FileName = $sdkManager
-    foreach ($argument in $allArguments) {
-        [void]$startInfo.ArgumentList.Add($argument)
-    }
+    $startInfo.Arguments = ($allArguments | ForEach-Object {
+        if ($_ -match '\s') {
+            '"' + ($_ -replace '"', '\"') + '"'
+        } else {
+            $_
+        }
+    }) -join ' '
     $startInfo.UseShellExecute = $false
     $startInfo.RedirectStandardInput = $true
     $startInfo.RedirectStandardOutput = $true
