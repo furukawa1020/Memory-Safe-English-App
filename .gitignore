@@ -71,6 +71,7 @@ target/
 .env.*
 !.env.example
 .mobile-local.json
+.android-sdk/
 
 # Logs
 *.log
