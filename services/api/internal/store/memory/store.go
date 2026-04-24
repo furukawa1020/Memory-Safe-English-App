@@ -774,6 +774,7 @@ func (s *Store) seedContents() {
 			UpdatedAt:   now,
 		},
 	}
+	items = append(items, additionalSeedCatalog(now)...)
 	for _, item := range items {
 		s.contents[item.ID] = item
 	}
