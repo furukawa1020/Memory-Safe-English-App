@@ -37,6 +37,26 @@ VALUES
         'Short self introduction in stable short units'
     ),
     (
+        'cnt_self_intro_003',
+        'Self Introduction: Research Interest',
+        'reading',
+        'intro',
+        'self_intro',
+        'en',
+        'I am interested in how people understand difficult information when they feel tired or overloaded.',
+        'Interest statement with one clear idea'
+    ),
+    (
+        'cnt_self_intro_004',
+        'Self Introduction: Goal',
+        'speaking_template',
+        'intro',
+        'self_intro',
+        'en',
+        'My goal is simple. I want to explain my work clearly. I do not need long sentences.',
+        'Goal-focused self introduction in short units'
+    ),
+    (
         'cnt_daily_001',
         'Ordering Coffee',
         'reading',
@@ -55,6 +75,46 @@ VALUES
         'en',
         'The train is delayed by ten minutes. Please wait on platform three for the next announcement.',
         'Simple delay announcement with one action point'
+    ),
+    (
+        'cnt_daily_003',
+        'Asking for Directions',
+        'reading',
+        'intro',
+        'daily',
+        'en',
+        'Excuse me, is this the right way to the library, or should I turn left at the next corner?',
+        'Direction question with one contrast'
+    ),
+    (
+        'cnt_daily_004',
+        'Daily Listening: Payment Counter',
+        'listening',
+        'intro',
+        'daily',
+        'en',
+        'Please place your basket here, and pay at counter two when the light turns green.',
+        'Short instruction with two steps'
+    ),
+    (
+        'cnt_daily_005',
+        'Daily Speaking: Simple Request',
+        'speaking_template',
+        'intro',
+        'daily',
+        'en',
+        'I need help. This part is difficult. Could you explain the first step?',
+        'Simple request for help using short units'
+    ),
+    (
+        'cnt_daily_006',
+        'Daily Reading: Appointment Change',
+        'reading',
+        'intro',
+        'daily',
+        'en',
+        'I am sorry, but I need to move our appointment to tomorrow afternoon because I have a class this morning.',
+        'Appointment change with one reason'
     ),
     (
         'cnt_research_002',
@@ -87,6 +147,46 @@ VALUES
         'Three-step research explanation template'
     ),
     (
+        'cnt_research_005',
+        'Research Motivation',
+        'reading',
+        'intermediate',
+        'research',
+        'en',
+        'Many learners know the vocabulary, but they still lose the sentence when too many details arrive at the same time.',
+        'Problem statement for overload-sensitive learners'
+    ),
+    (
+        'cnt_research_006',
+        'Research Listening: Limitation',
+        'listening',
+        'intermediate',
+        'research',
+        'en',
+        'One limitation is that we tested short passages first, so we still need to evaluate longer academic texts.',
+        'Limitation with one future task'
+    ),
+    (
+        'cnt_research_007',
+        'Research Speaking: Main Claim',
+        'speaking_template',
+        'intermediate',
+        'research',
+        'en',
+        'The main claim is clear. Lower memory load helps comprehension. Our interface supports that process.',
+        'Short speaking template for claim delivery'
+    ),
+    (
+        'cnt_research_008',
+        'Research Reading: Future Work',
+        'reading',
+        'intermediate',
+        'research',
+        'en',
+        'In future work, we plan to personalize pause timing and display density for each learner profile.',
+        'Future work sentence with two targets'
+    ),
+    (
         'cnt_meeting_001',
         'Meeting Decision Summary',
         'reading',
@@ -107,6 +207,46 @@ VALUES
         'Short meeting instruction with one task'
     ),
     (
+        'cnt_meeting_003',
+        'Meeting Reading: Clarify Priority',
+        'reading',
+        'intermediate',
+        'meeting',
+        'en',
+        'Our first priority is stability, and we can discuss visual improvements after the release schedule is fixed.',
+        'Priority sentence with one deferment'
+    ),
+    (
+        'cnt_meeting_004',
+        'Meeting Listening: Schedule Change',
+        'listening',
+        'intermediate',
+        'meeting',
+        'en',
+        'The client moved the review to next Tuesday, so please send your comments by Monday evening.',
+        'Schedule update with one deadline'
+    ),
+    (
+        'cnt_meeting_005',
+        'Meeting Speaking: Report Status',
+        'speaking_template',
+        'intermediate',
+        'meeting',
+        'en',
+        'The status is simple. The core feature works. The remaining risk is test coverage.',
+        'Status update in three short units'
+    ),
+    (
+        'cnt_meeting_006',
+        'Meeting Reading: Action Owner',
+        'reading',
+        'intermediate',
+        'meeting',
+        'en',
+        'Mika will prepare the notes, and I will share the summary with the group after lunch.',
+        'Action ownership sentence with two people'
+    ),
+    (
         'cnt_rescue_001',
         'Rescue: Ask for the Main Point',
         'rescue',
@@ -125,5 +265,45 @@ VALUES
         'en',
         'Could you say that in a shorter way?',
         'Rescue phrase to reduce sentence length'
+    ),
+    (
+        'cnt_rescue_003',
+        'Rescue: Ask to Repeat Slowly',
+        'rescue',
+        'intro',
+        'rescue',
+        'en',
+        'Could you repeat that more slowly?',
+        'Rescue phrase for fast speech'
+    ),
+    (
+        'cnt_rescue_004',
+        'Rescue: Buy Time',
+        'rescue',
+        'intro',
+        'rescue',
+        'en',
+        'Please give me a moment to think.',
+        'Rescue phrase to create a short pause'
+    ),
+    (
+        'cnt_rescue_005',
+        'Rescue: Confirm Meaning',
+        'rescue',
+        'intro',
+        'rescue',
+        'en',
+        'Do you mean the deadline is tomorrow?',
+        'Rescue phrase to confirm one key meaning'
+    ),
+    (
+        'cnt_rescue_006',
+        'Rescue: Ask for One Step',
+        'rescue',
+        'intro',
+        'rescue',
+        'en',
+        'Can you show me the first step only?',
+        'Rescue phrase to reduce multi-step overload'
     )
 ON CONFLICT (id) DO NOTHING;
