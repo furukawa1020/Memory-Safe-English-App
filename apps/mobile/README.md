@@ -63,6 +63,13 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap-mobile.ps1 `
 
 ## エミュレーター起動
 
+system image や emulator package が足りない場合は、先にこれを実行できます。
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\install-android-emulator-deps.ps1 `
+  -AndroidSdkRoot "C:\Program Files\Unity\Hub\Editor\6000.0.66f2\Editor\Data\PlaybackEngines\AndroidPlayer\SDK"
+```
+
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\start-android-emulator.ps1
 ```

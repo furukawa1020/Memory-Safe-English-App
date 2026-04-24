@@ -281,6 +281,84 @@ function Resolve-EmulatorExecutable {
     return $null
 }
 
+function Resolve-SdkManagerExecutable {
+    param(
+        [string]$AndroidSdkRoot
+    )
+
+    $sdkRoot = Resolve-AndroidSdkRoot -AndroidSdkRoot $AndroidSdkRoot
+    if (-not $sdkRoot) {
+        return $null
+    }
+
+    $candidates = @(
+        (Join-Path $sdkRoot "cmdline-tools\latest\bin\sdkmanager.bat"),
+        (Join-Path $sdkRoot "cmdline-tools\16.0\bin\sdkmanager.bat"),
+        (Join-Path $sdkRoot "tools\bin\sdkmanager.bat")
+    )
+
+    foreach ($candidate in $candidates) {
+        if (Test-Path $candidate) {
+            return $candidate
+        }
+    }
+
+    return $null
+}
+
+function Invoke-AndroidSdkManager {
+    param(
+        [string]$AndroidSdkRoot,
+        [string[]]$Arguments,
+        [switch]$AutoAcceptLicenses
+    )
+
+    $sdkManager = Resolve-SdkManagerExecutable -AndroidSdkRoot $AndroidSdkRoot
+    if (-not $sdkManager) {
+        throw "sdkmanager.bat was not found in the Android SDK."
+    }
+
+    $resolvedAndroidSdkRoot = Resolve-AndroidSdkRoot -AndroidSdkRoot $AndroidSdkRoot
+    $allArguments = @("--sdk_root=$resolvedAndroidSdkRoot") + $Arguments
+
+    $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+    $startInfo.FileName = $sdkManager
+    foreach ($argument in $allArguments) {
+        [void]$startInfo.ArgumentList.Add($argument)
+    }
+    $startInfo.UseShellExecute = $false
+    $startInfo.RedirectStandardInput = $true
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+    $startInfo.CreateNoWindow = $true
+
+    $process = New-Object System.Diagnostics.Process
+    $process.StartInfo = $startInfo
+    [void]$process.Start()
+
+    if ($AutoAcceptLicenses) {
+        for ($i = 0; $i -lt 40; $i++) {
+            $process.StandardInput.WriteLine("y")
+        }
+    }
+    $process.StandardInput.Close()
+
+    $stdout = $process.StandardOutput.ReadToEnd()
+    $stderr = $process.StandardError.ReadToEnd()
+    $process.WaitForExit()
+
+    if (-not [string]::IsNullOrWhiteSpace($stdout)) {
+        Write-Host $stdout
+    }
+    if (-not [string]::IsNullOrWhiteSpace($stderr)) {
+        Write-Host $stderr
+    }
+
+    if ($process.ExitCode -ne 0) {
+        throw "sdkmanager failed with exit code $($process.ExitCode)."
+    }
+}
+
 function Invoke-FlutterCommand {
     param(
         [string]$FlutterExecutable,
