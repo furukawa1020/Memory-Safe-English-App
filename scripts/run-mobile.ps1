@@ -5,7 +5,11 @@ param(
     [string]$AvdName,
     [string]$FlutterPath,
     [string]$AndroidSdkRoot,
-    [switch]$SkipPubGet
+    [switch]$SkipPubGet,
+    [switch]$Detached,
+    [string]$DeviceId,
+    [string]$ApplicationId = "com.example.memory_safe_english_mobile",
+    [string]$ActivityName = ".MainActivity"
 )
 
 $ErrorActionPreference = "Stop"
@@ -20,6 +24,21 @@ $startStackScript = Join-Path $repoRoot "scripts\start-dev-stack.ps1"
 $bootstrapScript = Join-Path $repoRoot "scripts\bootstrap-mobile.ps1"
 $startEmulatorScript = Join-Path $repoRoot "scripts\start-android-emulator.ps1"
 
+function Get-ConnectedAndroidDeviceId {
+    param(
+        [string]$AdbExecutable
+    )
+
+    $deviceLines = & $AdbExecutable devices 2>$null | Select-Object -Skip 1
+    foreach ($line in $deviceLines) {
+        if ($line -match "^\s*(\S+)\s+device\s*$") {
+            return $Matches[1]
+        }
+    }
+
+    return $null
+}
+
 if ($StartStack) {
     & $startStackScript
     if ($LASTEXITCODE -ne 0) {
@@ -30,6 +49,11 @@ if ($StartStack) {
 $flutterExecutable = Resolve-FlutterExecutable -FlutterPath $FlutterPath
 if (-not $flutterExecutable) {
     throw "Flutter SDK was not found. Add it to PATH or pass -FlutterPath."
+}
+
+$adbExecutable = Resolve-AdbExecutable -AndroidSdkRoot $AndroidSdkRoot
+if (-not $adbExecutable) {
+    throw "adb was not found. Pass -AndroidSdkRoot or configure it in .mobile-local.json."
 }
 
 Push-Location $mobileRoot
@@ -53,10 +77,53 @@ try {
         }
     }
 
-    Write-Host "Running Flutter app against $ApiBaseUrl"
-    Invoke-FlutterCommand -FlutterExecutable $flutterExecutable -AndroidSdkRoot $AndroidSdkRoot -Arguments @("run", "--dart-define=API_BASE_URL=$ApiBaseUrl")
-    if ($LASTEXITCODE -ne 0) {
-        throw "flutter run failed."
+    $resolvedDeviceId = $DeviceId
+    if (-not $resolvedDeviceId) {
+        $resolvedDeviceId = Get-ConnectedAndroidDeviceId -AdbExecutable $adbExecutable
+    }
+
+    if ($Detached) {
+        if (-not $resolvedDeviceId) {
+            throw "No connected Android device was found for detached launch."
+        }
+
+        Write-Host "Building debug APK for detached install..."
+        $buildArguments = @("build", "apk", "--debug", "--dart-define=API_BASE_URL=$ApiBaseUrl")
+        if ($resolvedDeviceId) {
+            $buildArguments += @("-d", $resolvedDeviceId)
+        }
+        Invoke-FlutterCommand -FlutterExecutable $flutterExecutable -AndroidSdkRoot $AndroidSdkRoot -Arguments $buildArguments
+        if ($LASTEXITCODE -ne 0) {
+            throw "flutter build apk failed."
+        }
+
+        $apkPath = Join-Path $mobileRoot "build\app\outputs\flutter-apk\app-debug.apk"
+        if (-not (Test-Path $apkPath)) {
+            throw "Debug APK was not found at $apkPath."
+        }
+
+        Write-Host "Installing debug APK on $resolvedDeviceId"
+        & $adbExecutable -s $resolvedDeviceId install -r $apkPath
+        if ($LASTEXITCODE -ne 0) {
+            throw "adb install failed."
+        }
+
+        $componentName = "$ApplicationId/$ActivityName"
+        Write-Host "Launching $componentName on $resolvedDeviceId"
+        & $adbExecutable -s $resolvedDeviceId shell am start -n $componentName
+        if ($LASTEXITCODE -ne 0) {
+            throw "adb launch failed."
+        }
+    } else {
+        Write-Host "Running Flutter app against $ApiBaseUrl"
+        $runArguments = @("run", "--dart-define=API_BASE_URL=$ApiBaseUrl")
+        if ($resolvedDeviceId) {
+            $runArguments += @("-d", $resolvedDeviceId)
+        }
+        Invoke-FlutterCommand -FlutterExecutable $flutterExecutable -AndroidSdkRoot $AndroidSdkRoot -Arguments $runArguments
+        if ($LASTEXITCODE -ne 0) {
+            throw "flutter run failed."
+        }
     }
 } finally {
     Pop-Location

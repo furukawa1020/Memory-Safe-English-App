@@ -276,65 +276,67 @@ class _ChunkListView extends StatelessWidget {
         : chunks;
     return Column(
       children: [
-        for (var index = 0; index < visible.length; index++) ...[
-          final chunk = visible[index],
-          Opacity(
-            opacity: _resolveOpacity(index, chunk),
-            child: Card(
-              elevation: chunk.order == focusedChunkOrder ? 3 : 0,
-              shape: RoundedRectangleBorder(
-                side: BorderSide(
-                  color: chunk.order == focusedChunkOrder
-                      ? Theme.of(context).colorScheme.primary
-                      : Colors.transparent,
-                  width: 1.4,
+        ...List.generate(visible.length, (index) {
+          final chunk = visible[index];
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Opacity(
+              opacity: _resolveOpacity(index, chunk),
+              child: Card(
+                elevation: chunk.order == focusedChunkOrder ? 3 : 0,
+                shape: RoundedRectangleBorder(
+                  side: BorderSide(
+                    color: chunk.order == focusedChunkOrder
+                        ? Theme.of(context).colorScheme.primary
+                        : Colors.transparent,
+                    width: 1.4,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    CircleAvatar(
-                      radius: 16,
-                      backgroundColor: chunk.isCore
-                          ? Theme.of(context).colorScheme.primaryContainer
-                          : Theme.of(context).colorScheme.secondaryContainer,
-                      child: Text(
-                        '${chunk.order}',
-                        style: Theme.of(context).textTheme.labelLarge,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      CircleAvatar(
+                        radius: 16,
+                        backgroundColor: chunk.isCore
+                            ? Theme.of(context).colorScheme.primaryContainer
+                            : Theme.of(context).colorScheme.secondaryContainer,
+                        child: Text(
+                          '${chunk.order}',
+                          style: Theme.of(context).textTheme.labelLarge,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            chunk.text,
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            chunk.role,
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodySmall
-                                ?.copyWith(
-                                  color: Theme.of(context).colorScheme.primary,
-                                ),
-                          ),
-                        ],
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              chunk.text,
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              chunk.role,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
+                                    color: Theme.of(context).colorScheme.primary,
+                                  ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-          const SizedBox(height: 10),
-        ],
+          );
+        }),
       ],
     );
   }
@@ -460,9 +462,11 @@ class _SkeletonListView extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        for (var index = 0; index < parts.length; index++) ...[
-          final part = parts[index],
-          Card(
+        ...List.generate(parts.length, (index) {
+          final part = parts[index];
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Card(
             elevation: index == focusIndex ? 3 : 0,
             shape: RoundedRectangleBorder(
               side: BorderSide(
@@ -521,9 +525,9 @@ class _SkeletonListView extends StatelessWidget {
                 ],
               ),
             ),
-          ),
-          const SizedBox(height: 10),
-        ],
+            ),
+          );
+        }),
       ],
     );
   }
