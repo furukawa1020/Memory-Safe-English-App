@@ -410,7 +410,7 @@ class _ReaderPlanPanel extends StatelessWidget {
               Text(step.guidanceJa),
               const SizedBox(height: 8),
               Text(
-                'Support density: \\ | Risk: \\',
+                'Support density: ${step.supportDensity} | Risk: ${step.overloadRisk}',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               const SizedBox(height: 6),
@@ -511,7 +511,7 @@ class _SkeletonListView extends StatelessWidget {
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          '\\ | emphasis \\',
+                          '${part.role} | emphasis ${part.emphasis}',
                           style: Theme.of(context)
                               .textTheme
                               .bodySmall
