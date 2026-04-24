@@ -310,10 +310,14 @@ function Invoke-AndroidSdkManager {
     param(
         [string]$AndroidSdkRoot,
         [string[]]$Arguments,
+        [string]$SdkManagerPath,
         [switch]$AutoAcceptLicenses
     )
 
-    $sdkManager = Resolve-SdkManagerExecutable -AndroidSdkRoot $AndroidSdkRoot
+    $sdkManager = $SdkManagerPath
+    if ([string]::IsNullOrWhiteSpace($sdkManager)) {
+        $sdkManager = Resolve-SdkManagerExecutable -AndroidSdkRoot $AndroidSdkRoot
+    }
     if (-not $sdkManager) {
         throw "sdkmanager.bat was not found in the Android SDK."
     }
