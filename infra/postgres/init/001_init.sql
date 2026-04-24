@@ -167,3 +167,36 @@ VALUES
     ('ask_summary', 'Can you say it in a shorter way?', 'もっと短く言ってもらえますか。'),
     ('buy_time', 'Let me think for a moment.', '少し考えさせてください。')
 ON CONFLICT DO NOTHING;
+
+INSERT INTO contents (
+    id,
+    title,
+    content_type,
+    level,
+    topic,
+    language,
+    raw_text,
+    summary_text
+)
+VALUES
+    (
+        'cnt_self_intro_001',
+        'Self Introduction',
+        'reading',
+        'intro',
+        'self_intro',
+        'en',
+        'Hello, my name is Aki, and I study human computer interaction at university.',
+        'Simple self introduction'
+    ),
+    (
+        'cnt_research_001',
+        'Research Presentation Opening',
+        'reading',
+        'intermediate',
+        'research',
+        'en',
+        'In this study, we propose a memory safe interface that reduces cognitive overload during English reading.',
+        'Research opening sentence'
+    )
+ON CONFLICT (id) DO NOTHING;
