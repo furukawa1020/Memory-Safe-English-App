@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import '../../../app/app_scope.dart';
 import '../model/chunking_result.dart';
@@ -410,7 +410,7 @@ class _ReaderPlanPanel extends StatelessWidget {
               Text(step.guidanceJa),
               const SizedBox(height: 8),
               Text(
-                'Support density: ${step.supportDensity} • Risk: ${step.overloadRisk}',
+                'Support density: \\ | Risk: \\',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               const SizedBox(height: 6),
@@ -511,7 +511,7 @@ class _SkeletonListView extends StatelessWidget {
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          '${part.role} • emphasis ${part.emphasis}',
+                          '\\ | emphasis \\',
                           style: Theme.of(context)
                               .textTheme
                               .bodySmall
@@ -633,3 +633,4 @@ class _MetaChip extends StatelessWidget {
     );
   }
 }
+
