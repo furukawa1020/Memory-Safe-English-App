@@ -70,6 +70,17 @@ powershell -ExecutionPolicy Bypass -File .\scripts\install-android-emulator-deps
   -AndroidSdkRoot "C:\Program Files\Unity\Hub\Editor\6000.0.66f2\Editor\Data\PlaybackEngines\AndroidPlayer\SDK"
 ```
 
+`Program Files` 配下の SDK へ直接書き込めない場合は、書き込み可能な SDK root を repo 内へ作る方法もあります。
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\provision-user-android-sdk.ps1 `
+  -SourceAndroidSdkRoot "C:\Program Files\Unity\Hub\Editor\6000.0.66f2\Editor\Data\PlaybackEngines\AndroidPlayer\SDK" `
+  -DestinationAndroidSdkRoot ".android-sdk" `
+  -SaveConfig
+```
+
+これで `.android-sdk` に `platform-tools / emulator / system image` を入れ、以後のスクリプトもその SDK root を使いやすくなります。
+
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\start-android-emulator.ps1
 ```
