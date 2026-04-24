@@ -9,7 +9,8 @@ param(
     [switch]$Detached,
     [string]$DeviceId,
     [string]$ApplicationId = "com.example.memory_safe_english_mobile",
-    [string]$ActivityName = ".MainActivity"
+    [string]$ActivityName = ".MainActivity",
+    [switch]$WipeEmulatorData
 )
 
 $ErrorActionPreference = "Stop"
@@ -67,11 +68,16 @@ try {
     }
 
     if ($StartEmulator) {
-        if ($AvdName) {
-            & $startEmulatorScript -AvdName $AvdName -AndroidSdkRoot $AndroidSdkRoot
-        } else {
-            & $startEmulatorScript -AndroidSdkRoot $AndroidSdkRoot
+        $startEmulatorParams = @{
+            AndroidSdkRoot = $AndroidSdkRoot
         }
+        if ($AvdName) {
+            $startEmulatorParams.AvdName = $AvdName
+        }
+        if ($WipeEmulatorData) {
+            $startEmulatorParams.WipeData = $true
+        }
+        & $startEmulatorScript @startEmulatorParams
         if ($LASTEXITCODE -ne 0) {
             throw "Failed to start the Android emulator."
         }
