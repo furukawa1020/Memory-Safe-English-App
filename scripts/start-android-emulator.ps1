@@ -1,7 +1,8 @@
 param(
     [string]$AvdName,
     [int]$BootTimeoutSeconds = 180,
-    [string]$AndroidSdkRoot
+    [string]$AndroidSdkRoot,
+    [switch]$WipeData
 )
 
 $ErrorActionPreference = "Stop"
@@ -30,7 +31,12 @@ function Wait-ForEmulatorBoot {
     & $AdbPath wait-for-device
     $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
     while ((Get-Date) -lt $deadline) {
-        $bootCompleted = (& $AdbPath shell getprop sys.boot_completed 2>$null | Out-String).Trim()
+        $bootOutput = & $AdbPath shell getprop sys.boot_completed 2>$null
+        $bootCompleted = if ($null -eq $bootOutput) {
+            ""
+        } else {
+            ($bootOutput | Out-String).Trim()
+        }
         if ($bootCompleted -eq "1") {
             return
         }
@@ -75,7 +81,11 @@ if ($availableAvds -notcontains $selectedAvd) {
 }
 
 Write-Host "Starting Android emulator: $selectedAvd"
-Start-Process -FilePath $emulatorPath -ArgumentList @("-avd", $selectedAvd) | Out-Null
+$arguments = @("-avd", $selectedAvd)
+if ($WipeData) {
+    $arguments += "-wipe-data"
+}
+Start-Process -FilePath $emulatorPath -ArgumentList $arguments | Out-Null
 
 Write-Host "Waiting for emulator boot to complete..."
 Wait-ForEmulatorBoot -AdbPath $adbPath -TimeoutSeconds $BootTimeoutSeconds
