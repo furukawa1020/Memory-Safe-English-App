@@ -2,8 +2,8 @@ use std::net::SocketAddr;
 
 use axum::{
     body::Body,
-    extract::{connect_info::ConnectInfo, State},
-    http::{HeaderMap, HeaderValue, StatusCode},
+    extract::{connect_info::ConnectInfo, rejection::JsonRejection, State},
+    http::{HeaderMap, HeaderValue, Method, StatusCode},
     response::IntoResponse,
     Json,
 };
@@ -15,7 +15,7 @@ use crate::{
     client_ip::resolve_client_ip_from_parts,
     http_response::with_standard_headers,
     request_id::resolve_request_id,
-    security_audit::log_event,
+    security_audit::{log_event, log_http_event},
     state::AppState,
 };
 
@@ -50,8 +50,9 @@ pub async fn cache_stats(
 pub async fn purge_cache(
     State(state): State<AppState>,
     connect_info: Option<ConnectInfo<SocketAddr>>,
+    method: Method,
     headers: HeaderMap,
-    Json(request): Json<PurgeCacheRequest>,
+    payload: Result<Json<PurgeCacheRequest>, JsonRejection>,
 ) -> impl IntoResponse {
     let request_id = resolve_request_id(&headers);
     let client_ip = resolve_client_ip_from_parts(
@@ -72,22 +73,42 @@ pub async fn purge_cache(
         return response;
     }
 
-    let selector = match request.scope.as_deref() {
+    let request = match payload {
+        Ok(Json(request)) => request,
+        Err(_) => {
+            log_http_event(
+                "admin_invalid_json",
+                request_id.to_str().unwrap_or("proxy-request-id"),
+                &client_ip,
+                method.as_str(),
+                "/admin/cache/purge",
+                StatusCode::BAD_REQUEST.as_u16(),
+                "invalid admin json body",
+            );
+            return admin_error_response(
+                StatusCode::BAD_REQUEST,
+                "invalid_json",
+                &request_id,
+            );
+        }
+    };
+
+    let normalized_scope = request.scope.as_deref().map(str::trim).filter(|value| !value.is_empty());
+    let selector = match normalized_scope {
         Some("all") | None => CachePurgeSelector::All,
         Some("chunks") => CachePurgeSelector::Prefix("POST:/worker/analyze/chunks".to_string()),
         Some("skeleton") => CachePurgeSelector::Prefix("POST:/worker/analyze/skeleton".to_string()),
         Some(_) => {
-            return with_standard_headers(
-                (
-                    StatusCode::BAD_REQUEST,
-                    Json(AdminErrorResponse {
-                        error: "invalid purge scope",
-                    }),
-                )
-                    .into_response(),
-                &request_id,
-                "miss",
+            log_http_event(
+                "admin_invalid_scope",
+                request_id.to_str().unwrap_or("proxy-request-id"),
+                &client_ip,
+                method.as_str(),
+                "/admin/cache/purge",
+                StatusCode::BAD_REQUEST.as_u16(),
+                "invalid cache purge scope",
             );
+            return admin_error_response(StatusCode::BAD_REQUEST, "invalid purge scope", &request_id);
         }
     };
 
@@ -186,24 +207,27 @@ fn is_authorized(state: &AppState, headers: &HeaderMap) -> bool {
 }
 
 fn rate_limited_response(request_id: &HeaderValue) -> http::Response<Body> {
-    let mut response = with_standard_headers(
-        (
-            StatusCode::TOO_MANY_REQUESTS,
-            Json(AdminErrorResponse {
-                error: "rate_limited",
-            }),
-        )
-            .into_response(),
-        request_id,
-        "miss",
-    );
+    let mut response = admin_error_response(StatusCode::TOO_MANY_REQUESTS, "rate_limited", request_id);
     response
         .headers_mut()
         .insert(http::header::RETRY_AFTER, HeaderValue::from_static("1"));
     response
 }
 
+fn admin_error_response(
+    status: StatusCode,
+    error: &'static str,
+    request_id: &HeaderValue,
+) -> http::Response<Body> {
+    with_standard_headers(
+        (status, Json(AdminErrorResponse { error })).into_response(),
+        request_id,
+        "miss",
+    )
+}
+
 #[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct PurgeCacheRequest {
     pub scope: Option<String>,
 }
