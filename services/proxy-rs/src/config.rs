@@ -157,6 +157,18 @@ impl Config {
                     self.admin_rate_limit_max_requests.to_string(),
                 ));
             }
+            if self.max_request_body_bytes > 1024 * 1024 {
+                return Err(ConfigError::InvalidValue(
+                    "PROXY_MAX_REQUEST_BODY_BYTES".to_string(),
+                    self.max_request_body_bytes.to_string(),
+                ));
+            }
+            if self.api_base_url.is_empty() || self.worker_base_url.is_empty() {
+                return Err(ConfigError::InvalidValue(
+                    "PROXY_API_BASE_URL/PROXY_WORKER_BASE_URL".to_string(),
+                    "empty".to_string(),
+                ));
+            }
         }
         Ok(())
     }
@@ -277,6 +289,33 @@ mod tests {
         assert!(matches!(
             config.validate(),
             Err(ConfigError::MissingRequired(key, _)) if key == "PROXY_ADMIN_ALLOWED_IPS"
+        ));
+    }
+
+    #[test]
+    fn production_rejects_excessive_body_limit() {
+        let config = Config {
+            runtime_environment: RuntimeEnvironment::Production,
+            http_addr: "0.0.0.0:8070".parse().unwrap(),
+            api_base_url: "http://api.internal:8080".to_string(),
+            worker_base_url: "http://worker.internal:8090".to_string(),
+            admin_token: Some("0123456789abcdef".to_string()),
+            trusted_proxy_ips: vec!["10.0.0.1".parse().unwrap()],
+            admin_allowed_ips: vec!["10.0.0.2".parse().unwrap()],
+            admin_rate_limit_max_requests: 30,
+            admin_rate_limit_window: Duration::from_secs(60),
+            auth_rate_limit_max_requests: 20,
+            auth_rate_limit_window: Duration::from_secs(60),
+            upstream_timeout: Duration::from_secs(10),
+            cache_ttl: Duration::from_secs(300),
+            gc_interval: Duration::from_secs(60),
+            cache_max_entries: 1024,
+            max_request_body_bytes: 2 * 1024 * 1024,
+        };
+
+        assert!(matches!(
+            config.validate(),
+            Err(ConfigError::InvalidValue(key, _)) if key == "PROXY_MAX_REQUEST_BODY_BYTES"
         ));
     }
 }
