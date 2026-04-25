@@ -475,6 +475,38 @@ mod tests {
         assert!(text.contains("\"refresh\":\"/auth/refresh\""));
         assert!(text.contains("\"reader_plan\":\"/analysis/reader-plan\""));
         assert!(text.contains("\"analytics_summary\":true"));
+        assert!(text.contains("\"environment\":\"development\""));
+    }
+
+    #[tokio::test]
+    async fn mobile_bootstrap_hides_internal_details_in_production() {
+        let api = spawn_health_server(StatusCode::OK).await;
+        let worker = spawn_health_server(StatusCode::OK).await;
+        let mut state = state_with_urls(api.base_url(), worker.base_url());
+        state.config.runtime_environment = RuntimeEnvironment::Production;
+        state.config.admin_token = Some("0123456789abcdef".to_string());
+        state.config.trusted_proxy_ips = vec!["127.0.0.1".parse().unwrap()];
+        state.config.admin_allowed_ips = vec!["127.0.0.1".parse().unwrap()];
+        let app = build_router(state);
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/bootstrap/mobile")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = to_bytes(response.into_body(), 4096).await.unwrap();
+        let text = String::from_utf8(body.to_vec()).unwrap();
+        assert!(text.contains("\"environment\":\"production\""));
+        assert!(text.contains("\"recommended_base_urls\":null"));
+        assert!(text.contains("\"api\":null"));
+        assert!(text.contains("\"worker\":null"));
+        assert!(text.contains("\"login\":\"/auth/login\""));
     }
 
     fn state_with_urls(api_base_url: String, worker_base_url: String) -> AppState {
