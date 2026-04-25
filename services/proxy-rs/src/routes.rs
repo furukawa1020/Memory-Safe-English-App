@@ -10,6 +10,7 @@ use serde::Serialize;
 use crate::{
     admin, frontend, http_response::with_standard_headers, proxy, readiness,
     request_id::resolve_request_id, state::AppState,
+    response_headers::HeaderPolicy,
 };
 
 pub fn build_router(state: AppState) -> Router {
@@ -44,6 +45,8 @@ async fn health(State(state): State<AppState>, headers: HeaderMap) -> impl IntoR
             .into_response(),
         &request_id,
         "miss",
+        &state.config.runtime_environment,
+        HeaderPolicy::Sensitive,
     )
 }
 
