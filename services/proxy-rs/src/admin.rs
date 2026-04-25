@@ -13,8 +13,10 @@ use subtle::ConstantTimeEq;
 use crate::{
     cache::{CachePurgeSelector, CacheStats},
     client_ip::resolve_client_ip_from_parts,
+    config::RuntimeEnvironment,
     http_response::with_standard_headers,
     request_id::resolve_request_id,
+    response_headers::HeaderPolicy,
     security_audit::{log_event, log_http_event},
     state::AppState,
 };
@@ -44,6 +46,8 @@ pub async fn cache_stats(
         (StatusCode::OK, Json(CacheStatsResponse::from_stats(stats))).into_response(),
         &request_id,
         "miss",
+        &state.config.runtime_environment,
+        HeaderPolicy::Sensitive,
     )
 }
 
@@ -89,6 +93,7 @@ pub async fn purge_cache(
                 StatusCode::BAD_REQUEST,
                 "invalid_json",
                 &request_id,
+                &state.config.runtime_environment,
             );
         }
     };
@@ -108,7 +113,12 @@ pub async fn purge_cache(
                 StatusCode::BAD_REQUEST.as_u16(),
                 "invalid cache purge scope",
             );
-            return admin_error_response(StatusCode::BAD_REQUEST, "invalid purge scope", &request_id);
+            return admin_error_response(
+                StatusCode::BAD_REQUEST,
+                "invalid purge scope",
+                &request_id,
+                &state.config.runtime_environment,
+            );
         }
     };
 
@@ -117,6 +127,8 @@ pub async fn purge_cache(
         (StatusCode::OK, Json(PurgeCacheResponse { removed })).into_response(),
         &request_id,
         "miss",
+        &state.config.runtime_environment,
+        HeaderPolicy::Sensitive,
     )
 }
 
@@ -143,6 +155,8 @@ async fn guard_admin_request(
                 .into_response(),
             request_id,
             "miss",
+            &state.config.runtime_environment,
+            HeaderPolicy::Sensitive,
         ));
     }
 
@@ -156,7 +170,10 @@ async fn guard_admin_request(
             path,
             "admin rate limit exceeded",
         );
-        return Some(rate_limited_response(request_id));
+        return Some(rate_limited_response(
+            request_id,
+            &state.config.runtime_environment,
+        ));
     }
 
     if !is_authorized(state, headers) {
@@ -177,6 +194,8 @@ async fn guard_admin_request(
                 .into_response(),
             request_id,
             "miss",
+            &state.config.runtime_environment,
+            HeaderPolicy::Sensitive,
         ));
     }
 
@@ -206,8 +225,16 @@ fn is_authorized(state: &AppState, headers: &HeaderMap) -> bool {
     }
 }
 
-fn rate_limited_response(request_id: &HeaderValue) -> http::Response<Body> {
-    let mut response = admin_error_response(StatusCode::TOO_MANY_REQUESTS, "rate_limited", request_id);
+fn rate_limited_response(
+    request_id: &HeaderValue,
+    runtime_environment: &RuntimeEnvironment,
+) -> http::Response<Body> {
+    let mut response = admin_error_response(
+        StatusCode::TOO_MANY_REQUESTS,
+        "rate_limited",
+        request_id,
+        runtime_environment,
+    );
     response
         .headers_mut()
         .insert(http::header::RETRY_AFTER, HeaderValue::from_static("1"));
@@ -218,11 +245,14 @@ fn admin_error_response(
     status: StatusCode,
     error: &'static str,
     request_id: &HeaderValue,
+    runtime_environment: &RuntimeEnvironment,
 ) -> http::Response<Body> {
     with_standard_headers(
         (status, Json(AdminErrorResponse { error })).into_response(),
         request_id,
         "miss",
+        runtime_environment,
+        HeaderPolicy::Sensitive,
     )
 }
 
