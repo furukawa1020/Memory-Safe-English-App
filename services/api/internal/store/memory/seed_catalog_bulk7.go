@@ -1,0 +1,70 @@
+package memory
+
+import (
+	"time"
+
+	"memory-safe-english/services/api/internal/domain"
+)
+
+func additionalSeedCatalogBulk7(now time.Time) []domain.Content {
+	specs := []seedSpec{
+		{"cnt_toeic_001", "Business Reading: Shipment Delay Notice", "reading", "upper_intermediate", "meeting", "Due to severe weather in the western region, shipments scheduled for Tuesday afternoon will arrive one day later than originally planned.", "Shipment delay notice with one cause and one consequence"},
+		{"cnt_toeic_002", "Business Reading: Training Registration Reminder", "reading", "upper_intermediate", "meeting", "Employees who plan to attend the data-security workshop must complete the online registration form by Friday noon to reserve a seat.", "Training reminder with one deadline"},
+		{"cnt_toeic_003", "Business Reading: Office Relocation Update", "reading", "upper_intermediate", "meeting", "Although the marketing team will move to the fourth floor next month, client meetings will continue to be held in the first-floor conference rooms.", "Relocation update with one contrast"},
+		{"cnt_toeic_004", "Business Reading: Maintenance Schedule", "reading", "upper_intermediate", "daily", "The building management office announced that elevator maintenance will begin at 7 a.m., so staff should allow extra time to reach the upper floors.", "Maintenance notice with one practical implication"},
+		{"cnt_toeic_005", "Business Reading: Contract Review Request", "reading", "upper_intermediate", "meeting", "Before we finalize the contract, please review the pricing section once more and highlight any clause that may require legal confirmation.", "Contract review request with one action focus"},
+		{"cnt_toeic_006", "Business Reading: Survey Summary", "reading", "upper_intermediate", "research", "According to the customer survey, users valued quick navigation most, while detailed customization options were mentioned less frequently.", "Survey summary with one ranking contrast"},
+		{"cnt_toeic_007", "Business Reading: Budget Adjustment", "reading", "upper_intermediate", "meeting", "To stay within budget, the team decided to postpone the optional illustration work and prioritize features required for the public release.", "Budget adjustment with one priority shift"},
+		{"cnt_toeic_008", "Business Reading: Internal Memo on Hiring", "reading", "upper_intermediate", "meeting", "Because two senior engineers will leave at the end of June, the department plans to begin interviewing replacement candidates earlier than usual.", "Hiring memo with one forward plan"},
+		{"cnt_toeic_009", "Business Listening: Flight Rebooking", "listening", "upper_intermediate", "daily", "Passengers whose flights were canceled this evening may rebook at the service counter near gate nineteen or use the mobile application for the same purpose.", "Rebooking announcement with two options"},
+		{"cnt_toeic_010", "Business Listening: Conference Venue Change", "listening", "upper_intermediate", "meeting", "Please note that tomorrow's product briefing will take place in Hall B rather than Room 204 because additional seating is needed.", "Venue change announcement with one reason"},
+		{"cnt_toeic_011", "Business Listening: Invoice Processing", "listening", "upper_intermediate", "meeting", "If an invoice exceeds the approved amount, forward it to the finance manager before entering it into the payment system.", "Invoice process instruction with one condition"},
+		{"cnt_toeic_012", "Business Listening: Customer Support Queue", "listening", "upper_intermediate", "daily", "Current wait times are longer than usual, but callers who leave a message before 5 p.m. will receive a response today.", "Support queue notice with one guarantee"},
+		{"cnt_toeic_013", "Business Listening: Project Debrief", "listening", "upper_intermediate", "meeting", "At the debriefing session, we will review the launch results first and then discuss which tasks should be assigned to the regional teams.", "Debrief structure with ordered agenda"},
+		{"cnt_toeic_014", "Business Listening: Subscription Renewal", "listening", "upper_intermediate", "daily", "Your annual subscription will renew automatically next Monday unless you update the billing preference in your account settings.", "Renewal notice with one condition"},
+		{"cnt_toeic_015", "Business Listening: Delivery Window", "listening", "upper_intermediate", "daily", "The courier is expected to arrive between one and three o'clock, so someone should remain at the reception desk during that period.", "Delivery window instruction with one implication"},
+		{"cnt_toeic_016", "Business Listening: Quarterly Report Deadline", "listening", "upper_intermediate", "meeting", "Team leaders should submit the final quarterly figures by Wednesday morning so that the report can be printed before the board meeting.", "Report deadline with one dependent task"},
+		{"cnt_toeic_017", "Business Speaking: Give a Status Update", "speaking_template", "upper_intermediate", "meeting", "Here is the short update. The client approved the design draft. The remaining issue is the delivery schedule.", "Status update for business meetings"},
+		{"cnt_toeic_018", "Business Speaking: Explain a Delay", "speaking_template", "upper_intermediate", "meeting", "There is one delay. The supplier changed the shipment date. We need one more day to confirm inventory.", "Short explanation for a delay"},
+		{"cnt_toeic_019", "Business Speaking: Ask for Priority", "speaking_template", "upper_intermediate", "meeting", "Before I continue, I need one priority. Should I finish the report first, or should I answer the client email first?", "Priority check in short units"},
+		{"cnt_toeic_020", "Business Speaking: Confirm a Decision", "speaking_template", "upper_intermediate", "meeting", "Let me confirm the decision. We will keep the current design. We will update the schedule only.", "Decision confirmation template"},
+		{"cnt_toeic_021", "Business Speaking: Summarize a Proposal", "speaking_template", "upper_intermediate", "meeting", "The proposal is simple. We reduce the cost now. We add the optional feature later if demand grows.", "Short proposal summary"},
+		{"cnt_toeic_022", "Business Speaking: Report One Risk", "speaking_template", "upper_intermediate", "meeting", "I see one risk. The timeline is tight. If feedback arrives late, testing may be shortened.", "Risk report in three short units"},
+		{"cnt_toeic_023", "Business Speaking: Request Clarification", "speaking_template", "upper_intermediate", "daily", "I want to make sure I understood. Are you asking for the revised file today, or only the draft summary?", "Clarification request for work tasks"},
+		{"cnt_toeic_024", "Business Speaking: Introduce a Main Point", "speaking_template", "upper_intermediate", "research", "The main point is this. Simpler presentation improves follow-through. The effect is strongest when information arrives quickly.", "Main-point delivery in short units"},
+		{"cnt_toeic_025", "Toeic-Style Reading: Store Policy Update", "reading", "upper_intermediate", "daily", "Starting next month, returned items must be accompanied by either the original receipt or a digital purchase record shown on the store application.", "Store policy update with one requirement"},
+		{"cnt_toeic_026", "Toeic-Style Reading: Marketing Email Summary", "reading", "upper_intermediate", "meeting", "The email campaign reached fewer subscribers than expected, but the response rate among long-term customers was higher than last quarter.", "Marketing summary with mixed result"},
+		{"cnt_toeic_027", "Toeic-Style Reading: Staff Rotation Notice", "reading", "upper_intermediate", "meeting", "From July onward, front-desk staff will rotate weekend duties so that experienced employees are available during the busiest hours.", "Staff rotation notice with purpose"},
+		{"cnt_toeic_028", "Toeic-Style Reading: Seminar Overview", "reading", "upper_intermediate", "research", "The seminar will examine how interface structure affects comprehension, especially when participants must process long explanations under time pressure.", "Seminar overview for academic-business English"},
+		{"cnt_toeic_029", "Toeic-Style Listening: Refund Procedure", "listening", "upper_intermediate", "daily", "Customers requesting a refund should complete the online form first and attach a photo of the damaged item before visiting the service desk.", "Refund procedure with ordered steps"},
+		{"cnt_toeic_030", "Toeic-Style Listening: Hotel Meeting Room", "listening", "upper_intermediate", "meeting", "The meeting room reservation includes projector access, but printed materials must be ordered separately through the front office.", "Hotel meeting room notice with one exception"},
+		{"cnt_toeic_031", "Toeic-Style Listening: Internship Orientation", "listening", "upper_intermediate", "meeting", "All interns are asked to arrive fifteen minutes early so that security badges can be issued before the orientation begins.", "Orientation instruction with one reason"},
+		{"cnt_toeic_032", "Toeic-Style Listening: Service Outage Notice", "listening", "upper_intermediate", "daily", "Online booking will be unavailable for approximately thirty minutes while the payment system is updated this evening.", "Service outage notice with one duration"},
+		{"cnt_toeic_033", "Toeic-Style Rescue: Ask for the Deadline First", "rescue", "upper_intermediate", "rescue", "Could you tell me the deadline first, and then explain the rest?", "Rescue phrase for deadline-first processing"},
+		{"cnt_toeic_034", "Toeic-Style Rescue: Ask for One Condition at a Time", "rescue", "upper_intermediate", "rescue", "Could we go through one condition at a time?", "Rescue phrase for multi-condition instructions"},
+		{"cnt_toeic_035", "Toeic-Style Rescue: Ask for the Decision Only", "rescue", "upper_intermediate", "rescue", "Before the background, could you give me the decision only?", "Rescue phrase for decision-first listening"},
+		{"cnt_toeic_036", "Toeic-Style Rescue: Ask for a Short Summary Email", "rescue", "upper_intermediate", "rescue", "Could you send a short summary email after this?", "Rescue phrase for external memory support"},
+		{"cnt_toeic_037", "Toeic-Style Rescue: Ask to Repeat the Two Actions", "rescue", "upper_intermediate", "rescue", "Could you repeat the two actions I need to take?", "Rescue phrase for two-step recall"},
+		{"cnt_toeic_038", "Toeic-Style Rescue: Ask Which Part Is Optional", "rescue", "upper_intermediate", "rescue", "Which part is optional, and which part is required?", "Rescue phrase for required-vs-optional split"},
+		{"cnt_toeic_039", "Toeic-Style Reading: Purchasing Procedure", "reading", "upper_intermediate", "meeting", "Purchase requests under five hundred dollars may be approved directly by team leaders, whereas larger amounts must be reviewed by finance staff.", "Purchasing procedure with threshold rule"},
+		{"cnt_toeic_040", "Toeic-Style Listening: Candidate Interview Plan", "listening", "upper_intermediate", "meeting", "We will interview two candidates this afternoon, and the discussion form should be completed immediately after each session ends.", "Interview plan with one follow-up action"},
+	}
+
+	items := make([]domain.Content, 0, len(specs))
+	for _, spec := range specs {
+		items = append(items, domain.Content{
+			ID:          spec.id,
+			Title:       spec.title,
+			ContentType: spec.contentType,
+			Level:       spec.level,
+			Topic:       spec.topic,
+			Language:    "en",
+			RawText:     spec.rawText,
+			SummaryText: spec.summaryText,
+			CreatedAt:   now,
+			UpdatedAt:   now,
+		})
+	}
+
+	return items
+}
