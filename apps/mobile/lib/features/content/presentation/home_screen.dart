@@ -89,6 +89,7 @@ class _ContentHomeTabState extends State<_ContentHomeTab> {
 
   @override
   Widget build(BuildContext context) {
+    final groupedSections = _buildContentSections(widget.controller.items);
     return SafeArea(
       child: AnimatedBuilder(
         animation: widget.controller,
@@ -117,9 +118,17 @@ class _ContentHomeTabState extends State<_ContentHomeTab> {
                 else if (widget.controller.errorText != null)
                   Text(widget.controller.errorText!)
                 else
-                  for (final item in widget.controller.items) ...[
-                    _ContentTile(item: item),
+                  for (final section in groupedSections) ...[
+                    _SectionHeader(
+                      title: section.title,
+                      subtitle: section.subtitle,
+                    ),
                     const SizedBox(height: 12),
+                    for (final item in section.items) ...[
+                      _ContentTile(item: item),
+                      const SizedBox(height: 12),
+                    ],
+                    const SizedBox(height: 8),
                   ],
               ],
             ),
@@ -127,6 +136,59 @@ class _ContentHomeTabState extends State<_ContentHomeTab> {
         },
       ),
     );
+  }
+
+  List<_ContentSection> _buildContentSections(List<ContentItem> items) {
+    final intro = <ContentItem>[];
+    final toeic600to700 = <ContentItem>[];
+    final toeic750to800 = <ContentItem>[];
+
+    for (final item in items) {
+      switch (item.level) {
+        case 'intro':
+          intro.add(item);
+          break;
+        case 'intermediate':
+          toeic600to700.add(item);
+          break;
+        case 'upper_intermediate':
+          toeic750to800.add(item);
+          break;
+        default:
+          toeic600to700.add(item);
+          break;
+      }
+    }
+
+    final sections = <_ContentSection>[];
+    if (intro.isNotEmpty) {
+      sections.add(
+        _ContentSection(
+          title: 'Start Here',
+          subtitle: 'Shorter, lower-load items for warming up before heavier business English.',
+          items: intro,
+        ),
+      );
+    }
+    if (toeic600to700.isNotEmpty) {
+      sections.add(
+        _ContentSection(
+          title: 'TOEIC 600-700 Bridge',
+          subtitle: 'Intermediate items for keeping the main sentence stable across daily, meeting, and research contexts.',
+          items: toeic600to700,
+        ),
+      );
+    }
+    if (toeic750to800.isNotEmpty) {
+      sections.add(
+        _ContentSection(
+          title: 'TOEIC 750-800 Business Track',
+          subtitle: 'Upper-intermediate notices, meetings, procedures, and updates with stronger business vocabulary.',
+          items: toeic750to800,
+        ),
+      );
+    }
+    return sections;
   }
 }
 
@@ -325,7 +387,7 @@ class _ContentTile extends StatelessWidget {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  _Pill(label: item.level),
+                  _Pill(label: _levelLabel(item.level)),
                   _Pill(label: item.topic),
                   _Pill(label: item.contentType),
                 ],
@@ -334,6 +396,40 @@ class _ContentTile extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _ContentSection {
+  const _ContentSection({
+    required this.title,
+    required this.subtitle,
+    required this.items,
+  });
+
+  final String title;
+  final String subtitle;
+  final List<ContentItem> items;
+}
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({
+    required this.title,
+    required this.subtitle,
+  });
+
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 4),
+        Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
+      ],
     );
   }
 }
@@ -717,5 +813,18 @@ class _Pill extends StatelessWidget {
       ),
       child: Text(label),
     );
+  }
+}
+
+String _levelLabel(String level) {
+  switch (level) {
+    case 'intro':
+      return 'starter';
+    case 'intermediate':
+      return 'toeic 600-700';
+    case 'upper_intermediate':
+      return 'toeic 750-800';
+    default:
+      return level;
   }
 }
