@@ -10,7 +10,8 @@ use serde::Serialize;
 use tokio::join;
 
 use crate::{
-    http_response::with_standard_headers, request_id::resolve_request_id, state::AppState,
+    http_response::with_standard_headers, request_id::resolve_request_id,
+    response_headers::HeaderPolicy, state::AppState,
 };
 
 pub async fn ready(State(state): State<AppState>, headers: HeaderMap) -> impl IntoResponse {
@@ -22,7 +23,13 @@ pub async fn ready(State(state): State<AppState>, headers: HeaderMap) -> impl In
         StatusCode::SERVICE_UNAVAILABLE
     };
 
-    with_standard_headers((status, Json(report)).into_response(), &request_id, "miss")
+    with_standard_headers(
+        (status, Json(report)).into_response(),
+        &request_id,
+        "miss",
+        &state.config.runtime_environment,
+        HeaderPolicy::Sensitive,
+    )
 }
 
 pub async fn probe_upstreams(state: &AppState) -> ReadinessReport {
