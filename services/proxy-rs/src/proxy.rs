@@ -10,10 +10,11 @@ use sha2::{Digest, Sha256};
 use crate::{
     cache::CachedResponse,
     client_ip::resolve_client_ip,
+    config::RuntimeEnvironment,
     request_guard::{validate_request, GuardUpstream},
     rate_limit,
     request_id::resolve_request_id,
-    response_headers::{apply_standard_headers, apply_upstream_header},
+    response_headers::{apply_standard_headers, apply_upstream_header, HeaderPolicy},
     security_audit::log_event,
     state::AppState,
 };
@@ -73,6 +74,7 @@ async fn forward(state: AppState, request: Request<Body>, upstream: Upstream) ->
             StatusCode::PAYLOAD_TOO_LARGE,
             "request body too large",
             &request_id,
+            &state.config.runtime_environment,
             upstream.header_value(),
         );
     }
@@ -94,6 +96,7 @@ async fn forward(state: AppState, request: Request<Body>, upstream: Upstream) ->
             rejection.status,
             rejection.message,
             &request_id,
+            &state.config.runtime_environment,
             upstream.header_value(),
         );
     }
@@ -113,6 +116,7 @@ async fn forward(state: AppState, request: Request<Body>, upstream: Upstream) ->
             );
             return rate_limited_response(
                 &request_id,
+                &state.config.runtime_environment,
                 Upstream::ProxyRateLimited.header_value(),
                 decision.retry_after,
             );
@@ -135,6 +139,7 @@ async fn forward(state: AppState, request: Request<Body>, upstream: Upstream) ->
                 StatusCode::PAYLOAD_TOO_LARGE,
                 "request body too large",
                 &request_id,
+                &state.config.runtime_environment,
                 upstream.header_value(),
             )
         }
@@ -143,7 +148,12 @@ async fn forward(state: AppState, request: Request<Body>, upstream: Upstream) ->
     let maybe_cache_key = cache_key(&upstream, &method, &path_and_query, &body_bytes);
     if let Some(key) = maybe_cache_key.as_ref() {
         if let Some(cached) = state.cache.get(key).await {
-            return build_cached_response(cached, &request_id, upstream.cache_header_value());
+            return build_cached_response(
+                cached,
+                &request_id,
+                &state.config.runtime_environment,
+                upstream.cache_header_value(),
+            );
         }
     }
 
@@ -161,6 +171,7 @@ async fn forward(state: AppState, request: Request<Body>, upstream: Upstream) ->
                 StatusCode::BAD_REQUEST,
                 "invalid upstream request path",
                 &request_id,
+                &state.config.runtime_environment,
                 upstream.header_value(),
             )
         }
@@ -189,6 +200,7 @@ async fn forward(state: AppState, request: Request<Body>, upstream: Upstream) ->
                 StatusCode::BAD_GATEWAY,
                 "upstream request failed",
                 &request_id,
+                &state.config.runtime_environment,
                 upstream.header_value(),
             )
         }
@@ -199,6 +211,7 @@ async fn forward(state: AppState, request: Request<Body>, upstream: Upstream) ->
     let headers = sanitize_response_headers(
         upstream_response.headers(),
         &request_id,
+        &state.config.runtime_environment,
         upstream.header_value(),
     );
     let response_body = match upstream_response.bytes().await {
@@ -215,6 +228,7 @@ async fn forward(state: AppState, request: Request<Body>, upstream: Upstream) ->
                 StatusCode::BAD_GATEWAY,
                 "failed to read upstream response",
                 &request_id,
+                &state.config.runtime_environment,
                 upstream.header_value(),
             )
         }
@@ -334,6 +348,7 @@ fn sanitize_request_headers(
 fn sanitize_response_headers(
     headers: &reqwest::header::HeaderMap,
     request_id: &HeaderValue,
+    runtime_environment: &RuntimeEnvironment,
     upstream_name: &'static str,
 ) -> HeaderMap {
     let mut sanitized = HeaderMap::new();
@@ -343,7 +358,13 @@ fn sanitize_response_headers(
         }
         sanitized.insert(name.clone(), value.clone());
     }
-    apply_standard_headers(&mut sanitized, request_id, "miss");
+    apply_standard_headers(
+        &mut sanitized,
+        request_id,
+        "miss",
+        runtime_environment,
+        HeaderPolicy::Default,
+    );
     apply_upstream_header(&mut sanitized, upstream_name);
     sanitized
 }
@@ -351,9 +372,16 @@ fn sanitize_response_headers(
 fn build_cached_response(
     mut response: CachedResponse,
     request_id: &HeaderValue,
+    runtime_environment: &RuntimeEnvironment,
     upstream_name: &'static str,
 ) -> Response<Body> {
-    apply_standard_headers(&mut response.headers, request_id, "hit");
+    apply_standard_headers(
+        &mut response.headers,
+        request_id,
+        "hit",
+        runtime_environment,
+        HeaderPolicy::Default,
+    );
     apply_upstream_header(&mut response.headers, upstream_name);
     build_response(response.status, response.headers, response.body)
 }
@@ -369,6 +397,7 @@ fn error_response(
     status: StatusCode,
     message: &'static str,
     request_id: &HeaderValue,
+    runtime_environment: &RuntimeEnvironment,
     upstream_name: &'static str,
 ) -> Response<Body> {
     let payload = serde_json::json!({ "error": message }).to_string();
@@ -379,13 +408,20 @@ fn error_response(
         http::header::CONTENT_TYPE,
         HeaderValue::from_static("application/json"),
     );
-    apply_standard_headers(headers, request_id, "miss");
+    apply_standard_headers(
+        headers,
+        request_id,
+        "miss",
+        runtime_environment,
+        HeaderPolicy::Sensitive,
+    );
     apply_upstream_header(headers, upstream_name);
     response
 }
 
 fn rate_limited_response(
     request_id: &HeaderValue,
+    runtime_environment: &RuntimeEnvironment,
     upstream_name: &'static str,
     retry_after: std::time::Duration,
 ) -> Response<Body> {
@@ -393,6 +429,7 @@ fn rate_limited_response(
         StatusCode::TOO_MANY_REQUESTS,
         "too many authentication attempts",
         request_id,
+        runtime_environment,
         upstream_name,
     );
     let retry_after_seconds = retry_after.as_secs().max(1).to_string();
@@ -574,7 +611,12 @@ mod tests {
         upstream.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
         let request_id = HeaderValue::from_static("request-123");
 
-        let sanitized = sanitize_response_headers(&upstream, &request_id, "api");
+        let sanitized = sanitize_response_headers(
+            &upstream,
+            &request_id,
+            &RuntimeEnvironment::Development,
+            "api",
+        );
 
         assert!(sanitized.get("server").is_none());
         assert!(sanitized.get("x-powered-by").is_none());
