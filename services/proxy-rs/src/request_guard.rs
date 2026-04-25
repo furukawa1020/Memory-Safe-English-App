@@ -27,6 +27,14 @@ pub fn validate_request(
         });
     }
 
+    if has_ambiguous_or_dangerous_path(path_and_query) {
+        return Some(GuardRejection {
+            status: StatusCode::BAD_REQUEST,
+            event: "proxy_path_rejected",
+            message: "invalid request path",
+        });
+    }
+
     let normalized = normalized_path(path_and_query);
     match upstream {
         GuardUpstream::Worker => validate_worker_request(method, normalized, headers),
@@ -142,6 +150,28 @@ fn normalized_path(path_and_query: &str) -> &str {
     path_and_query.split('?').next().unwrap_or(path_and_query)
 }
 
+fn has_ambiguous_or_dangerous_path(path_and_query: &str) -> bool {
+    let path = normalized_path(path_and_query);
+    if path.is_empty() || !path.starts_with('/') {
+        return true;
+    }
+    if path.contains('\\') || path.contains("//") || path.contains("/./") || path.ends_with("/.") {
+        return true;
+    }
+
+    let lowered = path.to_ascii_lowercase();
+    if lowered.contains("/../")
+        || lowered.ends_with("/..")
+        || lowered.contains("%2e")
+        || lowered.contains("%2f")
+        || lowered.contains("%5c")
+    {
+        return true;
+    }
+
+    path.chars().any(|ch| ch.is_control())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -199,5 +229,22 @@ mod tests {
         .expect("expected rejection");
 
         assert_eq!(rejection.status, StatusCode::NOT_FOUND);
+    }
+
+    #[test]
+    fn rejects_ambiguous_or_traversal_like_paths() {
+        let mut headers = HeaderMap::new();
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+
+        for path in [
+            "/auth//login",
+            "/auth/../login",
+            "/auth/%2e%2e/login",
+            "/auth\\login",
+        ] {
+            let rejection = validate_request(GuardUpstream::Api, &Method::POST, path, &headers)
+                .expect("expected rejection");
+            assert_eq!(rejection.status, StatusCode::BAD_REQUEST);
+        }
     }
 }
