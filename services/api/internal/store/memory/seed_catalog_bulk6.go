@@ -1,0 +1,60 @@
+package memory
+
+import (
+	"time"
+
+	"memory-safe-english/services/api/internal/domain"
+)
+
+func additionalSeedCatalogBulk6(now time.Time) []domain.Content {
+	specs := []seedSpec{
+		{"cnt_self_intro_031", "Self Introduction: Field and Theme", "reading", "intro", "self_intro", "My field is learning support, and my main theme is making English easier to process under pressure.", "Field and theme in one sentence"},
+		{"cnt_self_intro_032", "Self Introduction: Short Research Focus", "speaking_template", "intro", "self_intro", "My research focus is simple. I study overload. I design safer learning tools.", "Short research focus"},
+		{"cnt_self_intro_033", "Self Introduction: Learning Background", "reading", "intro", "self_intro", "I became interested in this topic because I often understood single words but lost the full sentence too quickly.", "Learning background statement"},
+		{"cnt_self_intro_034", "Self Introduction: Strength in Short Units", "speaking_template", "intro", "self_intro", "I speak best in short units. That helps me stay clear. It also helps my listener.", "Short-units self introduction"},
+		{"cnt_self_intro_035", "Self Introduction: Study Goal", "reading", "intro", "self_intro", "My study goal is to build tools that support meaning before extra details become too heavy to hold.", "Study goal sentence"},
+		{"cnt_self_intro_036", "Self Introduction: Friendly Closing", "speaking_template", "intro", "self_intro", "That is a quick overview of me. I am happy to explain one point at a time.", "Friendly closing for self introduction"},
+		{"cnt_daily_048", "Daily Reading: Ask for the Nearest Exit", "reading", "intro", "daily", "Excuse me, which exit is closest if I need the bus stop, not the taxi stand?", "Nearest-exit question"},
+		{"cnt_daily_049", "Daily Listening: Gate Change Notice", "listening", "intro", "daily", "Attention please. The bus for Central Station now leaves from gate six instead of gate four.", "Gate change notice"},
+		{"cnt_daily_050", "Daily Speaking: Ask for One Recommendation", "speaking_template", "intro", "daily", "I only need one recommendation. Which option is the easiest for a beginner?", "One-recommendation template"},
+		{"cnt_daily_051", "Daily Reading: Return the Item", "reading", "intro", "daily", "I would like to return this item because the size is fine, but the buttons do not work.", "Return request with one reason"},
+		{"cnt_daily_052", "Daily Listening: Check-in Instruction", "listening", "intro", "daily", "Please show your ID first, then sign here, and wait near the blue line for your number.", "Check-in instruction with short sequence"},
+		{"cnt_daily_053", "Daily Speaking: Ask to Slow Down", "speaking_template", "intro", "daily", "I want to follow correctly. Could we go a little more slowly from the start?", "Slow-down speaking template"},
+		{"cnt_research_051", "Research Reading: Main Contribution", "reading", "intermediate", "research", "Our main contribution is a reading flow that keeps the core relation visible before additional information appears.", "Main contribution sentence"},
+		{"cnt_research_052", "Research Listening: Participant Profile", "listening", "intermediate", "research", "Most participants reported that they knew many of the words, but they often lost the sentence after new details arrived.", "Participant profile for listening"},
+		{"cnt_research_053", "Research Speaking: Method in Steps", "speaking_template", "intermediate", "research", "First, we measured overload. Next, we changed the interface. Finally, we compared the results.", "Method explanation in short steps"},
+		{"cnt_research_054", "Research Reading: Key Observation", "reading", "intermediate", "research", "A key observation was that visual support helped most when the sentence contained multiple modifiers before the main point.", "Key observation sentence"},
+		{"cnt_research_055", "Research Listening: Practical Impact", "listening", "intermediate", "research", "In practice, this means learners may understand more when the system reduces holding demand at the right moment.", "Practical impact for listening"},
+		{"cnt_research_056", "Research Speaking: Limitation and Next Step", "speaking_template", "intermediate", "research", "One limitation remains. We need more live conversation data. That is our next step.", "Limitation and next-step template"},
+		{"cnt_meeting_045", "Meeting Reading: Decide the First Task", "reading", "intermediate", "meeting", "Before we discuss every detail, let us decide the first task that must be finished today.", "First-task meeting sentence"},
+		{"cnt_meeting_046", "Meeting Listening: One Risk to Watch", "listening", "intermediate", "meeting", "The biggest risk this week is not design quality. It is delayed feedback from the test group.", "One-risk listening item"},
+		{"cnt_meeting_047", "Meeting Speaking: Ask for a Simple Summary", "speaking_template", "intermediate", "meeting", "Could you give me a simple summary first, then one detail after that?", "Simple-summary meeting template"},
+		{"cnt_meeting_048", "Meeting Reading: Confirm the Owner", "reading", "intermediate", "meeting", "To avoid confusion, can we confirm who owns the final review and who sends the update?", "Owner-confirmation question"},
+		{"cnt_meeting_049", "Meeting Listening: Small Scope Reminder", "listening", "intermediate", "meeting", "Just a reminder, we are checking only the sign-up flow today, not the full account settings page.", "Scope reminder for meetings"},
+		{"cnt_meeting_050", "Meeting Speaking: State One Blocker", "speaking_template", "intermediate", "meeting", "I have one blocker. The main screen works. The export step still needs review.", "One-blocker progress update"},
+		{"cnt_rescue_050", "Rescue: Ask for One Keyword", "rescue", "intro", "rescue", "Could you give me one keyword first?", "Rescue phrase for one keyword"},
+		{"cnt_rescue_051", "Rescue: Ask for the First Part Only", "rescue", "intro", "rescue", "Could we do the first part only for now?", "Rescue phrase for first part only"},
+		{"cnt_rescue_052", "Rescue: Ask to Keep the Main Point Visible", "rescue", "intro", "rescue", "Can we keep the main point visible while you explain the detail?", "Rescue phrase for visible main point"},
+		{"cnt_rescue_053", "Rescue: Ask for One Example Before More Detail", "rescue", "intro", "rescue", "Could you give one example before the extra detail?", "Rescue phrase for one example"},
+		{"cnt_rescue_054", "Rescue: Ask to Repeat the Decision", "rescue", "intro", "rescue", "Could you repeat the decision one more time?", "Rescue phrase for decision repetition"},
+		{"cnt_rescue_055", "Rescue: Ask for the Next Step Only", "rescue", "intro", "rescue", "Please tell me only the next step for now.", "Rescue phrase for next step only"},
+	}
+
+	items := make([]domain.Content, 0, len(specs))
+	for _, spec := range specs {
+		items = append(items, domain.Content{
+			ID:          spec.id,
+			Title:       spec.title,
+			ContentType: spec.contentType,
+			Level:       spec.level,
+			Topic:       spec.topic,
+			Language:    "en",
+			RawText:     spec.rawText,
+			SummaryText: spec.summaryText,
+			CreatedAt:   now,
+			UpdatedAt:   now,
+		})
+	}
+
+	return items
+}
