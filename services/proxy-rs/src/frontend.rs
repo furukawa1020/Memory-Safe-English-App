@@ -7,6 +7,7 @@ use axum::{
 use serde::Serialize;
 
 use crate::{
+    config::RuntimeEnvironment,
     http_response::with_standard_headers, readiness, request_id::resolve_request_id,
     state::AppState,
 };
@@ -21,7 +22,7 @@ pub async fn mobile_bootstrap(
     with_standard_headers(
         (
             StatusCode::OK,
-            Json(MobileBootstrapResponse::from_readiness(&readiness)),
+            Json(MobileBootstrapResponse::from_state(&state, &readiness)),
         )
             .into_response(),
         &request_id,
@@ -33,23 +34,38 @@ pub async fn mobile_bootstrap(
 struct MobileBootstrapResponse {
     ready: bool,
     checked_at_unix_ms: u128,
-    recommended_base_urls: RecommendedBaseUrls,
+    recommended_base_urls: Option<RecommendedBaseUrls>,
     routes: FrontendRoutes,
     capabilities: FrontendCapabilities,
-    api: readiness::UpstreamStatus,
-    worker: readiness::UpstreamStatus,
+    api: Option<readiness::UpstreamStatus>,
+    worker: Option<readiness::UpstreamStatus>,
+    environment: &'static str,
 }
 
 impl MobileBootstrapResponse {
-    fn from_readiness(report: &readiness::ReadinessReport) -> Self {
+    fn from_state(state: &AppState, report: &readiness::ReadinessReport) -> Self {
+        let is_production = state.config.runtime_environment == RuntimeEnvironment::Production;
         Self {
             ready: report.ready,
             checked_at_unix_ms: report.checked_at_unix_ms,
-            recommended_base_urls: RecommendedBaseUrls::default(),
+            recommended_base_urls: if is_production {
+                None
+            } else {
+                Some(RecommendedBaseUrls::default())
+            },
             routes: FrontendRoutes::default(),
             capabilities: FrontendCapabilities::default(),
-            api: report.api.clone(),
-            worker: report.worker.clone(),
+            api: if is_production {
+                None
+            } else {
+                Some(report.api.clone())
+            },
+            worker: if is_production {
+                None
+            } else {
+                Some(report.worker.clone())
+            },
+            environment: if is_production { "production" } else { "development" },
         }
     }
 }
