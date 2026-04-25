@@ -284,6 +284,52 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn cache_purge_rejects_unknown_json_fields() {
+        let app = build_router(state());
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/admin/cache/purge")
+                    .header("content-type", "application/json")
+                    .header("x-proxy-admin-token", "secret")
+                    .body(Body::from(r#"{"scope":"chunks","extra":true}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        let body = to_bytes(response.into_body(), 1024).await.unwrap();
+        let text = String::from_utf8(body.to_vec()).unwrap();
+        assert!(text.contains("invalid_json"));
+    }
+
+    #[tokio::test]
+    async fn cache_purge_rejects_invalid_json_body() {
+        let app = build_router(state());
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/admin/cache/purge")
+                    .header("content-type", "application/json")
+                    .header("x-proxy-admin-token", "secret")
+                    .body(Body::from(r#"{"scope":"chunks""#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        let body = to_bytes(response.into_body(), 1024).await.unwrap();
+        let text = String::from_utf8(body.to_vec()).unwrap();
+        assert!(text.contains("invalid_json"));
+    }
+
+    #[tokio::test]
     async fn ready_endpoint_returns_ok_when_upstreams_are_healthy() {
         let api = spawn_health_server(StatusCode::OK).await;
         let worker = spawn_health_server(StatusCode::OK).await;
