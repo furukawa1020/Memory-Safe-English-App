@@ -7,9 +7,8 @@ use axum::{
 use serde::Serialize;
 
 use crate::{
-    config::RuntimeEnvironment,
-    http_response::with_standard_headers, readiness, request_id::resolve_request_id,
-    state::AppState,
+    config::RuntimeEnvironment, http_response::with_standard_headers, readiness,
+    request_id::resolve_request_id, response_headers::HeaderPolicy, state::AppState,
 };
 
 pub async fn mobile_bootstrap(
@@ -27,6 +26,8 @@ pub async fn mobile_bootstrap(
             .into_response(),
         &request_id,
         "miss",
+        &state.config.runtime_environment,
+        HeaderPolicy::Sensitive,
     )
 }
 
