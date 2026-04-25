@@ -36,6 +36,7 @@ static RESPONSE_HEADERS_TO_STRIP: &[&str] = &[
     "alt-svc",
     "x-aspnet-version",
     "x-aspnetmvc-version",
+    "set-cookie",
 ];
 
 pub async fn proxy_to_api(State(state): State<AppState>, request: Request<Body>) -> Response<Body> {
@@ -59,6 +60,22 @@ async fn forward(state: AppState, request: Request<Body>, upstream: Upstream) ->
         .map(|value| value.as_str())
         .unwrap_or("/")
         .to_string();
+
+    if is_declared_body_too_large(request.headers(), state.config.max_request_body_bytes) {
+        log_event(
+            "proxy_content_length_rejected",
+            request_id.to_str().unwrap_or("proxy-request-id"),
+            &client_ip,
+            &path_and_query,
+            "declared content-length exceeded proxy limit",
+        );
+        return error_response(
+            StatusCode::PAYLOAD_TOO_LARGE,
+            "request body too large",
+            &request_id,
+            upstream.header_value(),
+        );
+    }
 
     if let Some(rejection) = validate_request(
         upstream.guard_upstream(),
@@ -287,6 +304,11 @@ fn sanitize_request_headers(
             || name.as_str().eq_ignore_ascii_case("cf-connecting-ip")
             || name.as_str().eq_ignore_ascii_case("x-client-ip")
             || name.as_str().eq_ignore_ascii_case("x-cluster-client-ip")
+            || name.as_str().eq_ignore_ascii_case("x-http-method-override")
+            || name.as_str().eq_ignore_ascii_case("x-method-override")
+            || name.as_str().eq_ignore_ascii_case("x-original-url")
+            || name.as_str().eq_ignore_ascii_case("x-rewrite-url")
+            || name.as_str().eq_ignore_ascii_case("cookie")
         {
             continue;
         }
@@ -385,6 +407,15 @@ fn rate_limited_response(
 fn auth_rate_limit_key(path_and_query: &str, client_ip: &str) -> String {
     let normalized = path_and_query.split('?').next().unwrap_or(path_and_query);
     format!("auth:{normalized}:{client_ip}")
+}
+
+fn is_declared_body_too_large(headers: &HeaderMap, max_bytes: usize) -> bool {
+    headers
+        .get(http::header::CONTENT_LENGTH)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.parse::<usize>().ok())
+        .map(|value| value > max_bytes)
+        .unwrap_or(false)
 }
 
 fn should_skip_header(header_name: &str) -> bool {
@@ -522,10 +553,24 @@ mod tests {
     }
 
     #[test]
+    fn sanitize_request_headers_strips_override_and_cookie_headers() {
+        let mut headers = HeaderMap::new();
+        headers.insert("x-http-method-override", HeaderValue::from_static("DELETE"));
+        headers.insert("cookie", HeaderValue::from_static("session=secret"));
+        let request_id = HeaderValue::from_static("request-123");
+
+        let sanitized = sanitize_request_headers(&headers, &request_id, "198.51.100.10");
+
+        assert!(sanitized.get("x-http-method-override").is_none());
+        assert!(sanitized.get("cookie").is_none());
+    }
+
+    #[test]
     fn sanitize_response_headers_strips_server_fingerprint_headers() {
         let mut upstream = reqwest::header::HeaderMap::new();
         upstream.insert("server", HeaderValue::from_static("nginx"));
         upstream.insert("x-powered-by", HeaderValue::from_static("express"));
+        upstream.insert("set-cookie", HeaderValue::from_static("session=secret"));
         upstream.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
         let request_id = HeaderValue::from_static("request-123");
 
@@ -533,6 +578,16 @@ mod tests {
 
         assert!(sanitized.get("server").is_none());
         assert!(sanitized.get("x-powered-by").is_none());
+        assert!(sanitized.get("set-cookie").is_none());
         assert_eq!(sanitized.get(CONTENT_TYPE).unwrap(), "application/json");
+    }
+
+    #[test]
+    fn detects_declared_body_too_large() {
+        let mut headers = HeaderMap::new();
+        headers.insert(http::header::CONTENT_LENGTH, HeaderValue::from_static("2048"));
+
+        assert!(is_declared_body_too_large(&headers, 1024));
+        assert!(!is_declared_body_too_large(&headers, 4096));
     }
 }
