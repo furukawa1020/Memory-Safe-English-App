@@ -5,6 +5,7 @@ pub mod config;
 pub mod frontend;
 pub mod gc;
 pub mod http_response;
+pub mod problem_bank;
 pub mod proxy;
 pub mod rate_limit;
 pub mod readiness;
