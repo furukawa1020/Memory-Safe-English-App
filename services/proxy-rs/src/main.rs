@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use mse_proxy::{
-    cache::CacheStore, config::Config, gc, rate_limit::RateLimiter, routes, state::AppState,
+    cache::CacheStore, config::Config, gc, problem_bank::ProblemBank, rate_limit::RateLimiter, routes, state::AppState,
 };
 use reqwest::Client;
 use tokio::{net::TcpListener, signal};
@@ -37,6 +37,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         config: config.clone(),
         http_client,
         cache,
+        problem_bank: ProblemBank::seeded(),
         admin_rate_limiter,
         auth_rate_limiter,
     };
