@@ -1,6 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 #[derive(Clone)]
 pub struct ProblemBank {
@@ -40,6 +41,91 @@ impl ProblemBank {
     pub fn get(&self, id: &str) -> Option<ProblemRecord> {
         self.by_id.get(id).cloned()
     }
+
+    pub fn generate(&self, request: ProblemGenerationRequest) -> GeneratedProblemSet {
+        let normalized = normalize_text(&request.text);
+        let sentences = split_sentences(&normalized);
+        let summary = summarize(&sentences, &normalized);
+        let focus_text = sentences
+            .first()
+            .cloned()
+            .unwrap_or_else(|| normalized.clone());
+        let level_band = request
+            .level_band
+            .unwrap_or_else(|| "toeic_600_700".to_string());
+        let target_context = request
+            .target_context
+            .unwrap_or_else(|| "general".to_string());
+        let topic = request.topic.unwrap_or_else(|| infer_topic(&target_context, &normalized));
+        let base_id = generated_id(&normalized, &target_context, &level_band);
+
+        let items = vec![
+            generated_problem(
+                format!("{base_id}_read"),
+                "Generated Core Lock",
+                "reading",
+                &level_band,
+                &topic,
+                &target_context,
+                format!("Read only this first and stop before extra detail: '{focus_text}'"),
+                "Keep the main sentence stable before support detail appears.",
+                "You can restate the main point in one short sentence.",
+                10,
+                &["generated", "core_lock"],
+            ),
+            generated_problem(
+                format!("{base_id}_listen"),
+                "Generated Pause Recall",
+                "listening",
+                &level_band,
+                &topic,
+                &target_context,
+                format!("Listen to this chunk, pause, and say only the checkpoint meaning: '{focus_text}'"),
+                "A forced pause protects one meaning unit before the next audio arrives.",
+                "You can say the checkpoint meaning without replaying immediately.",
+                20,
+                &["generated", "pause_recall"],
+            ),
+            generated_problem(
+                format!("{base_id}_speak"),
+                "Generated Short-Unit Speaking",
+                "speaking",
+                &level_band,
+                &topic,
+                &target_context,
+                format!(
+                    "Say this in two or three short parts instead of one long sentence: '{}'",
+                    speaking_target(&summary)
+                ),
+                "Short units reduce the need to plan and hold the full answer at once.",
+                "You can finish the explanation without restarting the sentence.",
+                30,
+                &["generated", "short_unit"],
+            ),
+            generated_problem(
+                format!("{base_id}_rescue"),
+                "Generated Rescue Prompt",
+                "rescue",
+                &level_band,
+                "rescue",
+                &target_context,
+                rescue_prompt(&target_context),
+                "A rescue line creates one external anchor before more detail arrives.",
+                "You can use the line quickly when the sentence starts to collapse.",
+                40,
+                &["generated", "rescue"],
+            ),
+        ];
+
+        GeneratedProblemSet {
+            source_text: normalized,
+            summary,
+            target_context,
+            level_band,
+            topic,
+            items,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -55,6 +141,25 @@ pub struct ProblemRecord {
     pub success_check: String,
     pub tags: Vec<String>,
     pub sort_order: u32,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProblemGenerationRequest {
+    pub text: String,
+    pub level_band: Option<String>,
+    pub topic: Option<String>,
+    pub target_context: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct GeneratedProblemSet {
+    pub source_text: String,
+    pub summary: String,
+    pub target_context: String,
+    pub level_band: String,
+    pub topic: String,
+    pub items: Vec<ProblemRecord>,
 }
 
 #[derive(Clone, Debug)]
@@ -172,6 +277,97 @@ fn problem(
     }
 }
 
+fn generated_problem(
+    id: String,
+    title: &str,
+    mode: &str,
+    level_band: &str,
+    topic: &str,
+    target_context: &str,
+    prompt: String,
+    wm_support: &str,
+    success_check: &str,
+    sort_order: u32,
+    tags: &[&str],
+) -> ProblemRecord {
+    ProblemRecord {
+        id,
+        title: title.to_string(),
+        mode: mode.to_string(),
+        level_band: level_band.to_string(),
+        topic: topic.to_string(),
+        target_context: target_context.to_string(),
+        prompt,
+        wm_support: wm_support.to_string(),
+        success_check: success_check.to_string(),
+        tags: tags.iter().map(|tag| (*tag).to_string()).collect(),
+        sort_order,
+    }
+}
+
+fn normalize_text(text: &str) -> String {
+    text.split_whitespace().collect::<Vec<_>>().join(" ").trim().to_string()
+}
+
+fn split_sentences(text: &str) -> Vec<String> {
+    text.split(['.', '!', '?'])
+        .map(str::trim)
+        .filter(|segment| !segment.is_empty())
+        .map(ToString::to_string)
+        .collect()
+}
+
+fn summarize(sentences: &[String], normalized: &str) -> String {
+    if let Some(first) = sentences.first() {
+        first.clone()
+    } else {
+        normalized.to_string()
+    }
+}
+
+fn infer_topic(target_context: &str, text: &str) -> String {
+    let lowered = text.to_ascii_lowercase();
+    if target_context.eq_ignore_ascii_case("meeting")
+        || lowered.contains("meeting")
+        || lowered.contains("schedule")
+        || lowered.contains("client")
+    {
+        "meeting".to_string()
+    } else if target_context.eq_ignore_ascii_case("research")
+        || lowered.contains("study")
+        || lowered.contains("participants")
+        || lowered.contains("result")
+    {
+        "research".to_string()
+    } else if target_context.eq_ignore_ascii_case("self_intro") {
+        "self_intro".to_string()
+    } else {
+        "daily".to_string()
+    }
+}
+
+fn speaking_target(summary: &str) -> String {
+    summary.trim_end_matches('.').to_string()
+}
+
+fn rescue_prompt(target_context: &str) -> String {
+    match target_context {
+        "meeting" => "Practice saying: 'Could you give me the decision first, and then the detail?'".to_string(),
+        "research" => "Practice saying: 'Could you repeat the main result first?'".to_string(),
+        "self_intro" => "Practice saying: 'Could I explain it one short step at a time?'".to_string(),
+        _ => "Practice saying: 'Could you tell me the main point first?'".to_string(),
+    }
+}
+
+fn generated_id(text: &str, target_context: &str, level_band: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(text.as_bytes());
+    hasher.update(target_context.as_bytes());
+    hasher.update(level_band.as_bytes());
+    let digest = format!("{:x}", hasher.finalize());
+    format!("gen_{}", &digest[..12])
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -198,5 +394,20 @@ mod tests {
         });
 
         assert_eq!(results.len(), 2);
+    }
+
+    #[test]
+    fn generates_problem_set_from_text() {
+        let bank = ProblemBank::seeded();
+        let generated = bank.generate(ProblemGenerationRequest {
+            text: "The client approved the design draft, but the delivery schedule is still under review.".to_string(),
+            level_band: Some("toeic_750_800".to_string()),
+            topic: None,
+            target_context: Some("meeting".to_string()),
+        });
+
+        assert_eq!(generated.items.len(), 4);
+        assert_eq!(generated.topic, "meeting");
+        assert!(generated.items.iter().any(|item| item.mode == "speaking"));
     }
 }
