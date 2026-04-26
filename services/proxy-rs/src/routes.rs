@@ -9,7 +9,7 @@ use serde::Serialize;
 
 use crate::{
     admin, frontend, http_response::with_standard_headers, problems, proxy, readiness,
-    problem_bank::ProblemBank, request_id::resolve_request_id, state::AppState,
+    request_id::resolve_request_id, state::AppState,
     response_headers::HeaderPolicy,
 };
 
@@ -102,7 +102,7 @@ mod tests {
             },
             http_client: reqwest::Client::new(),
             cache: CacheStore::new(Duration::from_secs(60), 32),
-            problem_bank: ProblemBank::seeded(),
+            problem_bank: crate::problem_bank::ProblemBank::seeded(),
             admin_rate_limiter: RateLimiter::new(30, Duration::from_secs(60)),
             auth_rate_limiter: RateLimiter::new(10, Duration::from_secs(60)),
         }
@@ -587,6 +587,7 @@ mod tests {
             },
             http_client: reqwest::Client::new(),
             cache: CacheStore::new(Duration::from_secs(60), 32),
+            problem_bank: crate::problem_bank::ProblemBank::seeded(),
             admin_rate_limiter: RateLimiter::new(30, Duration::from_secs(60)),
             auth_rate_limiter: RateLimiter::new(
                 auth_rate_limit_max_requests,
