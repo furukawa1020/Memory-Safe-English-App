@@ -8,8 +8,8 @@ use axum::{
 use serde::Serialize;
 
 use crate::{
-    admin, frontend, http_response::with_standard_headers, proxy, readiness,
-    request_id::resolve_request_id, state::AppState,
+    admin, frontend, http_response::with_standard_headers, problems, proxy, readiness,
+    problem_bank::ProblemBank, request_id::resolve_request_id, state::AppState,
     response_headers::HeaderPolicy,
 };
 
@@ -18,6 +18,8 @@ pub fn build_router(state: AppState) -> Router {
         .route("/health", get(health))
         .route("/ready", get(readiness::ready))
         .route("/bootstrap/mobile", get(frontend::mobile_bootstrap))
+        .route("/problem-bank", get(problems::list_problems))
+        .route("/problem-bank/:id", get(problems::get_problem))
         .route("/admin/cache", get(admin::cache_stats))
         .route("/admin/cache/purge", post(admin::purge_cache))
         .route("/auth/*path", any(proxy::proxy_to_api))
@@ -100,6 +102,7 @@ mod tests {
             },
             http_client: reqwest::Client::new(),
             cache: CacheStore::new(Duration::from_secs(60), 32),
+            problem_bank: ProblemBank::seeded(),
             admin_rate_limiter: RateLimiter::new(30, Duration::from_secs(60)),
             auth_rate_limiter: RateLimiter::new(10, Duration::from_secs(60)),
         }
@@ -510,6 +513,48 @@ mod tests {
         assert!(text.contains("\"api\":null"));
         assert!(text.contains("\"worker\":null"));
         assert!(text.contains("\"login\":\"/auth/login\""));
+    }
+
+    #[tokio::test]
+    async fn problem_bank_lists_seeded_items() {
+        let app = build_router(state());
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/problem-bank?mode=speaking&limit=2")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = to_bytes(response.into_body(), 4096).await.unwrap();
+        let text = String::from_utf8(body.to_vec()).unwrap();
+        assert!(text.contains("\"total\":2"));
+        assert!(text.contains("\"mode\":\"speaking\""));
+    }
+
+    #[tokio::test]
+    async fn problem_bank_returns_item_by_id() {
+        let app = build_router(state());
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/problem-bank/pb_read_001")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = to_bytes(response.into_body(), 4096).await.unwrap();
+        let text = String::from_utf8(body.to_vec()).unwrap();
+        assert!(text.contains("\"id\":\"pb_read_001\""));
+        assert!(text.contains("\"wm_support\""));
     }
 
     fn state_with_urls(api_base_url: String, worker_base_url: String) -> AppState {
