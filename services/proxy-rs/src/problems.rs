@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     http_response::with_standard_headers,
-    problem_bank::{ProblemFilter, ProblemRecord},
+    problem_bank::{GeneratedProblemSet, ProblemFilter, ProblemGenerationRequest, ProblemRecord},
     request_id::resolve_request_id,
     response_headers::HeaderPolicy,
     state::AppState,
@@ -76,6 +76,23 @@ pub async fn get_problem(
     }
 }
 
+pub async fn generate_problems(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(request): Json<ProblemGenerationRequest>,
+) -> impl IntoResponse {
+    let request_id = resolve_request_id(&headers);
+    let generated = state.problem_bank.generate(request);
+
+    with_standard_headers(
+        (StatusCode::OK, Json(GeneratedProblemSetResponse::from(generated))).into_response(),
+        &request_id,
+        "miss",
+        &state.config.runtime_environment,
+        HeaderPolicy::Sensitive,
+    )
+}
+
 #[derive(Debug, Deserialize)]
 pub struct ProblemBankQuery {
     pub mode: Option<String>,
@@ -90,6 +107,29 @@ pub struct ProblemBankQuery {
 struct ProblemBankListResponse {
     total: usize,
     items: Vec<ProblemRecord>,
+}
+
+#[derive(Debug, Serialize)]
+struct GeneratedProblemSetResponse {
+    source_text: String,
+    summary: String,
+    target_context: String,
+    level_band: String,
+    topic: String,
+    items: Vec<ProblemRecord>,
+}
+
+impl From<GeneratedProblemSet> for GeneratedProblemSetResponse {
+    fn from(value: GeneratedProblemSet) -> Self {
+        Self {
+            source_text: value.source_text,
+            summary: value.summary,
+            target_context: value.target_context,
+            level_band: value.level_band,
+            topic: value.topic,
+            items: value.items,
+        }
+    }
 }
 
 #[derive(Debug, Serialize)]

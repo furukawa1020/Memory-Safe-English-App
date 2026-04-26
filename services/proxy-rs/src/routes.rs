@@ -20,6 +20,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/bootstrap/mobile", get(frontend::mobile_bootstrap))
         .route("/problem-bank", get(problems::list_problems))
         .route("/problem-bank/:id", get(problems::get_problem))
+        .route("/problem-bank/generate", post(problems::generate_problems))
         .route("/admin/cache", get(admin::cache_stats))
         .route("/admin/cache/purge", post(admin::purge_cache))
         .route("/auth/*path", any(proxy::proxy_to_api))
@@ -555,6 +556,34 @@ mod tests {
         let text = String::from_utf8(body.to_vec()).unwrap();
         assert!(text.contains("\"id\":\"pb_read_001\""));
         assert!(text.contains("\"wm_support\""));
+    }
+
+    #[tokio::test]
+    async fn problem_bank_generates_problems_from_text() {
+        let app = build_router(state());
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/problem-bank/generate")
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        r#"{"text":"The client approved the design draft, but the delivery schedule is still under review.","target_context":"meeting","level_band":"toeic_750_800"}"#,
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = to_bytes(response.into_body(), 4096).await.unwrap();
+        let text = String::from_utf8(body.to_vec()).unwrap();
+        assert!(text.contains("\"target_context\":\"meeting\""));
+        assert!(text.contains("\"mode\":\"reading\""));
+        assert!(text.contains("\"mode\":\"listening\""));
+        assert!(text.contains("\"mode\":\"speaking\""));
+        assert!(text.contains("\"mode\":\"rescue\""));
     }
 
     fn state_with_urls(api_base_url: String, worker_base_url: String) -> AppState {
