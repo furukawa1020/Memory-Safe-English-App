@@ -19,8 +19,10 @@ pub fn build_router(state: AppState) -> Router {
         .route("/ready", get(readiness::ready))
         .route("/bootstrap/mobile", get(frontend::mobile_bootstrap))
         .route("/problem-bank", get(problems::list_problems))
+        .route("/problem-bank/stats", get(problems::problem_bank_stats))
         .route("/problem-bank/:id", get(problems::get_problem))
         .route("/problem-bank/generate", post(problems::generate_problems))
+        .route("/problem-bank/save", post(problems::save_generated_problems))
         .route("/admin/cache", get(admin::cache_stats))
         .route("/admin/cache/purge", post(admin::purge_cache))
         .route("/auth/*path", any(proxy::proxy_to_api))
@@ -100,6 +102,7 @@ mod tests {
                 gc_interval: Duration::from_secs(60),
                 cache_max_entries: 32,
                 max_request_body_bytes: 1024,
+                problem_bank_path: None,
             },
             http_client: reqwest::Client::new(),
             cache: CacheStore::new(Duration::from_secs(60), 32),
@@ -615,6 +618,76 @@ mod tests {
         assert!(text.contains("Practice saying: 'Could you give me the decision first?'"));
     }
 
+    #[tokio::test]
+    async fn problem_bank_stats_returns_seed_counts() {
+        let app = build_router(state());
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/problem-bank/stats")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = to_bytes(response.into_body(), 4096).await.unwrap();
+        let text = String::from_utf8(body.to_vec()).unwrap();
+        assert!(text.contains("\"seeded\":"));
+        assert!(text.contains("\"by_mode\""));
+    }
+
+    #[tokio::test]
+    async fn problem_bank_save_persists_generated_items_in_memory() {
+        let app = build_router(state());
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/problem-bank/save")
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        r#"{
+                            "source":"reviewed",
+                            "generated_set":{
+                                "source_text":"The client approved the design draft, but the delivery schedule is still under review.",
+                                "summary":"The client approved the design draft",
+                                "target_context":"meeting",
+                                "level_band":"toeic_750_800",
+                                "topic":"meeting",
+                                "items":[
+                                    {
+                                        "id":"gen_read",
+                                        "title":"Generated Decision Lock",
+                                        "mode":"reading",
+                                        "level_band":"toeic_750_800",
+                                        "topic":"meeting",
+                                        "target_context":"meeting",
+                                        "prompt":"Read the decision first.",
+                                        "wm_support":"Keep the decision stable.",
+                                        "success_check":"You can say the decision.",
+                                        "tags":["generated","core_lock"],
+                                        "sort_order":10
+                                    }
+                                ]
+                            }
+                        }"#,
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::CREATED);
+        let body = to_bytes(response.into_body(), 4096).await.unwrap();
+        let text = String::from_utf8(body.to_vec()).unwrap();
+        assert!(text.contains("\"saved_count\":1"));
+        assert!(text.contains("\"source\":\"reviewed\""));
+    }
+
     fn state_with_urls(api_base_url: String, worker_base_url: String) -> AppState {
         state_with_urls_and_auth_limit(api_base_url, worker_base_url, 10)
     }
@@ -642,6 +715,7 @@ mod tests {
                 gc_interval: Duration::from_secs(60),
                 cache_max_entries: 32,
                 max_request_body_bytes: 1024,
+                problem_bank_path: None,
             },
             http_client: reqwest::Client::new(),
             cache: CacheStore::new(Duration::from_secs(60), 32),
