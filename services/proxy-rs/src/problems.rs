@@ -10,8 +10,8 @@ use tokio::join;
 use crate::{
     http_response::with_standard_headers,
     problem_bank::{
-        GeneratedProblemSet, ProblemBankStats, ProblemFilter, ProblemGenerationRequest,
-        ProblemRecord, ProblemSaveSource, SavedProblemSet,
+        GeneratedProblemSet, ProblemFilter, ProblemGenerationRequest, ProblemRecord,
+        ProblemSaveSource,
     },
     request_id::resolve_request_id,
     response_headers::HeaderPolicy,
