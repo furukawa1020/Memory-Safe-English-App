@@ -64,6 +64,17 @@ class SessionController extends ChangeNotifier {
     }
   }
 
+  Future<void> continueAsGuest({
+    required AuthRepository repository,
+  }) async {
+    _setBusy(true);
+    try {
+      await _setSession(await repository.continueAsGuest());
+    } finally {
+      _setBusy(false);
+    }
+  }
+
   Future<void> logout() async {
     _session = null;
     await _storage.clear();

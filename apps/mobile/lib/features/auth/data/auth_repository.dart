@@ -38,4 +38,13 @@ class AuthRepository {
     );
     return AuthSession.fromJson(response);
   }
+
+  Future<AuthSession> continueAsGuest() async {
+    final response = await _apiClient.post(
+      '/auth/guest',
+      authenticated: false,
+      body: const <String, dynamic>{},
+    );
+    return AuthSession.fromJson(response);
+  }
 }
