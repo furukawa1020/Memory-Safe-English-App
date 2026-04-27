@@ -9,7 +9,10 @@ use tokio::join;
 
 use crate::{
     http_response::with_standard_headers,
-    problem_bank::{GeneratedProblemSet, ProblemFilter, ProblemGenerationRequest, ProblemRecord},
+    problem_bank::{
+        GeneratedProblemSet, ProblemBankStats, ProblemFilter, ProblemGenerationRequest,
+        ProblemRecord, ProblemSaveSource, SavedProblemSet,
+    },
     request_id::resolve_request_id,
     response_headers::HeaderPolicy,
     state::AppState,
@@ -94,6 +97,55 @@ pub async fn generate_problems(
     )
 }
 
+pub async fn problem_bank_stats(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> impl IntoResponse {
+    let request_id = resolve_request_id(&headers);
+    let stats = state.problem_bank.stats();
+
+    with_standard_headers(
+        (StatusCode::OK, Json(stats)).into_response(),
+        &request_id,
+        "miss",
+        &state.config.runtime_environment,
+        HeaderPolicy::Sensitive,
+    )
+}
+
+pub async fn save_generated_problems(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(request): Json<SaveGeneratedProblemRequest>,
+) -> impl IntoResponse {
+    let request_id = resolve_request_id(&headers);
+    match state
+        .problem_bank
+        .save_generated_set(&request.generated_set, request.source)
+    {
+        Ok(saved) => with_standard_headers(
+            (StatusCode::CREATED, Json(saved)).into_response(),
+            &request_id,
+            "miss",
+            &state.config.runtime_environment,
+            HeaderPolicy::Sensitive,
+        ),
+        Err(_) => with_standard_headers(
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ProblemBankErrorResponse {
+                    error: "problem_bank_save_failed",
+                }),
+            )
+                .into_response(),
+            &request_id,
+            "miss",
+            &state.config.runtime_environment,
+            HeaderPolicy::Sensitive,
+        ),
+    }
+}
+
 #[derive(Debug, Deserialize)]
 pub struct ProblemBankQuery {
     pub mode: Option<String>,
@@ -131,6 +183,13 @@ impl From<GeneratedProblemSet> for GeneratedProblemSetResponse {
             items: value.items,
         }
     }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SaveGeneratedProblemRequest {
+    generated_set: GeneratedProblemSet,
+    source: ProblemSaveSource,
 }
 
 #[derive(Debug, Serialize)]
