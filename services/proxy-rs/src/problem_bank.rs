@@ -50,6 +50,7 @@ impl ProblemBank {
             .first()
             .cloned()
             .unwrap_or_else(|| normalized.clone());
+        let support_text = support_focus(&normalized).unwrap_or_else(|| focus_text.clone());
         let level_band = request
             .level_band
             .unwrap_or_else(|| "toeic_600_700".to_string());
@@ -58,60 +59,58 @@ impl ProblemBank {
             .unwrap_or_else(|| "general".to_string());
         let topic = request.topic.unwrap_or_else(|| infer_topic(&target_context, &normalized));
         let base_id = generated_id(&normalized, &target_context, &level_band);
+        let profile = generated_profile(&target_context, &topic, &focus_text, &support_text, &summary);
 
         let items = vec![
             generated_problem(
                 format!("{base_id}_read"),
-                "Generated Core Lock",
+                profile.reading_title,
                 "reading",
                 &level_band,
                 &topic,
                 &target_context,
-                format!("Read only this first and stop before extra detail: '{focus_text}'"),
-                "Keep the main sentence stable before support detail appears.",
-                "You can restate the main point in one short sentence.",
+                profile.reading_prompt,
+                profile.reading_support,
+                profile.reading_success,
                 10,
                 &["generated", "core_lock"],
             ),
             generated_problem(
                 format!("{base_id}_listen"),
-                "Generated Pause Recall",
+                profile.listening_title,
                 "listening",
                 &level_band,
                 &topic,
                 &target_context,
-                format!("Listen to this chunk, pause, and say only the checkpoint meaning: '{focus_text}'"),
-                "A forced pause protects one meaning unit before the next audio arrives.",
-                "You can say the checkpoint meaning without replaying immediately.",
+                profile.listening_prompt,
+                profile.listening_support,
+                profile.listening_success,
                 20,
                 &["generated", "pause_recall"],
             ),
             generated_problem(
                 format!("{base_id}_speak"),
-                "Generated Short-Unit Speaking",
+                profile.speaking_title,
                 "speaking",
                 &level_band,
                 &topic,
                 &target_context,
-                format!(
-                    "Say this in two or three short parts instead of one long sentence: '{}'",
-                    speaking_target(&summary)
-                ),
-                "Short units reduce the need to plan and hold the full answer at once.",
-                "You can finish the explanation without restarting the sentence.",
+                profile.speaking_prompt,
+                profile.speaking_support,
+                profile.speaking_success,
                 30,
                 &["generated", "short_unit"],
             ),
             generated_problem(
                 format!("{base_id}_rescue"),
-                "Generated Rescue Prompt",
+                profile.rescue_title,
                 "rescue",
                 &level_band,
                 "rescue",
                 &target_context,
-                rescue_prompt(&target_context),
-                "A rescue line creates one external anchor before more detail arrives.",
-                "You can use the line quickly when the sentence starts to collapse.",
+                profile.rescue_prompt,
+                profile.rescue_support,
+                profile.rescue_success,
                 40,
                 &["generated", "rescue"],
             ),
@@ -339,9 +338,9 @@ fn split_sentences(text: &str) -> Vec<String> {
 
 fn summarize(sentences: &[String], normalized: &str) -> String {
     if let Some(first) = sentences.first() {
-        first.clone()
+        shorten_for_summary(first)
     } else {
-        normalized.to_string()
+        shorten_for_summary(normalized)
     }
 }
 
@@ -370,13 +369,12 @@ fn speaking_target(summary: &str) -> String {
     summary.trim_end_matches('.').to_string()
 }
 
-fn rescue_prompt(target_context: &str) -> String {
-    match target_context {
-        "meeting" => "Practice saying: 'Could you give me the decision first, and then the detail?'".to_string(),
-        "research" => "Practice saying: 'Could you repeat the main result first?'".to_string(),
-        "self_intro" => "Practice saying: 'Could I explain it one short step at a time?'".to_string(),
-        _ => "Practice saying: 'Could you tell me the main point first?'".to_string(),
-    }
+fn support_focus(text: &str) -> Option<String> {
+    split_on_support_markers(text)
+        .into_iter()
+        .nth(1)
+        .map(|value| value.trim().trim_end_matches('.').to_string())
+        .filter(|value| !value.is_empty())
 }
 
 fn generated_id(text: &str, target_context: &str, level_band: &str) -> String {
@@ -386,6 +384,179 @@ fn generated_id(text: &str, target_context: &str, level_band: &str) -> String {
     hasher.update(level_band.as_bytes());
     let digest = format!("{:x}", hasher.finalize());
     format!("gen_{}", &digest[..12])
+}
+
+struct GeneratedProfile {
+    reading_title: &'static str,
+    reading_prompt: String,
+    reading_support: &'static str,
+    reading_success: &'static str,
+    listening_title: &'static str,
+    listening_prompt: String,
+    listening_support: &'static str,
+    listening_success: &'static str,
+    speaking_title: &'static str,
+    speaking_prompt: String,
+    speaking_support: &'static str,
+    speaking_success: &'static str,
+    rescue_title: &'static str,
+    rescue_prompt: String,
+    rescue_support: &'static str,
+    rescue_success: &'static str,
+}
+
+fn generated_profile(
+    target_context: &str,
+    topic: &str,
+    focus_text: &str,
+    support_text: &str,
+    summary: &str,
+) -> GeneratedProfile {
+    match target_context {
+        "meeting" => GeneratedProfile {
+            reading_title: "Generated Decision Lock",
+            reading_prompt: format!(
+                "Read the core meeting point first: '{}'. Add this detail only after the decision feels stable: '{}'.",
+                trim_sentence(focus_text),
+                trim_sentence(support_text)
+            ),
+            reading_support: "Keep the decision stable before you add timing, ownership, or reason details.",
+            reading_success: "You can state the decision and one follow-up detail without rereading the full line.",
+            listening_title: "Generated Agenda Pause",
+            listening_prompt: format!(
+                "Pause after this meeting chunk and say only the checkpoint meaning: '{}'.",
+                trim_sentence(focus_text)
+            ),
+            listening_support: "Short pauses protect the agenda or decision before the next business detail arrives.",
+            listening_success: "You can repeat the meeting checkpoint before continuing.",
+            speaking_title: "Generated Meeting Update",
+            speaking_prompt: format!(
+                "Say this as two short business steps: '{}'. Then add one short follow-up detail: '{}'.",
+                speaking_target(focus_text),
+                speaking_target(support_text)
+            ),
+            speaking_support: "Two short business steps are safer than one dense update sentence.",
+            speaking_success: "You can finish the update without losing the second step.",
+            rescue_title: "Generated Meeting Rescue",
+            rescue_prompt: "Practice saying: 'Could you give me the decision first, and then the detail?'".to_string(),
+            rescue_support: "Decision-first rescue keeps the main meeting point visible.",
+            rescue_success: "You can ask for the decision quickly when the update becomes too dense.",
+        },
+        "research" => GeneratedProfile {
+            reading_title: "Generated Research Core Lock",
+            reading_prompt: format!(
+                "Read the core claim first: '{}'. Treat this as support that comes second: '{}'.",
+                trim_sentence(focus_text),
+                trim_sentence(support_text)
+            ),
+            reading_support: "Hold the claim before you load method, limitation, or result detail.",
+            reading_success: "You can explain the claim and one support detail in order.",
+            listening_title: "Generated Result Pause",
+            listening_prompt: format!(
+                "Pause after the main research point and keep only this checkpoint: '{}'.",
+                trim_sentence(focus_text)
+            ),
+            listening_support: "Research sentences often hide the takeaway behind detail, so the pause protects the result first.",
+            listening_success: "You can say the main result or claim before replaying.",
+            speaking_title: "Generated Research Short Units",
+            speaking_prompt: format!(
+                "Deliver the research point in short units: '{}'. Then add one support line: '{}'.",
+                speaking_target(summary),
+                speaking_target(support_text)
+            ),
+            speaking_support: "Short units keep the claim from collapsing under method or limitation detail.",
+            speaking_success: "You can say the claim clearly and then add one supporting line.",
+            rescue_title: "Generated Research Rescue",
+            rescue_prompt: "Practice saying: 'Could you tell me the result first, and then the method?'".to_string(),
+            rescue_support: "Result-first rescue prevents the method from displacing the main takeaway.",
+            rescue_success: "You can recover the takeaway before the explanation gets longer.",
+        },
+        "self_intro" => GeneratedProfile {
+            reading_title: "Generated Self-Intro Core Lock",
+            reading_prompt: format!(
+                "Read the self-introduction core first: '{}'. Add the next detail only after that feels stable.",
+                trim_sentence(focus_text)
+            ),
+            reading_support: "One stable identity sentence is easier to hold than a full introduction at once.",
+            reading_success: "You can restate the core self-introduction sentence smoothly.",
+            listening_title: "Generated Self-Intro Pause",
+            listening_prompt: format!(
+                "Pause after this self-introduction chunk and keep only the main identity line: '{}'.",
+                trim_sentence(focus_text)
+            ),
+            listening_support: "Pausing protects name, role, or goal before more background appears.",
+            listening_success: "You can repeat the main self-introduction line without replaying.",
+            speaking_title: "Generated Self-Intro Starter",
+            speaking_prompt: format!(
+                "Say this as two short introduction steps: '{}'. Then add one more simple detail.",
+                speaking_target(summary)
+            ),
+            speaking_support: "A short opener lowers pressure to plan the whole self-introduction.",
+            speaking_success: "You can start the introduction clearly and continue one step at a time.",
+            rescue_title: "Generated Self-Intro Rescue",
+            rescue_prompt: "Practice saying: 'Could I explain it one short step at a time?'".to_string(),
+            rescue_support: "This makes it easier to slow the exchange before the introduction collapses.",
+            rescue_success: "You can ask for a shorter interaction without losing confidence.",
+        },
+        _ => GeneratedProfile {
+            reading_title: "Generated Core Lock",
+            reading_prompt: format!(
+                "Read only this first and stop before extra detail: '{}'. Then add this support second: '{}'.",
+                trim_sentence(focus_text),
+                trim_sentence(support_text)
+            ),
+            reading_support: "Keep the main sentence stable before support detail appears.",
+            reading_success: "You can restate the main point in one short sentence.",
+            listening_title: "Generated Pause Recall",
+            listening_prompt: format!(
+                "Listen to this chunk, pause, and say only the checkpoint meaning: '{}'.",
+                trim_sentence(focus_text)
+            ),
+            listening_support: "A forced pause protects one meaning unit before the next audio arrives.",
+            listening_success: "You can say the checkpoint meaning without replaying immediately.",
+            speaking_title: if topic == "daily" {
+                "Generated Daily Short Units"
+            } else {
+                "Generated Short-Unit Speaking"
+            },
+            speaking_prompt: format!(
+                "Say this in two or three short parts instead of one long sentence: '{}'.",
+                speaking_target(summary)
+            ),
+            speaking_support: "Short units reduce the need to plan and hold the full answer at once.",
+            speaking_success: "You can finish the explanation without restarting the sentence.",
+            rescue_title: "Generated Rescue Prompt",
+            rescue_prompt: "Practice saying: 'Could you tell me the main point first?'".to_string(),
+            rescue_support: "A rescue line creates one external anchor before more detail arrives.",
+            rescue_success: "You can use the line quickly when the sentence starts to collapse.",
+        },
+    }
+}
+
+fn split_on_support_markers(text: &str) -> Vec<String> {
+    let markers = [", but ", ", and ", " because ", " while ", " so that ", " so ", " although ", " whereas "];
+    for marker in markers {
+        if text.to_ascii_lowercase().contains(marker.trim()) {
+            let parts = text.splitn(2, marker).map(str::trim).map(ToString::to_string).collect::<Vec<_>>();
+            if parts.len() > 1 {
+                return parts;
+            }
+        }
+    }
+    vec![text.to_string()]
+}
+
+fn trim_sentence(text: &str) -> String {
+    text.trim().trim_end_matches('.').to_string()
+}
+
+fn shorten_for_summary(text: &str) -> String {
+    let trimmed = trim_sentence(text);
+    let words = trimmed.split_whitespace().collect::<Vec<_>>();
+    if words.len() <= 16 {
+        return trimmed;
+    }
+    words[..16].join(" ")
 }
 
 #[cfg(test)]
@@ -429,5 +600,80 @@ mod tests {
         assert_eq!(generated.items.len(), 4);
         assert_eq!(generated.topic, "meeting");
         assert!(generated.items.iter().any(|item| item.mode == "speaking"));
+        let speaking = generated
+            .items
+            .iter()
+            .find(|item| item.mode == "speaking")
+            .expect("speaking item");
+        assert!(speaking.prompt.contains("two short business steps"));
+        let rescue = generated
+            .items
+            .iter()
+            .find(|item| item.mode == "rescue")
+            .expect("rescue item");
+        assert!(rescue.prompt.contains("decision first"));
+    }
+
+    #[test]
+    fn generates_research_specific_wording() {
+        let bank = ProblemBank::seeded();
+        let generated = bank.generate(ProblemGenerationRequest {
+            text: "The study found lower overload, but live conversation data is still limited.".to_string(),
+            level_band: Some("toeic_750_800".to_string()),
+            topic: None,
+            target_context: Some("research".to_string()),
+        });
+
+        let reading = generated
+            .items
+            .iter()
+            .find(|item| item.mode == "reading")
+            .expect("reading item");
+        assert!(reading.prompt.contains("core claim"));
+        let rescue = generated
+            .items
+            .iter()
+            .find(|item| item.mode == "rescue")
+            .expect("rescue item");
+        assert!(rescue.prompt.contains("result first"));
+    }
+
+    #[test]
+    fn generates_self_intro_specific_wording() {
+        let bank = ProblemBank::seeded();
+        let generated = bank.generate(ProblemGenerationRequest {
+            text: "Hello, I support students who need lower-load English practice, and I focus on step-by-step communication.".to_string(),
+            level_band: Some("starter".to_string()),
+            topic: None,
+            target_context: Some("self_intro".to_string()),
+        });
+
+        let speaking = generated
+            .items
+            .iter()
+            .find(|item| item.mode == "speaking")
+            .expect("speaking item");
+        assert!(speaking.prompt.contains("introduction steps"));
+        let rescue = generated
+            .items
+            .iter()
+            .find(|item| item.mode == "rescue")
+            .expect("rescue item");
+        assert!(rescue.prompt.contains("one short step at a time"));
+    }
+
+    #[test]
+    fn shortens_long_summary() {
+        let bank = ProblemBank::seeded();
+        let generated = bank.generate(ProblemGenerationRequest {
+            text: "The client approved the first draft after the review meeting, and the operations team will send the updated shipping timeline after checking supplier availability tomorrow morning.".to_string(),
+            level_band: Some("toeic_750_800".to_string()),
+            topic: None,
+            target_context: Some("meeting".to_string()),
+        });
+
+        let summary_word_count = generated.summary.split_whitespace().count();
+        assert!(summary_word_count <= 16);
+        assert!(generated.summary.contains("client approved"));
     }
 }
