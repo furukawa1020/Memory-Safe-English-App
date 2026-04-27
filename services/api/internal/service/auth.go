@@ -96,6 +96,31 @@ func (s AuthService) Login(ctx context.Context, email, plainPassword string) (Au
 	return s.newAuthResult(ctx, user)
 }
 
+func (s AuthService) Guest(ctx context.Context) (AuthResult, error) {
+	passwordHash, err := s.hasher.Hash(newSecureID("guest_secret"))
+	if err != nil {
+		return AuthResult{}, err
+	}
+
+	guestID := newSecureID("guest")
+	user, err := s.auth.CreateUserWithPassword(ctx, repository.NewAuthUser{
+		Email:        guestID + "@guest.memory-safe.local",
+		DisplayName:  "Guest " + strings.ToUpper(guestID[len(guestID)-4:]),
+		AuthProvider: "guest",
+		PasswordHash: passwordHash,
+	})
+	if err != nil {
+		return AuthResult{}, err
+	}
+
+	result, err := s.newAuthResult(ctx, user)
+	if err != nil {
+		return AuthResult{}, err
+	}
+	result.NativeNotice = "guest_session"
+	return result, nil
+}
+
 func (s AuthService) Refresh(ctx context.Context, refreshToken string) (AuthResult, error) {
 	if strings.TrimSpace(refreshToken) == "" {
 		return AuthResult{}, domain.ErrInvalidInput

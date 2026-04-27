@@ -116,6 +116,22 @@ func (h AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 	httpjson.Write(w, http.StatusOK, result)
 }
 
+func (h AuthHandler) Guest(w http.ResponseWriter, r *http.Request) {
+	if !h.allowAttempt(w, r, h.limiters.Register, "guest") {
+		return
+	}
+
+	result, err := h.service.Guest(r.Context())
+	if err != nil {
+		audit.LogAuthEvent(httpx.RequestID(r.Context()), "guest_failed", security.ClientIPFromRequest(r), "guest", false, err.Error())
+		httpx.WriteDomainError(w, err, "guest session could not be created", "user not found")
+		return
+	}
+
+	audit.LogAuthEvent(httpx.RequestID(r.Context()), "guest_succeeded", security.ClientIPFromRequest(r), "guest", true, "")
+	httpjson.Write(w, http.StatusCreated, result)
+}
+
 func (h AuthHandler) allowAttempt(w http.ResponseWriter, r *http.Request, limiter *security.AttemptLimiter, subject string) bool {
 	decision := limiter.Allow(
 		security.ClientIPFromRequest(r),

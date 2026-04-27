@@ -17,6 +17,7 @@ func RegisterRoutes(mux *http.ServeMux, routes RouteSet, protected ProtectedMidd
 	mux.Handle("GET /health", routes.Health)
 	mux.Handle("POST /auth/register", http.HandlerFunc(routes.Auth.Register))
 	mux.Handle("POST /auth/login", http.HandlerFunc(routes.Auth.Login))
+	mux.Handle("POST /auth/guest", http.HandlerFunc(routes.Auth.Guest))
 	mux.Handle("POST /auth/refresh", http.HandlerFunc(routes.Auth.Refresh))
 	mux.Handle("GET /me", protected(http.HandlerFunc(routes.Me.Get)))
 	mux.Handle("POST /analysis/chunks", protected(http.HandlerFunc(routes.Analysis.AnalyzeChunks)))
