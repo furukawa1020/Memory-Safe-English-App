@@ -33,11 +33,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .connect_timeout(Duration::from_secs(3))
         .build()?;
 
+    let problem_bank = config
+        .problem_bank_path
+        .clone()
+        .map(ProblemBank::with_persisted_path)
+        .unwrap_or_else(ProblemBank::seeded);
+
     let app_state = AppState {
         config: config.clone(),
         http_client,
         cache,
-        problem_bank: ProblemBank::seeded(),
+        problem_bank,
         admin_rate_limiter,
         auth_rate_limiter,
     };
