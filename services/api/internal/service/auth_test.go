@@ -105,3 +105,25 @@ func TestAuthServiceRefreshRejectsReusedTokenFamily(t *testing.T) {
 		t.Fatalf("expected latest refresh token to be rejected after family revoke")
 	}
 }
+
+func TestAuthServiceGuest(t *testing.T) {
+	store := memory.NewStore()
+	svc := NewAuthService(store, store, password.NewHasher(100000), token.NewManager("test-secret", 15*time.Minute, 30*time.Minute))
+
+	result, err := svc.Guest(context.Background())
+	if err != nil {
+		t.Fatalf("Guest() error = %v", err)
+	}
+	if result.User.ID == "" {
+		t.Fatalf("expected guest user id")
+	}
+	if result.User.AuthProvider != "guest" {
+		t.Fatalf("expected guest auth provider, got %q", result.User.AuthProvider)
+	}
+	if result.Tokens.AccessToken == "" || result.Tokens.RefreshToken == "" {
+		t.Fatalf("expected guest tokens")
+	}
+	if result.NativeNotice != "guest_session" {
+		t.Fatalf("expected guest notice, got %q", result.NativeNotice)
+	}
+}

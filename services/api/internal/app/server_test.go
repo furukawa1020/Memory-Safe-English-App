@@ -141,3 +141,46 @@ func TestServerRefreshFlow(t *testing.T) {
 		t.Fatalf("expected rotated family to be revoked after reuse, got %d body=%s", latestRec.Code, latestRec.Body.String())
 	}
 }
+
+func TestServerGuestAndMeFlow(t *testing.T) {
+	server, err := NewServer(newTestConfig())
+	if err != nil {
+		t.Fatalf("NewServer() error = %v", err)
+	}
+
+	rec := jsonRequest(t, server, http.MethodPost, "/auth/guest", "", nil)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("guest status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+
+	var guestResponse struct {
+		User struct {
+			UserID       string `json:"user_id"`
+			AuthProvider string `json:"auth_provider"`
+		} `json:"user"`
+		Tokens struct {
+			AccessToken string `json:"access_token"`
+		} `json:"tokens"`
+		NativeNotice string `json:"native_notice"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &guestResponse); err != nil {
+		t.Fatalf("unmarshal guest response: %v", err)
+	}
+	if guestResponse.User.UserID == "" {
+		t.Fatalf("expected guest user id")
+	}
+	if guestResponse.User.AuthProvider != "guest" {
+		t.Fatalf("expected guest auth provider, got %q", guestResponse.User.AuthProvider)
+	}
+	if guestResponse.NativeNotice != "guest_session" {
+		t.Fatalf("expected guest notice, got %q", guestResponse.NativeNotice)
+	}
+
+	meReq := httptest.NewRequest(http.MethodGet, "/me", nil)
+	meReq.Header.Set("Authorization", "Bearer "+guestResponse.Tokens.AccessToken)
+	meRec := httptest.NewRecorder()
+	server.Handler.ServeHTTP(meRec, meReq)
+	if meRec.Code != http.StatusOK {
+		t.Fatalf("guest me status = %d, body = %s", meRec.Code, meRec.Body.String())
+	}
+}
