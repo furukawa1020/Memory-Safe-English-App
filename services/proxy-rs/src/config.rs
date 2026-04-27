@@ -1,6 +1,7 @@
 use std::{
     env,
     net::{IpAddr, SocketAddr},
+    path::PathBuf,
     time::Duration,
 };
 
@@ -28,6 +29,7 @@ pub struct Config {
     pub gc_interval: Duration,
     pub cache_max_entries: usize,
     pub max_request_body_bytes: usize,
+    pub problem_bank_path: Option<PathBuf>,
 }
 
 impl Config {
@@ -58,6 +60,7 @@ impl Config {
             gc_interval: Duration::from_secs(parse_env("PROXY_GC_INTERVAL_SECONDS", "60")?),
             cache_max_entries: parse_env("PROXY_CACHE_MAX_ENTRIES", "1024")?,
             max_request_body_bytes: parse_env("PROXY_MAX_REQUEST_BODY_BYTES", "262144")?,
+            problem_bank_path: parse_optional_path("PROXY_PROBLEM_BANK_PATH"),
         };
         config.validate()?;
         Ok(config)
@@ -188,6 +191,10 @@ fn parse_optional(key: &str) -> Option<String> {
         .filter(|value| !value.is_empty())
 }
 
+fn parse_optional_path(key: &str) -> Option<PathBuf> {
+    parse_optional(key).map(PathBuf::from)
+}
+
 fn parse_ip_list(key: &str) -> Result<Vec<IpAddr>, ConfigError> {
     let raw = match env::var(key) {
         Ok(value) => value,
@@ -257,6 +264,7 @@ mod tests {
             gc_interval: Duration::from_secs(60),
             cache_max_entries: 1024,
             max_request_body_bytes: 262144,
+            problem_bank_path: None,
         };
 
         assert!(matches!(
@@ -284,6 +292,7 @@ mod tests {
             gc_interval: Duration::from_secs(60),
             cache_max_entries: 1024,
             max_request_body_bytes: 262144,
+            problem_bank_path: None,
         };
 
         assert!(matches!(
@@ -311,6 +320,7 @@ mod tests {
             gc_interval: Duration::from_secs(60),
             cache_max_entries: 1024,
             max_request_body_bytes: 2 * 1024 * 1024,
+            problem_bank_path: None,
         };
 
         assert!(matches!(
