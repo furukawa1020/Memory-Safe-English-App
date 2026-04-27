@@ -167,6 +167,19 @@ class _AuthScreenState extends State<AuthScreen> {
                                   ),
                                 ),
                               ),
+                              const SizedBox(height: 12),
+                              SizedBox(
+                                width: double.infinity,
+                                child: OutlinedButton(
+                                  onPressed: sessionController.isBusy
+                                      ? null
+                                      : () => _continueAsGuest(context),
+                                  child: const Padding(
+                                    padding: EdgeInsets.symmetric(vertical: 12),
+                                    child: Text('Try as guest'),
+                                  ),
+                                ),
+                              ),
                             ],
                           ),
                         );
@@ -215,6 +228,23 @@ class _AuthScreenState extends State<AuthScreen> {
       setState(
         () => _errorText = 'Authentication failed. Please try again.',
       );
+    }
+  }
+
+  Future<void> _continueAsGuest(BuildContext context) async {
+    final scope = AppScope.of(context);
+    try {
+      await scope.sessionController.continueAsGuest(
+        repository: scope.authRepository,
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() => _errorText = null);
+    } on ApiException catch (error) {
+      setState(() => _errorText = error.message);
+    } catch (_) {
+      setState(() => _errorText = 'Guest session could not be started.');
     }
   }
 }
