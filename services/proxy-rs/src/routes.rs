@@ -586,6 +586,35 @@ mod tests {
         assert!(text.contains("\"mode\":\"rescue\""));
     }
 
+    #[tokio::test]
+    async fn problem_bank_generate_uses_worker_plan_details_when_available() {
+        let api = spawn_health_server(StatusCode::OK).await;
+        let worker = spawn_problem_worker_server().await;
+        let app = build_router(state_with_urls(api.base_url(), worker.base_url()));
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/problem-bank/generate")
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        r#"{"text":"The client approved the design draft, but the delivery schedule is still under review.","target_context":"meeting","level_band":"toeic_750_800"}"#,
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = to_bytes(response.into_body(), 8192).await.unwrap();
+        let text = String::from_utf8(body.to_vec()).unwrap();
+        assert!(text.contains("Focus here first"));
+        assert!(text.contains("checkpoint meaning before the next chunk at 0.85x speed"));
+        assert!(text.contains("Start with: 'The decision is approved.'"));
+        assert!(text.contains("Practice saying: 'Could you give me the decision first?'"));
+    }
+
     fn state_with_urls(api_base_url: String, worker_base_url: String) -> AppState {
         state_with_urls_and_auth_limit(api_base_url, worker_base_url, 10)
     }
@@ -661,6 +690,100 @@ mod tests {
                 )
             }),
         );
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+
+        tokio::spawn(async move {
+            axum::serve(listener, app).await.unwrap();
+        });
+
+        TestServer { address }
+    }
+
+    async fn spawn_problem_worker_server() -> TestServer {
+        let app = AxumRouter::new()
+            .route(
+                "/analyze/reader-plan",
+                axum::routing::post(|| async {
+                    (
+                        StatusCode::OK,
+                        AxumJson(serde_json::json!({
+                            "summary": "The client approved the design draft.",
+                            "focus_steps": [
+                                {
+                                    "text": "The client approved the design draft",
+                                    "guidance_en": "Keep the decision stable before adding schedule detail."
+                                }
+                            ],
+                            "hotspots": [
+                                {
+                                    "recommendation": "Hide the schedule clause until the decision is clear."
+                                }
+                            ]
+                        })),
+                    )
+                }),
+            )
+            .route(
+                "/analyze/listening-plan",
+                axum::routing::post(|| async {
+                    (
+                        StatusCode::OK,
+                        AxumJson(serde_json::json!({
+                            "recommended_speed": "0.85x",
+                            "pause_points": [
+                                {
+                                    "after_chunk_order": 1,
+                                    "cue_en": "Say the decision first.",
+                                    "preview_text": "The client approved the design draft"
+                                }
+                            ],
+                            "final_pass_strategy": "Listen once for the decision, then replay for the schedule detail."
+                        })),
+                    )
+                }),
+            )
+            .route(
+                "/analyze/speaking-plan",
+                axum::routing::post(|| async {
+                    (
+                        StatusCode::OK,
+                        AxumJson(serde_json::json!({
+                            "summary": "The client approved the design draft.",
+                            "recommended_style": "two_short_steps",
+                            "opener_options": ["The decision is approved."],
+                            "steps": [
+                                {
+                                    "text": "The client approved the design draft.",
+                                    "delivery_tip_en": "Finish the decision sentence before the schedule detail."
+                                },
+                                {
+                                    "text": "The delivery schedule is still under review.",
+                                    "delivery_tip_en": "Keep the follow-up detail in a second short sentence."
+                                }
+                            ]
+                        })),
+                    )
+                }),
+            )
+            .route(
+                "/analyze/rescue-plan",
+                axum::routing::post(|| async {
+                    (
+                        StatusCode::OK,
+                        AxumJson(serde_json::json!({
+                            "overload_level": "medium",
+                            "primary_strategy": "decision_first",
+                            "phrases": [
+                                {
+                                    "phrase_en": "Could you give me the decision first?",
+                                    "use_when": "you hear the detail before the main meeting point"
+                                }
+                            ]
+                        })),
+                    )
+                }),
+            );
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let address = listener.local_addr().unwrap();
 
