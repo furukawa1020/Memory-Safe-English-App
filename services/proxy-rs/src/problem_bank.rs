@@ -149,6 +149,32 @@ impl ProblemBank {
         })
     }
 
+    pub fn clone_problem(
+        &self,
+        id: &str,
+        source: ProblemSaveSource,
+    ) -> Result<SavedProblemSet, ProblemBankSaveError> {
+        let original = {
+            let store = self.store.read().expect("problem bank read lock");
+            store
+                .by_id
+                .get(id)
+                .cloned()
+                .ok_or(ProblemBankSaveError::ProblemNotFound)?
+        };
+
+        let generated = GeneratedProblemSet {
+            source_text: original.prompt.clone(),
+            summary: original.title.clone(),
+            target_context: original.target_context.clone(),
+            level_band: original.level_band.clone(),
+            topic: original.topic.clone(),
+            items: vec![original],
+        };
+
+        self.save_generated_set(&generated, source)
+    }
+
     pub fn delete_custom(&self, id: &str) -> Result<DeletedProblemRecord, ProblemBankDeleteError> {
         let mut store = self.store.write().expect("problem bank write lock");
         let removed = store
@@ -500,6 +526,8 @@ pub struct DeletedProblemRecord {
 
 #[derive(Debug, thiserror::Error)]
 pub enum ProblemBankSaveError {
+    #[error("problem not found")]
+    ProblemNotFound,
     #[error("failed to create problem bank directory")]
     CreateDirectory(#[source] std::io::Error),
     #[error("failed to serialize saved problems")]
@@ -1289,6 +1317,21 @@ mod tests {
         assert_eq!(updated.success_count, 1);
         assert_eq!(updated.last_used_unix, 123456789);
         assert!(updated.notes.contains("worked well"));
+        let _ = fs::remove_file(temp_path);
+    }
+
+    #[test]
+    fn clones_seed_problem_into_custom_store() {
+        let temp_path = temp_problem_bank_path();
+        let bank = ProblemBank::with_persisted_path(temp_path.clone());
+
+        let saved = bank
+            .clone_problem("pb_speak_002", ProblemSaveSource::Reviewed)
+            .expect("clone seed problem");
+
+        assert_eq!(saved.saved_count, 1);
+        assert_eq!(saved.items[0].title, "Two-Step Link: Status Update");
+        assert!(saved.items[0].tags.iter().any(|tag| tag == "saved"));
         let _ = fs::remove_file(temp_path);
     }
 
