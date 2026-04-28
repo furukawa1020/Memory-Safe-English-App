@@ -3,6 +3,7 @@ use std::{
     fs,
     path::{Path, PathBuf},
     sync::{Arc, RwLock},
+    time::{SystemTime, UNIX_EPOCH},
 };
 
 use serde::{Deserialize, Serialize};
@@ -71,9 +72,12 @@ impl ProblemBank {
             total: store.total_count(),
             seeded: store.seeded.len(),
             custom: store.custom.len(),
+            pinned: store.all_items().iter().filter(|item| item.pinned).count(),
+            total_usage: store.all_items().iter().map(|item| item.usage_count as usize).sum(),
             by_mode,
             by_level_band,
             by_context,
+            by_source: group_by_source(&store.all_items()),
         }
     }
 
@@ -113,6 +117,7 @@ impl ProblemBank {
             item.tags.push("saved".to_string());
             item.tags.push(source.as_tag().to_string());
             item.sort_order = 1000 + index as u32;
+            item.source = source.as_tag().to_string();
         }
 
         let mut store = self.store.write().expect("problem bank write lock");
@@ -159,6 +164,81 @@ impl ProblemBank {
             remaining_custom: store.custom.len(),
             remaining_total: store.total_count(),
         })
+    }
+
+    pub fn update_custom(
+        &self,
+        id: &str,
+        update: ProblemRecordUpdate,
+    ) -> Result<ProblemRecord, ProblemBankUpdateError> {
+        let mut store = self.store.write().expect("problem bank write lock");
+        let item = store
+            .custom
+            .get_mut(id)
+            .ok_or(ProblemBankUpdateError::NotFound)?;
+
+        if let Some(title) = update.title {
+            item.title = title;
+        }
+        if let Some(prompt) = update.prompt {
+            item.prompt = prompt;
+        }
+        if let Some(wm_support) = update.wm_support {
+            item.wm_support = wm_support;
+        }
+        if let Some(success_check) = update.success_check {
+            item.success_check = success_check;
+        }
+        if let Some(tags) = update.tags {
+            item.tags = tags;
+        }
+        if let Some(notes) = update.notes {
+            item.notes = notes;
+        }
+        if let Some(pinned) = update.pinned {
+            item.pinned = pinned;
+        }
+
+        let updated = item.clone();
+        store.rebuild_index();
+        if let Some(path) = self.persisted_path.as_ref() {
+            persist_custom_records(path, &store.custom.values().cloned().collect::<Vec<_>>())
+                .map_err(ProblemBankUpdateError::Persist)?;
+        }
+        Ok(updated)
+    }
+
+    pub fn record_usage(
+        &self,
+        id: &str,
+        event: ProblemUsageEvent,
+    ) -> Result<ProblemRecord, ProblemBankUpdateError> {
+        let mut store = self.store.write().expect("problem bank write lock");
+        let item = store
+            .custom
+            .get_mut(id)
+            .ok_or(ProblemBankUpdateError::NotFound)?;
+
+        item.usage_count = item.usage_count.saturating_add(1);
+        if event.successful {
+            item.success_count = item.success_count.saturating_add(1);
+        }
+        item.last_used_unix = event.occurred_at_unix.unwrap_or_else(current_unix_seconds);
+        if let Some(note) = event.append_note {
+            if item.notes.is_empty() {
+                item.notes = note;
+            } else {
+                item.notes = format!("{}\n{}", item.notes, note);
+            }
+        }
+
+        let updated = item.clone();
+        store.rebuild_index();
+        if let Some(path) = self.persisted_path.as_ref() {
+            persist_custom_records(path, &store.custom.values().cloned().collect::<Vec<_>>())
+                .map_err(ProblemBankUpdateError::Persist)?;
+        }
+        Ok(updated)
     }
 
     pub fn generate(&self, request: ProblemGenerationRequest) -> GeneratedProblemSet {
@@ -307,6 +387,18 @@ pub struct ProblemRecord {
     pub success_check: String,
     pub tags: Vec<String>,
     pub sort_order: u32,
+    #[serde(default = "default_problem_source")]
+    pub source: String,
+    #[serde(default)]
+    pub pinned: bool,
+    #[serde(default)]
+    pub usage_count: u32,
+    #[serde(default)]
+    pub success_count: u32,
+    #[serde(default)]
+    pub last_used_unix: u64,
+    #[serde(default)]
+    pub notes: String,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -333,9 +425,32 @@ pub struct ProblemBankStats {
     pub total: usize,
     pub seeded: usize,
     pub custom: usize,
+    pub pinned: usize,
+    pub total_usage: usize,
     pub by_mode: HashMap<String, usize>,
     pub by_level_band: HashMap<String, usize>,
     pub by_context: HashMap<String, usize>,
+    pub by_source: HashMap<String, usize>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProblemRecordUpdate {
+    pub title: Option<String>,
+    pub prompt: Option<String>,
+    pub wm_support: Option<String>,
+    pub success_check: Option<String>,
+    pub tags: Option<Vec<String>>,
+    pub notes: Option<String>,
+    pub pinned: Option<bool>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProblemUsageEvent {
+    pub successful: bool,
+    pub occurred_at_unix: Option<u64>,
+    pub append_note: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -392,6 +507,14 @@ pub enum ProblemBankSaveError {
 
 #[derive(Debug, thiserror::Error)]
 pub enum ProblemBankDeleteError {
+    #[error("problem not found")]
+    NotFound,
+    #[error("failed to persist updated problem bank")]
+    Persist(#[source] ProblemBankSaveError),
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum ProblemBankUpdateError {
     #[error("problem not found")]
     NotFound,
     #[error("failed to persist updated problem bank")]
@@ -513,8 +636,20 @@ fn recommendation_score(item: &ProblemRecord, request: &ProblemRecommendationReq
     if item.tags.iter().any(|tag| tag == "saved") {
         score += 1;
     }
+    if item.pinned {
+        score += 2;
+    }
+    score += (item.success_count.min(3)) as i32;
 
     score
+}
+
+fn group_by_source(items: &[ProblemRecord]) -> HashMap<String, usize> {
+    let mut by_source = HashMap::new();
+    for item in items {
+        *by_source.entry(item.source.clone()).or_insert(0) += 1;
+    }
+    by_source
 }
 
 fn persist_custom_records(path: &Path, records: &[ProblemRecord]) -> Result<(), ProblemBankSaveError> {
@@ -596,6 +731,12 @@ fn problem(
         success_check: success_check.to_string(),
         tags: tags.iter().map(|tag| (*tag).to_string()).collect(),
         sort_order,
+        source: "seeded".to_string(),
+        pinned: false,
+        usage_count: 0,
+        success_count: 0,
+        last_used_unix: 0,
+        notes: String::new(),
     }
 }
 
@@ -624,7 +765,24 @@ fn generated_problem(
         success_check: success_check.to_string(),
         tags: tags.iter().map(|tag| (*tag).to_string()).collect(),
         sort_order,
+        source: "generated".to_string(),
+        pinned: false,
+        usage_count: 0,
+        success_count: 0,
+        last_used_unix: 0,
+        notes: String::new(),
     }
+}
+
+fn default_problem_source() -> String {
+    "custom".to_string()
+}
+
+fn current_unix_seconds() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|value| value.as_secs())
+        .unwrap_or(0)
 }
 
 fn normalize_text(text: &str) -> String {
