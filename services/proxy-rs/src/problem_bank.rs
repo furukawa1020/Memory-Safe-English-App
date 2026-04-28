@@ -77,6 +77,31 @@ impl ProblemBank {
         }
     }
 
+    pub fn recommend(&self, request: ProblemRecommendationRequest) -> Vec<ProblemRecord> {
+        let store = self.store.read().expect("problem bank read lock");
+        let mut ranked = store
+            .all_items()
+            .into_iter()
+            .map(|item| {
+                let score = recommendation_score(&item, &request);
+                (score, item)
+            })
+            .filter(|(score, _)| *score > 0)
+            .collect::<Vec<_>>();
+
+        ranked.sort_by(|a, b| {
+            b.0.cmp(&a.0)
+                .then_with(|| a.1.sort_order.cmp(&b.1.sort_order))
+                .then_with(|| a.1.id.cmp(&b.1.id))
+        });
+
+        ranked
+            .into_iter()
+            .take(request.limit.max(1).min(20))
+            .map(|(_, item)| item)
+            .collect()
+    }
+
     pub fn save_generated_set(
         &self,
         generated: &GeneratedProblemSet,
@@ -113,6 +138,26 @@ impl ProblemBank {
             items: saved_items,
             total_custom: stats.custom,
             total_all: stats.total,
+        })
+    }
+
+    pub fn delete_custom(&self, id: &str) -> Result<DeletedProblemRecord, ProblemBankDeleteError> {
+        let mut store = self.store.write().expect("problem bank write lock");
+        let removed = store
+            .custom
+            .remove(id)
+            .ok_or(ProblemBankDeleteError::NotFound)?;
+        store.rebuild_index();
+
+        if let Some(path) = self.persisted_path.as_ref() {
+            persist_custom_records(path, &store.custom.values().cloned().collect::<Vec<_>>())
+                .map_err(ProblemBankDeleteError::Persist)?;
+        }
+
+        Ok(DeletedProblemRecord {
+            id: removed.id,
+            remaining_custom: store.custom.len(),
+            remaining_total: store.total_count(),
         })
     }
 
@@ -293,6 +338,16 @@ pub struct ProblemBankStats {
     pub by_context: HashMap<String, usize>,
 }
 
+#[derive(Clone, Debug, Deserialize)]
+pub struct ProblemRecommendationRequest {
+    pub preferred_mode: Option<String>,
+    pub target_context: Option<String>,
+    pub level_band: Option<String>,
+    pub topic: Option<String>,
+    pub focus_tag: Option<String>,
+    pub limit: usize,
+}
+
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ProblemSaveSource {
@@ -318,6 +373,13 @@ pub struct SavedProblemSet {
     pub total_all: usize,
 }
 
+#[derive(Clone, Debug, Serialize)]
+pub struct DeletedProblemRecord {
+    pub id: String,
+    pub remaining_custom: usize,
+    pub remaining_total: usize,
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum ProblemBankSaveError {
     #[error("failed to create problem bank directory")]
@@ -326,6 +388,14 @@ pub enum ProblemBankSaveError {
     Serialize(#[from] serde_json::Error),
     #[error("failed to write saved problems")]
     Write(#[source] std::io::Error),
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum ProblemBankDeleteError {
+    #[error("problem not found")]
+    NotFound,
+    #[error("failed to persist updated problem bank")]
+    Persist(#[source] ProblemBankSaveError),
 }
 
 #[derive(Clone, Debug)]
@@ -405,6 +475,46 @@ fn load_custom_records(path: &Path) -> Result<Vec<ProblemRecord>, std::io::Error
     let raw = fs::read_to_string(path)?;
     let records = serde_json::from_str::<Vec<ProblemRecord>>(&raw).unwrap_or_default();
     Ok(records)
+}
+
+fn recommendation_score(item: &ProblemRecord, request: &ProblemRecommendationRequest) -> i32 {
+    let mut score = 1;
+
+    if let Some(mode) = request.preferred_mode.as_deref() {
+        if item.mode.eq_ignore_ascii_case(mode) {
+            score += 5;
+        }
+    }
+    if let Some(target_context) = request.target_context.as_deref() {
+        if item.target_context.eq_ignore_ascii_case(target_context) {
+            score += 4;
+        }
+    }
+    if let Some(level_band) = request.level_band.as_deref() {
+        if item.level_band.eq_ignore_ascii_case(level_band) {
+            score += 3;
+        }
+    }
+    if let Some(topic) = request.topic.as_deref() {
+        if item.topic.eq_ignore_ascii_case(topic) {
+            score += 2;
+        }
+    }
+    if let Some(focus_tag) = request.focus_tag.as_deref() {
+        if item
+            .tags
+            .iter()
+            .any(|tag| tag.eq_ignore_ascii_case(focus_tag) || tag.to_ascii_lowercase().contains(&focus_tag.to_ascii_lowercase()))
+        {
+            score += 4;
+        }
+    }
+
+    if item.tags.iter().any(|tag| tag == "saved") {
+        score += 1;
+    }
+
+    score
 }
 
 fn persist_custom_records(path: &Path, records: &[ProblemRecord]) -> Result<(), ProblemBankSaveError> {
@@ -912,6 +1022,45 @@ mod tests {
         assert!(stats.custom >= 4);
         assert!(stats.by_mode.contains_key("reading"));
         assert!(stats.by_context.contains_key("research"));
+        let _ = fs::remove_file(temp_path);
+    }
+
+    #[test]
+    fn recommends_matching_items_first() {
+        let bank = ProblemBank::seeded();
+        let items = bank.recommend(ProblemRecommendationRequest {
+            preferred_mode: Some("speaking".to_string()),
+            target_context: Some("meeting".to_string()),
+            level_band: Some("toeic_750_800".to_string()),
+            topic: Some("meeting".to_string()),
+            focus_tag: Some("status_update".to_string()),
+            limit: 3,
+        });
+
+        assert!(!items.is_empty());
+        assert_eq!(items[0].id, "pb_speak_002");
+    }
+
+    #[test]
+    fn deletes_custom_item() {
+        let temp_path = temp_problem_bank_path();
+        let bank = ProblemBank::with_persisted_path(temp_path.clone());
+        let generated = bank.generate(ProblemGenerationRequest {
+            text: "The client approved the design draft, but the delivery schedule is still under review.".to_string(),
+            level_band: Some("toeic_750_800".to_string()),
+            topic: None,
+            target_context: Some("meeting".to_string()),
+        });
+        let saved = bank
+            .save_generated_set(&generated, ProblemSaveSource::Generated)
+            .expect("save generated set");
+
+        let deleted = bank
+            .delete_custom(&saved.items[0].id)
+            .expect("delete saved problem");
+
+        assert_eq!(deleted.id, saved.items[0].id);
+        assert!(bank.get(&saved.items[0].id).is_none());
         let _ = fs::remove_file(temp_path);
     }
 
