@@ -116,8 +116,26 @@ class _ContentHomeTabState extends State<_ContentHomeTab> {
                 const SizedBox(height: 12),
                 if (!widget.controller.isLoading &&
                     widget.controller.recommendedItems.isNotEmpty) ...[
+                  if (widget.controller.problemActionErrorText != null) ...[
+                    Text(
+                      widget.controller.problemActionErrorText!,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
                   for (final item in widget.controller.recommendedItems) ...[
-                    _ProblemTile(item: item),
+                    _ProblemTile(
+                      item: item,
+                      onSave: () => widget.controller.saveProblem(item),
+                      onTogglePinned: () => widget.controller.togglePinned(item),
+                      onRecordUsed: () => widget.controller.recordProblemUsage(
+                        item,
+                        successful: true,
+                      ),
+                      onAddNote: () => _showProblemNoteDialog(context, item),
+                    ),
                     const SizedBox(height: 12),
                   ],
                   const SizedBox(height: 8),
@@ -200,6 +218,45 @@ class _ContentHomeTabState extends State<_ContentHomeTab> {
       );
     }
     return sections;
+  }
+
+  Future<void> _showProblemNoteDialog(
+    BuildContext context,
+    ProblemItem item,
+  ) async {
+    final controller = TextEditingController(text: item.notes);
+    final nextValue = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Problem note'),
+          content: TextField(
+            controller: controller,
+            minLines: 3,
+            maxLines: 5,
+            decoration: const InputDecoration(
+              hintText: 'Add a note about when this problem works well.',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(controller.text.trim()),
+              child: const Text('Save note'),
+            ),
+          ],
+        );
+      },
+    );
+    controller.dispose();
+
+    if (!mounted || nextValue == null || nextValue.isEmpty) {
+      return;
+    }
+    await widget.controller.updateProblemNotes(item, nextValue);
   }
 }
 
@@ -412,9 +469,19 @@ class _ContentTile extends StatelessWidget {
 }
 
 class _ProblemTile extends StatelessWidget {
-  const _ProblemTile({required this.item});
+  const _ProblemTile({
+    required this.item,
+    required this.onSave,
+    required this.onTogglePinned,
+    required this.onRecordUsed,
+    required this.onAddNote,
+  });
 
   final ProblemItem item;
+  final VoidCallback onSave;
+  final VoidCallback onTogglePinned;
+  final VoidCallback onRecordUsed;
+  final VoidCallback onAddNote;
 
   @override
   Widget build(BuildContext context) {
@@ -456,6 +523,47 @@ class _ProblemTile extends StatelessWidget {
                 _Pill(label: item.levelBand),
                 _Pill(label: item.targetContext),
                 _Pill(label: item.topic),
+                if (item.pinned) const _Pill(label: 'pinned'),
+                if (item.usageCount > 0) _Pill(label: 'used ${item.usageCount}x'),
+              ],
+            ),
+            if (item.notes.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Text(
+                item.notes,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                if (!item.isSaved)
+                  OutlinedButton.icon(
+                    onPressed: onSave,
+                    icon: const Icon(Icons.bookmark_add_outlined),
+                    label: const Text('Save'),
+                  ),
+                if (item.isSaved) ...[
+                  OutlinedButton.icon(
+                    onPressed: onTogglePinned,
+                    icon: Icon(
+                      item.pinned ? Icons.push_pin : Icons.push_pin_outlined,
+                    ),
+                    label: Text(item.pinned ? 'Unpin' : 'Pin'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: onRecordUsed,
+                    icon: const Icon(Icons.check_circle_outline),
+                    label: const Text('Done'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: onAddNote,
+                    icon: const Icon(Icons.edit_note_outlined),
+                    label: const Text('Note'),
+                  ),
+                ],
               ],
             ),
           ],
