@@ -10,8 +10,8 @@ use tokio::join;
 use crate::{
     http_response::with_standard_headers,
     problem_bank::{
-        GeneratedProblemSet, ProblemFilter, ProblemGenerationRequest, ProblemRecord,
-        ProblemSaveSource,
+        GeneratedProblemSet, ProblemFilter, ProblemGenerationRequest, ProblemRecommendationRequest,
+        ProblemRecord, ProblemSaveSource,
     },
     request_id::resolve_request_id,
     response_headers::HeaderPolicy,
@@ -80,6 +80,49 @@ pub async fn get_problem(
     }
 }
 
+pub async fn delete_problem(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> impl IntoResponse {
+    let request_id = resolve_request_id(&headers);
+    match state.problem_bank.delete_custom(&id) {
+        Ok(deleted) => with_standard_headers(
+            (StatusCode::OK, Json(deleted)).into_response(),
+            &request_id,
+            "miss",
+            &state.config.runtime_environment,
+            HeaderPolicy::Sensitive,
+        ),
+        Err(crate::problem_bank::ProblemBankDeleteError::NotFound) => with_standard_headers(
+            (
+                StatusCode::NOT_FOUND,
+                Json(ProblemBankErrorResponse {
+                    error: "problem_not_found",
+                }),
+            )
+                .into_response(),
+            &request_id,
+            "miss",
+            &state.config.runtime_environment,
+            HeaderPolicy::Sensitive,
+        ),
+        Err(crate::problem_bank::ProblemBankDeleteError::Persist(_)) => with_standard_headers(
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ProblemBankErrorResponse {
+                    error: "problem_bank_delete_failed",
+                }),
+            )
+                .into_response(),
+            &request_id,
+            "miss",
+            &state.config.runtime_environment,
+            HeaderPolicy::Sensitive,
+        ),
+    }
+}
+
 pub async fn generate_problems(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -106,6 +149,37 @@ pub async fn problem_bank_stats(
 
     with_standard_headers(
         (StatusCode::OK, Json(stats)).into_response(),
+        &request_id,
+        "miss",
+        &state.config.runtime_environment,
+        HeaderPolicy::Sensitive,
+    )
+}
+
+pub async fn recommend_problems(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Query(query): Query<ProblemRecommendationQuery>,
+) -> impl IntoResponse {
+    let request_id = resolve_request_id(&headers);
+    let items = state.problem_bank.recommend(ProblemRecommendationRequest {
+        preferred_mode: query.preferred_mode,
+        target_context: query.target_context,
+        level_band: query.level_band,
+        topic: query.topic,
+        focus_tag: query.focus_tag,
+        limit: query.limit.unwrap_or(5),
+    });
+
+    with_standard_headers(
+        (
+            StatusCode::OK,
+            Json(ProblemBankListResponse {
+                total: items.len(),
+                items,
+            }),
+        )
+            .into_response(),
         &request_id,
         "miss",
         &state.config.runtime_environment,
@@ -153,6 +227,16 @@ pub struct ProblemBankQuery {
     pub topic: Option<String>,
     pub target_context: Option<String>,
     pub query: Option<String>,
+    pub limit: Option<usize>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ProblemRecommendationQuery {
+    pub preferred_mode: Option<String>,
+    pub target_context: Option<String>,
+    pub level_band: Option<String>,
+    pub topic: Option<String>,
+    pub focus_tag: Option<String>,
     pub limit: Option<usize>,
 }
 
