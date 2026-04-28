@@ -128,9 +128,12 @@ impl ProblemBank {
             total: store.total_count(),
             seeded: store.seeded.len(),
             custom: store.custom.len(),
+            pinned: store.all_items().iter().filter(|item| item.pinned).count(),
+            total_usage: store.all_items().iter().map(|item| item.usage_count as usize).sum(),
             by_mode: HashMap::new(),
             by_level_band: HashMap::new(),
             by_context: HashMap::new(),
+            by_source: HashMap::new(),
         };
         let saved_items = custom_items.clone();
         if let Some(path) = self.persisted_path.as_ref() {
@@ -1219,6 +1222,73 @@ mod tests {
 
         assert_eq!(deleted.id, saved.items[0].id);
         assert!(bank.get(&saved.items[0].id).is_none());
+        let _ = fs::remove_file(temp_path);
+    }
+
+    #[test]
+    fn updates_custom_item_metadata() {
+        let temp_path = temp_problem_bank_path();
+        let bank = ProblemBank::with_persisted_path(temp_path.clone());
+        let generated = bank.generate(ProblemGenerationRequest {
+            text: "The client approved the design draft, but the delivery schedule is still under review.".to_string(),
+            level_band: Some("toeic_750_800".to_string()),
+            topic: None,
+            target_context: Some("meeting".to_string()),
+        });
+        let saved = bank
+            .save_generated_set(&generated, ProblemSaveSource::Reviewed)
+            .expect("save reviewed set");
+
+        let updated = bank
+            .update_custom(
+                &saved.items[0].id,
+                ProblemRecordUpdate {
+                    title: Some("Pinned custom problem".to_string()),
+                    prompt: None,
+                    wm_support: None,
+                    success_check: None,
+                    tags: None,
+                    notes: Some("strong for meeting rehearsal".to_string()),
+                    pinned: Some(true),
+                },
+            )
+            .expect("update custom");
+
+        assert_eq!(updated.title, "Pinned custom problem");
+        assert!(updated.pinned);
+        assert!(updated.notes.contains("meeting rehearsal"));
+        let _ = fs::remove_file(temp_path);
+    }
+
+    #[test]
+    fn records_usage_on_custom_item() {
+        let temp_path = temp_problem_bank_path();
+        let bank = ProblemBank::with_persisted_path(temp_path.clone());
+        let generated = bank.generate(ProblemGenerationRequest {
+            text: "The study found lower overload, but live conversation data is still limited.".to_string(),
+            level_band: Some("toeic_750_800".to_string()),
+            topic: None,
+            target_context: Some("research".to_string()),
+        });
+        let saved = bank
+            .save_generated_set(&generated, ProblemSaveSource::Generated)
+            .expect("save generated set");
+
+        let updated = bank
+            .record_usage(
+                &saved.items[0].id,
+                ProblemUsageEvent {
+                    successful: true,
+                    occurred_at_unix: Some(123456789),
+                    append_note: Some("worked well in a short session".to_string()),
+                },
+            )
+            .expect("record usage");
+
+        assert_eq!(updated.usage_count, 1);
+        assert_eq!(updated.success_count, 1);
+        assert_eq!(updated.last_used_unix, 123456789);
+        assert!(updated.notes.contains("worked well"));
         let _ = fs::remove_file(temp_path);
     }
 
