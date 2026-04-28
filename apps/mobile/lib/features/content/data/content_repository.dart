@@ -88,4 +88,50 @@ class ContentRepository {
         .map((item) => ProblemItem.fromJson(item as Map<String, dynamic>))
         .toList();
   }
+
+  Future<ProblemItem> saveProblem(String problemId) async {
+    final response = await _apiClient.post(
+      '/problem-bank/$problemId/save',
+      body: const <String, dynamic>{'source': 'reviewed'},
+    );
+    final items = response['items'] as List<dynamic>? ?? const [];
+    if (items.isEmpty) {
+      throw StateError('Saved problem response did not include an item.');
+    }
+    return ProblemItem.fromJson(items.first as Map<String, dynamic>);
+  }
+
+  Future<ProblemItem> pinProblem(String problemId, {required bool pinned}) async {
+    final response = await _apiClient.patch(
+      '/problem-bank/$problemId',
+      body: <String, dynamic>{'pinned': pinned},
+    );
+    return ProblemItem.fromJson(response);
+  }
+
+  Future<ProblemItem> addProblemNote(
+    String problemId, {
+    required String notes,
+  }) async {
+    final response = await _apiClient.patch(
+      '/problem-bank/$problemId',
+      body: <String, dynamic>{'notes': notes},
+    );
+    return ProblemItem.fromJson(response);
+  }
+
+  Future<ProblemItem> recordProblemUsage(
+    String problemId, {
+    required bool successful,
+    String? note,
+  }) async {
+    final response = await _apiClient.post(
+      '/problem-bank/$problemId/usage',
+      body: <String, dynamic>{
+        'successful': successful,
+        if (note != null && note.isNotEmpty) 'append_note': note,
+      },
+    );
+    return ProblemItem.fromJson(response);
+  }
 }
