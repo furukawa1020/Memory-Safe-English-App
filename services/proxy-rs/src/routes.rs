@@ -641,6 +641,26 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn problem_bank_recommend_returns_ranked_items() {
+        let app = build_router(state());
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/problem-bank/recommend?preferred_mode=speaking&target_context=meeting&level_band=toeic_750_800&focus_tag=status_update")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = to_bytes(response.into_body(), 4096).await.unwrap();
+        let text = String::from_utf8(body.to_vec()).unwrap();
+        assert!(text.contains("\"id\":\"pb_speak_002\""));
+    }
+
+    #[tokio::test]
     async fn problem_bank_save_persists_generated_items_in_memory() {
         let app = build_router(state());
 
@@ -687,6 +707,73 @@ mod tests {
         let text = String::from_utf8(body.to_vec()).unwrap();
         assert!(text.contains("\"saved_count\":1"));
         assert!(text.contains("\"source\":\"reviewed\""));
+    }
+
+    #[tokio::test]
+    async fn problem_bank_delete_removes_saved_item() {
+        let app = build_router(state());
+
+        let save_response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/problem-bank/save")
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        r#"{
+                            "source":"generated",
+                            "generated_set":{
+                                "source_text":"The client approved the design draft, but the delivery schedule is still under review.",
+                                "summary":"The client approved the design draft",
+                                "target_context":"meeting",
+                                "level_band":"toeic_750_800",
+                                "topic":"meeting",
+                                "items":[
+                                    {
+                                        "id":"gen_delete",
+                                        "title":"Generated Decision Lock",
+                                        "mode":"reading",
+                                        "level_band":"toeic_750_800",
+                                        "topic":"meeting",
+                                        "target_context":"meeting",
+                                        "prompt":"Read the decision first.",
+                                        "wm_support":"Keep the decision stable.",
+                                        "success_check":"You can say the decision.",
+                                        "tags":["generated","core_lock"],
+                                        "sort_order":10
+                                    }
+                                ]
+                            }
+                        }"#,
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(save_response.status(), StatusCode::CREATED);
+        let save_body = to_bytes(save_response.into_body(), 4096).await.unwrap();
+        let save_text = String::from_utf8(save_body.to_vec()).unwrap();
+        let id_start = save_text.find("\"id\":\"saved_").expect("saved problem id");
+        let id_value = &save_text[id_start + 6..];
+        let end_quote = id_value.find('"').expect("saved id end quote");
+        let saved_id = &id_value[..end_quote];
+
+        let delete_response = app
+            .oneshot(
+                Request::builder()
+                    .method("DELETE")
+                    .uri(format!("/problem-bank/{saved_id}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(delete_response.status(), StatusCode::OK);
+        let delete_body = to_bytes(delete_response.into_body(), 4096).await.unwrap();
+        let delete_text = String::from_utf8(delete_body.to_vec()).unwrap();
+        assert!(delete_text.contains(saved_id));
     }
 
     fn state_with_urls(api_base_url: String, worker_base_url: String) -> AppState {
