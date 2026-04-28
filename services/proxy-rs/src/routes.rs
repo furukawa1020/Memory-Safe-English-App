@@ -27,6 +27,7 @@ pub fn build_router(state: AppState) -> Router {
                 .patch(problems::update_problem)
                 .delete(problems::delete_problem),
         )
+        .route("/problem-bank/:id/save", post(problems::clone_problem))
         .route("/problem-bank/:id/usage", post(problems::record_problem_usage))
         .route("/problem-bank/generate", post(problems::generate_problems))
         .route("/problem-bank/save", post(problems::save_generated_problems))
@@ -850,6 +851,29 @@ mod tests {
         let patch_text = String::from_utf8(patch_body.to_vec()).unwrap();
         assert!(patch_text.contains("Pinned meeting prompt"));
         assert!(patch_text.contains("\"pinned\":true"));
+    }
+
+    #[tokio::test]
+    async fn problem_bank_clone_saves_seed_problem() {
+        let app = build_router(state());
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/problem-bank/pb_speak_002/save")
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"source":"reviewed"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::CREATED);
+        let body = to_bytes(response.into_body(), 4096).await.unwrap();
+        let text = String::from_utf8(body.to_vec()).unwrap();
+        assert!(text.contains("\"saved_count\":1"));
+        assert!(text.contains("Two-Step Link: Status Update"));
     }
 
     #[tokio::test]
