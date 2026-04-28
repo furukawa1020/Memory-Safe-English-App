@@ -5,6 +5,7 @@ import '../../../app/session_controller.dart';
 import '../../analysis/presentation/analysis_controller.dart';
 import '../model/chunking_result.dart';
 import '../model/content_item.dart';
+import '../model/problem_item.dart';
 import 'content_catalog_controller.dart';
 import 'reader_screen.dart';
 
@@ -111,6 +112,16 @@ class _ContentHomeTabState extends State<_ContentHomeTab> {
                 const SizedBox(height: 18),
                 const _QuickStartPanel(),
                 const SizedBox(height: 18),
+                Text('Rust Problem Picks', style: Theme.of(context).textTheme.titleLarge),
+                const SizedBox(height: 12),
+                if (!widget.controller.isLoading &&
+                    widget.controller.recommendedItems.isNotEmpty) ...[
+                  for (final item in widget.controller.recommendedItems) ...[
+                    _ProblemTile(item: item),
+                    const SizedBox(height: 12),
+                  ],
+                  const SizedBox(height: 8),
+                ],
                 Text('Recommended Content', style: Theme.of(context).textTheme.titleLarge),
                 const SizedBox(height: 12),
                 if (widget.controller.isLoading)
@@ -394,6 +405,60 @@ class _ContentTile extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProblemTile extends StatelessWidget {
+  const _ProblemTile({required this.item});
+
+  final ProblemItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    item.title,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+                _Pill(label: item.mode),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(item.prompt),
+            const SizedBox(height: 12),
+            Text(
+              item.wmSupport,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Success check: ${item.successCheck}',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _Pill(label: item.levelBand),
+                _Pill(label: item.targetContext),
+                _Pill(label: item.topic),
+              ],
+            ),
+          ],
         ),
       ),
     );

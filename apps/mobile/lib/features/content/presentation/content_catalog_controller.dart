@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../data/content_repository.dart';
 import '../model/content_item.dart';
+import '../model/problem_item.dart';
 
 class ContentCatalogController extends ChangeNotifier {
   ContentCatalogController(this._repository);
@@ -9,6 +10,7 @@ class ContentCatalogController extends ChangeNotifier {
   final ContentRepository _repository;
 
   List<ContentItem> items = const [];
+  List<ProblemItem> recommendedItems = const [];
   bool isLoading = false;
   String? errorText;
 
@@ -18,7 +20,16 @@ class ContentCatalogController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      items = await _repository.fetchContents();
+      final contentsFuture = _repository.fetchContents();
+      final recommendedFuture = _repository.fetchRecommendedProblems(
+        preferredMode: 'speaking',
+        targetContext: 'meeting',
+        levelBand: 'toeic_750_800',
+        focusTag: 'status_update',
+        limit: 4,
+      );
+      items = await contentsFuture;
+      recommendedItems = await recommendedFuture;
     } catch (_) {
       errorText = 'Could not load content yet. Please try again.';
     } finally {
