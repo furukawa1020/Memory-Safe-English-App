@@ -123,6 +123,50 @@ pub async fn delete_problem(
     }
 }
 
+pub async fn clone_problem(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    Json(request): Json<CloneProblemRequest>,
+) -> impl IntoResponse {
+    let request_id = resolve_request_id(&headers);
+    match state.problem_bank.clone_problem(&id, request.source) {
+        Ok(saved) => with_standard_headers(
+            (StatusCode::CREATED, Json(saved)).into_response(),
+            &request_id,
+            "miss",
+            &state.config.runtime_environment,
+            HeaderPolicy::Sensitive,
+        ),
+        Err(crate::problem_bank::ProblemBankSaveError::ProblemNotFound) => with_standard_headers(
+            (
+                StatusCode::NOT_FOUND,
+                Json(ProblemBankErrorResponse {
+                    error: "problem_not_found",
+                }),
+            )
+                .into_response(),
+            &request_id,
+            "miss",
+            &state.config.runtime_environment,
+            HeaderPolicy::Sensitive,
+        ),
+        Err(_) => with_standard_headers(
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ProblemBankErrorResponse {
+                    error: "problem_bank_clone_failed",
+                }),
+            )
+                .into_response(),
+            &request_id,
+            "miss",
+            &state.config.runtime_environment,
+            HeaderPolicy::Sensitive,
+        ),
+    }
+}
+
 pub async fn update_problem(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -361,6 +405,12 @@ impl From<GeneratedProblemSet> for GeneratedProblemSetResponse {
 #[serde(deny_unknown_fields)]
 pub struct SaveGeneratedProblemRequest {
     generated_set: GeneratedProblemSet,
+    source: ProblemSaveSource,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CloneProblemRequest {
     source: ProblemSaveSource,
 }
 
