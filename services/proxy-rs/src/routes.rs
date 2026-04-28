@@ -21,7 +21,13 @@ pub fn build_router(state: AppState) -> Router {
         .route("/problem-bank", get(problems::list_problems))
         .route("/problem-bank/recommend", get(problems::recommend_problems))
         .route("/problem-bank/stats", get(problems::problem_bank_stats))
-        .route("/problem-bank/:id", get(problems::get_problem).delete(problems::delete_problem))
+        .route(
+            "/problem-bank/:id",
+            get(problems::get_problem)
+                .patch(problems::update_problem)
+                .delete(problems::delete_problem),
+        )
+        .route("/problem-bank/:id/usage", post(problems::record_problem_usage))
         .route("/problem-bank/generate", post(problems::generate_problems))
         .route("/problem-bank/save", post(problems::save_generated_problems))
         .route("/admin/cache", get(admin::cache_stats))
@@ -774,6 +780,147 @@ mod tests {
         let delete_body = to_bytes(delete_response.into_body(), 4096).await.unwrap();
         let delete_text = String::from_utf8(delete_body.to_vec()).unwrap();
         assert!(delete_text.contains(saved_id));
+    }
+
+    #[tokio::test]
+    async fn problem_bank_patch_updates_saved_item() {
+        let app = build_router(state());
+
+        let save_response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/problem-bank/save")
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        r#"{
+                            "source":"reviewed",
+                            "generated_set":{
+                                "source_text":"The client approved the design draft, but the delivery schedule is still under review.",
+                                "summary":"The client approved the design draft",
+                                "target_context":"meeting",
+                                "level_band":"toeic_750_800",
+                                "topic":"meeting",
+                                "items":[
+                                    {
+                                        "id":"gen_patch",
+                                        "title":"Generated Decision Lock",
+                                        "mode":"reading",
+                                        "level_band":"toeic_750_800",
+                                        "topic":"meeting",
+                                        "target_context":"meeting",
+                                        "prompt":"Read the decision first.",
+                                        "wm_support":"Keep the decision stable.",
+                                        "success_check":"You can say the decision.",
+                                        "tags":["generated","core_lock"],
+                                        "sort_order":10
+                                    }
+                                ]
+                            }
+                        }"#,
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let save_body = to_bytes(save_response.into_body(), 4096).await.unwrap();
+        let save_text = String::from_utf8(save_body.to_vec()).unwrap();
+        let id_start = save_text.find("\"id\":\"saved_").expect("saved problem id");
+        let id_value = &save_text[id_start + 6..];
+        let end_quote = id_value.find('"').expect("saved id end quote");
+        let saved_id = &id_value[..end_quote];
+
+        let patch_response = app
+            .oneshot(
+                Request::builder()
+                    .method("PATCH")
+                    .uri(format!("/problem-bank/{saved_id}"))
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        r#"{"title":"Pinned meeting prompt","notes":"good for rehearsal","pinned":true}"#,
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(patch_response.status(), StatusCode::OK);
+        let patch_body = to_bytes(patch_response.into_body(), 4096).await.unwrap();
+        let patch_text = String::from_utf8(patch_body.to_vec()).unwrap();
+        assert!(patch_text.contains("Pinned meeting prompt"));
+        assert!(patch_text.contains("\"pinned\":true"));
+    }
+
+    #[tokio::test]
+    async fn problem_bank_usage_updates_saved_item() {
+        let app = build_router(state());
+
+        let save_response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/problem-bank/save")
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        r#"{
+                            "source":"generated",
+                            "generated_set":{
+                                "source_text":"The study found lower overload, but live conversation data is still limited.",
+                                "summary":"The study found lower overload",
+                                "target_context":"research",
+                                "level_band":"toeic_750_800",
+                                "topic":"research",
+                                "items":[
+                                    {
+                                        "id":"gen_usage",
+                                        "title":"Generated Research Core Lock",
+                                        "mode":"reading",
+                                        "level_band":"toeic_750_800",
+                                        "topic":"research",
+                                        "target_context":"research",
+                                        "prompt":"Read the claim first.",
+                                        "wm_support":"Hold the claim first.",
+                                        "success_check":"You can say the claim.",
+                                        "tags":["generated","core_lock"],
+                                        "sort_order":10
+                                    }
+                                ]
+                            }
+                        }"#,
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let save_body = to_bytes(save_response.into_body(), 4096).await.unwrap();
+        let save_text = String::from_utf8(save_body.to_vec()).unwrap();
+        let id_start = save_text.find("\"id\":\"saved_").expect("saved problem id");
+        let id_value = &save_text[id_start + 6..];
+        let end_quote = id_value.find('"').expect("saved id end quote");
+        let saved_id = &id_value[..end_quote];
+
+        let usage_response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/problem-bank/{saved_id}/usage"))
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        r#"{"successful":true,"occurred_at_unix":123456789,"append_note":"worked in a short session"}"#,
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(usage_response.status(), StatusCode::OK);
+        let usage_body = to_bytes(usage_response.into_body(), 4096).await.unwrap();
+        let usage_text = String::from_utf8(usage_body.to_vec()).unwrap();
+        assert!(usage_text.contains("\"usage_count\":1"));
+        assert!(usage_text.contains("\"success_count\":1"));
+        assert!(usage_text.contains("\"last_used_unix\":123456789"));
     }
 
     fn state_with_urls(api_base_url: String, worker_base_url: String) -> AppState {
