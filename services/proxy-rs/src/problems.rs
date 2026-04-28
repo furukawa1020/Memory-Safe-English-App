@@ -11,7 +11,7 @@ use crate::{
     http_response::with_standard_headers,
     problem_bank::{
         GeneratedProblemSet, ProblemFilter, ProblemGenerationRequest, ProblemRecommendationRequest,
-        ProblemRecord, ProblemSaveSource,
+        ProblemRecord, ProblemRecordUpdate, ProblemSaveSource, ProblemUsageEvent,
     },
     request_id::resolve_request_id,
     response_headers::HeaderPolicy,
@@ -112,6 +112,94 @@ pub async fn delete_problem(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(ProblemBankErrorResponse {
                     error: "problem_bank_delete_failed",
+                }),
+            )
+                .into_response(),
+            &request_id,
+            "miss",
+            &state.config.runtime_environment,
+            HeaderPolicy::Sensitive,
+        ),
+    }
+}
+
+pub async fn update_problem(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    Json(request): Json<ProblemUpdateRequest>,
+) -> impl IntoResponse {
+    let request_id = resolve_request_id(&headers);
+    match state.problem_bank.update_custom(&id, request.into()) {
+        Ok(updated) => with_standard_headers(
+            (StatusCode::OK, Json(updated)).into_response(),
+            &request_id,
+            "miss",
+            &state.config.runtime_environment,
+            HeaderPolicy::Sensitive,
+        ),
+        Err(crate::problem_bank::ProblemBankUpdateError::NotFound) => with_standard_headers(
+            (
+                StatusCode::NOT_FOUND,
+                Json(ProblemBankErrorResponse {
+                    error: "problem_not_found",
+                }),
+            )
+                .into_response(),
+            &request_id,
+            "miss",
+            &state.config.runtime_environment,
+            HeaderPolicy::Sensitive,
+        ),
+        Err(crate::problem_bank::ProblemBankUpdateError::Persist(_)) => with_standard_headers(
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ProblemBankErrorResponse {
+                    error: "problem_bank_update_failed",
+                }),
+            )
+                .into_response(),
+            &request_id,
+            "miss",
+            &state.config.runtime_environment,
+            HeaderPolicy::Sensitive,
+        ),
+    }
+}
+
+pub async fn record_problem_usage(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    Json(request): Json<ProblemUsageRequest>,
+) -> impl IntoResponse {
+    let request_id = resolve_request_id(&headers);
+    match state.problem_bank.record_usage(&id, request.into()) {
+        Ok(updated) => with_standard_headers(
+            (StatusCode::OK, Json(updated)).into_response(),
+            &request_id,
+            "miss",
+            &state.config.runtime_environment,
+            HeaderPolicy::Sensitive,
+        ),
+        Err(crate::problem_bank::ProblemBankUpdateError::NotFound) => with_standard_headers(
+            (
+                StatusCode::NOT_FOUND,
+                Json(ProblemBankErrorResponse {
+                    error: "problem_not_found",
+                }),
+            )
+                .into_response(),
+            &request_id,
+            "miss",
+            &state.config.runtime_environment,
+            HeaderPolicy::Sensitive,
+        ),
+        Err(crate::problem_bank::ProblemBankUpdateError::Persist(_)) => with_standard_headers(
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ProblemBankErrorResponse {
+                    error: "problem_bank_usage_failed",
                 }),
             )
                 .into_response(),
@@ -274,6 +362,50 @@ impl From<GeneratedProblemSet> for GeneratedProblemSetResponse {
 pub struct SaveGeneratedProblemRequest {
     generated_set: GeneratedProblemSet,
     source: ProblemSaveSource,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProblemUpdateRequest {
+    title: Option<String>,
+    prompt: Option<String>,
+    wm_support: Option<String>,
+    success_check: Option<String>,
+    tags: Option<Vec<String>>,
+    notes: Option<String>,
+    pinned: Option<bool>,
+}
+
+impl From<ProblemUpdateRequest> for ProblemRecordUpdate {
+    fn from(value: ProblemUpdateRequest) -> Self {
+        Self {
+            title: value.title,
+            prompt: value.prompt,
+            wm_support: value.wm_support,
+            success_check: value.success_check,
+            tags: value.tags,
+            notes: value.notes,
+            pinned: value.pinned,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProblemUsageRequest {
+    successful: bool,
+    occurred_at_unix: Option<u64>,
+    append_note: Option<String>,
+}
+
+impl From<ProblemUsageRequest> for ProblemUsageEvent {
+    fn from(value: ProblemUsageRequest) -> Self {
+        Self {
+            successful: value.successful,
+            occurred_at_unix: value.occurred_at_unix,
+            append_note: value.append_note,
+        }
+    }
 }
 
 #[derive(Debug, Serialize)]
