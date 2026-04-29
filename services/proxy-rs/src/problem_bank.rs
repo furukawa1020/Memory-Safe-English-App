@@ -1408,7 +1408,7 @@ fn review_signal(item: &ProblemRecord) -> i32 {
     score
 }
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 struct ModeWindowCounter {
     total: usize,
     success: usize,
