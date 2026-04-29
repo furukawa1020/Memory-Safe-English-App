@@ -301,6 +301,7 @@ impl ProblemBank {
         &self,
         recommendation: ProblemRecommendationRequest,
         activity: ProblemActivityRequest,
+        stale: ProblemStaleRequest,
     ) -> ProblemBankDashboard {
         let review_queue = self.review_queue(recommendation.clone());
         let weakness_queue = self.weakness_queue(recommendation);
@@ -308,7 +309,7 @@ impl ProblemBank {
             .groups
             .first()
             .map(|group| group.mode.clone());
-        let stale_problems = self.stale_problems(ProblemStaleRequest::default());
+        let stale_problems = self.stale_problems(stale);
 
         ProblemBankDashboard {
             stats: self.stats(),
@@ -2131,6 +2132,11 @@ mod tests {
             ProblemActivityRequest {
                 source: Some("reviewed".to_string()),
                 ..ProblemActivityRequest::default()
+            },
+            ProblemStaleRequest {
+                source: Some("reviewed".to_string()),
+                stale_after_days: 1,
+                ..ProblemStaleRequest::default()
             },
         );
 
