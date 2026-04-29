@@ -1565,6 +1565,8 @@ mod tests {
             level_band: Some("toeic_750_800".to_string()),
             topic: Some("meeting".to_string()),
             focus_tag: Some("status_update".to_string()),
+            prefer_review: false,
+            avoid_mastered: false,
             limit: 3,
         });
 
