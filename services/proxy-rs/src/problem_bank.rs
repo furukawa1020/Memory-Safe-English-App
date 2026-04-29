@@ -2137,6 +2137,10 @@ mod tests {
         assert!(dashboard.stats.custom >= 1);
         assert!(dashboard.insights.total_history_entries >= 1);
         assert!(!dashboard.review_queue.is_empty());
+        assert_eq!(
+            dashboard.recommended_next_mode.as_deref(),
+            Some("speaking")
+        );
         assert!(
             dashboard
                 .weakness_queue
@@ -2144,6 +2148,38 @@ mod tests {
                 .iter()
                 .any(|group| group.mode == "speaking")
         );
+        assert!(!dashboard.stale_problems.is_empty());
+        let _ = fs::remove_file(temp_path);
+    }
+
+    #[test]
+    fn stale_problems_returns_old_or_unused_items() {
+        let temp_path = temp_problem_bank_path();
+        let bank = ProblemBank::with_persisted_path(temp_path.clone());
+        let saved = bank
+            .clone_problem("pb_speak_002", ProblemSaveSource::Reviewed)
+            .expect("clone seed problem");
+        let saved_id = saved.items[0].id.clone();
+
+        bank.record_usage(
+            &saved_id,
+            ProblemUsageEvent {
+                successful: true,
+                occurred_at_unix: Some(1),
+                append_note: Some("old success".to_string()),
+            },
+        )
+        .expect("record old usage");
+
+        let stale = bank.stale_problems(ProblemStaleRequest {
+            source: Some("reviewed".to_string()),
+            stale_after_days: 1,
+            limit: 5,
+            ..ProblemStaleRequest::default()
+        });
+
+        assert!(!stale.is_empty());
+        assert_eq!(stale[0].problem_id, saved_id);
         let _ = fs::remove_file(temp_path);
     }
 
