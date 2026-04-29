@@ -21,6 +21,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/problem-bank", get(problems::list_problems))
         .route("/problem-bank/custom", get(problems::list_custom_problems))
         .route("/problem-bank/activity", get(problems::problem_activity))
+        .route("/problem-bank/insights", get(problems::problem_insights))
         .route("/problem-bank/recommend", get(problems::recommend_problems))
         .route("/problem-bank/stats", get(problems::problem_bank_stats))
         .route(
@@ -1161,6 +1162,79 @@ mod tests {
         assert!(text.contains("\"successful\":true"));
         assert!(text.contains("\"occurred_at_unix\":333333333"));
         assert!(text.contains("worked well in rehearsal"));
+    }
+
+    #[tokio::test]
+    async fn problem_bank_insights_summarize_usage_patterns() {
+        let app = build_router(state());
+
+        let save_response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/problem-bank/pb_speak_002/save")
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"source":"reviewed"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let save_body = to_bytes(save_response.into_body(), 4096).await.unwrap();
+        let save_text = String::from_utf8(save_body.to_vec()).unwrap();
+        let id_start = save_text.find("\"id\":\"saved_").expect("saved problem id");
+        let id_value = &save_text[id_start + 6..];
+        let end_quote = id_value.find('"').expect("saved id end quote");
+        let saved_id = &id_value[..end_quote];
+
+        let _ = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/problem-bank/{saved_id}/usage"))
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        r#"{"successful":true,"occurred_at_unix":444444444,"append_note":"clear on first try"}"#,
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        let _ = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/problem-bank/{saved_id}/usage"))
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        r#"{"successful":false,"occurred_at_unix":555555555,"append_note":"lost the second step"}"#,
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/problem-bank/insights?source=reviewed")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = to_bytes(response.into_body(), 8192).await.unwrap();
+        let text = String::from_utf8(body.to_vec()).unwrap();
+        assert!(text.contains("\"total_history_entries\":2"));
+        assert!(text.contains("\"successful_history_entries\":1"));
+        assert!(text.contains("\"failed_history_entries\":1"));
+        assert!(text.contains("\"overall_success_rate\":0.5"));
+        assert!(text.contains(saved_id));
     }
 
     fn state_with_urls(api_base_url: String, worker_base_url: String) -> AppState {
