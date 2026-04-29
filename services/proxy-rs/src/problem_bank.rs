@@ -1539,6 +1539,95 @@ fn build_next_action(
     }
 }
 
+fn build_alerts(
+    mode_summary: &[ProblemModeSummary],
+    trend: &ProblemTrend,
+    stale_problems: &[ProblemStaleEntry],
+    review_queue: &[ProblemRecord],
+) -> Vec<ProblemAlert> {
+    let mut alerts = Vec::new();
+
+    if trend.success_rate_delta < -0.10 {
+        alerts.push(ProblemAlert {
+            level: "high",
+            code: "overall_worsening".to_string(),
+            message: "Recent success rate is lower than the previous week. Reduce load and review core steps first.".to_string(),
+        });
+    }
+
+    for mode in &trend.by_mode {
+        if mode.success_rate_delta < -0.20 && mode.recent_attempts > 0 {
+            alerts.push(ProblemAlert {
+                level: "high",
+                code: format!("{}_worsening", mode.mode),
+                message: format!(
+                    "{} performance is dropping. Use shorter units and review one stable problem first.",
+                    capitalize_mode(&mode.mode)
+                ),
+            });
+        }
+    }
+
+    for summary in mode_summary {
+        if summary.stale_count >= 3 {
+            alerts.push(ProblemAlert {
+                level: "medium",
+                code: format!("{}_stale", summary.mode),
+                message: format!(
+                    "{} has {} stale problems. Revisit one before adding new material.",
+                    capitalize_mode(&summary.mode),
+                    summary.stale_count
+                ),
+            });
+        }
+        if summary.recent_failures >= 2 {
+            alerts.push(ProblemAlert {
+                level: "medium",
+                code: format!("{}_recent_failures", summary.mode),
+                message: format!(
+                    "{} shows repeated recent failures. Slow down and protect the main point first.",
+                    capitalize_mode(&summary.mode)
+                ),
+            });
+        }
+    }
+
+    if stale_problems.len() >= 5 {
+        alerts.push(ProblemAlert {
+            level: "medium",
+            code: "stale_backlog".to_string(),
+            message: "There is a backlog of stale problems. Recycle one old problem before starting a new set.".to_string(),
+        });
+    }
+
+    if review_queue.len() >= 4 {
+        alerts.push(ProblemAlert {
+            level: "medium",
+            code: "review_backlog".to_string(),
+            message: "Review backlog is growing. Finish one unstable problem before exploring more.".to_string(),
+        });
+    }
+
+    if alerts.is_empty() {
+        alerts.push(ProblemAlert {
+            level: "low",
+            code: "stable_progress".to_string(),
+            message: "Current load looks stable. Keep sessions short and continue with the next recommended mode.".to_string(),
+        });
+    }
+
+    alerts.truncate(6);
+    alerts
+}
+
+fn capitalize_mode(mode: &str) -> String {
+    let mut chars = mode.chars();
+    match chars.next() {
+        Some(first) => first.to_ascii_uppercase().to_string() + chars.as_str(),
+        None => mode.to_string(),
+    }
+}
+
 fn is_mastered(item: &ProblemRecord) -> bool {
     item.usage_count >= 2
         && item.success_count >= 2
@@ -2475,6 +2564,7 @@ mod tests {
         );
         assert_eq!(dashboard.risk_level, "medium");
         assert!(dashboard.next_action.contains("speaking"));
+        assert!(!dashboard.alerts.is_empty());
         assert!(
             dashboard
                 .weakness_queue

@@ -928,6 +928,7 @@ mod tests {
         assert!(text.contains("\"trend\""));
         assert!(text.contains("\"risk_level\""));
         assert!(text.contains("\"next_action\""));
+        assert!(text.contains("\"alerts\""));
         assert!(text.contains(saved_id));
     }
 
