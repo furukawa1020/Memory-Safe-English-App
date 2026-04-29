@@ -158,6 +158,9 @@ impl ProblemBank {
         let mut by_mode_activity = HashMap::new();
         let mut by_context_activity = HashMap::new();
         let mut by_source_activity = HashMap::new();
+        let mut mode_success_counts = HashMap::new();
+        let mut mode_total_counts = HashMap::new();
+        let mut tag_activity = HashMap::new();
         let mut top_used_problems = Vec::new();
 
         for item in matched_problems {
@@ -176,10 +179,15 @@ impl ProblemBank {
             total_history_entries += matched_history.len();
             successful_history_entries += successful;
             *by_mode_activity.entry(item.mode.clone()).or_insert(0) += matched_history.len();
+            *mode_success_counts.entry(item.mode.clone()).or_insert(0usize) += successful;
+            *mode_total_counts.entry(item.mode.clone()).or_insert(0usize) += matched_history.len();
             *by_context_activity
                 .entry(item.target_context.clone())
                 .or_insert(0) += matched_history.len();
             *by_source_activity.entry(item.source.clone()).or_insert(0) += matched_history.len();
+            for tag in &item.tags {
+                *tag_activity.entry(tag.clone()).or_insert(0usize) += matched_history.len();
+            }
 
             let last_used_unix = matched_history
                 .iter()
@@ -210,6 +218,35 @@ impl ProblemBank {
             top_used_problems.truncate(request.limit);
         }
 
+        let failure_rate_by_mode = mode_total_counts
+            .into_iter()
+            .map(|(mode, total)| {
+                let success = mode_success_counts.get(&mode).copied().unwrap_or(0);
+                let failure_rate = if total == 0 {
+                    0.0
+                } else {
+                    (total.saturating_sub(success)) as f64 / total as f64
+                };
+                (mode, failure_rate)
+            })
+            .collect::<HashMap<_, _>>();
+
+        let mut focus_tag_bias = tag_activity
+            .into_iter()
+            .map(|(tag, activity_count)| ProblemTagActivity {
+                tag,
+                activity_count,
+            })
+            .collect::<Vec<_>>();
+        focus_tag_bias.sort_by(|a, b| {
+            b.activity_count
+                .cmp(&a.activity_count)
+                .then_with(|| a.tag.cmp(&b.tag))
+        });
+        if focus_tag_bias.len() > request.limit {
+            focus_tag_bias.truncate(request.limit);
+        }
+
         ProblemBankInsights {
             total_history_entries,
             successful_history_entries,
@@ -222,6 +259,8 @@ impl ProblemBank {
             by_mode_activity,
             by_context_activity,
             by_source_activity,
+            failure_rate_by_mode,
+            focus_tag_bias,
             top_used_problems,
         }
     }
