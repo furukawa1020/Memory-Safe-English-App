@@ -2,6 +2,7 @@ import '../../../core/api/api_client.dart';
 import '../model/chunking_result.dart';
 import '../model/content_item.dart';
 import '../model/problem_item.dart';
+import '../model/rust_problem_dashboard.dart';
 
 class ContentRepository {
   ContentRepository(this._apiClient);
@@ -133,5 +134,30 @@ class ContentRepository {
       },
     );
     return ProblemItem.fromJson(response);
+  }
+
+  Future<RustProblemDashboard> fetchProblemDashboard() async {
+    final response = await _apiClient.get(
+      '/problem-bank/dashboard?preferred_mode=speaking&activity_source=reviewed&stale_source=reviewed',
+    );
+    return RustProblemDashboard.fromJson(response);
+  }
+
+  Future<List<RustProblemSnapshot>> fetchProblemSnapshots({int limit = 5}) async {
+    final response = await _apiClient.get('/problem-bank/snapshots?limit=$limit');
+    final items = response['items'] as List<dynamic>? ?? const [];
+    return items
+        .map((item) => RustProblemSnapshot.fromJson(item as Map<String, dynamic>))
+        .toList(growable: false);
+  }
+
+  Future<RustProblemSnapshot> captureProblemSnapshot({String? note}) async {
+    final response = await _apiClient.post(
+      '/problem-bank/snapshots/capture?preferred_mode=speaking&activity_source=reviewed&stale_source=reviewed',
+      body: <String, dynamic>{
+        if (note != null && note.isNotEmpty) 'note': note,
+      },
+    );
+    return RustProblemSnapshot.fromJson(response);
   }
 }
