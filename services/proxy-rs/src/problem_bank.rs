@@ -1408,6 +1408,65 @@ fn review_signal(item: &ProblemRecord) -> i32 {
     score
 }
 
+#[derive(Default)]
+struct ModeWindowCounter {
+    total: usize,
+    success: usize,
+}
+
+fn accumulate_mode_window(
+    map: &mut HashMap<String, ModeWindowCounter>,
+    mode: &str,
+    successful: bool,
+) {
+    let counter = map.entry(mode.to_string()).or_default();
+    counter.total += 1;
+    if successful {
+        counter.success += 1;
+    }
+}
+
+fn build_mode_trend(
+    recent: HashMap<String, ModeWindowCounter>,
+    previous: HashMap<String, ModeWindowCounter>,
+) -> Vec<ProblemModeTrend> {
+    let mut modes = recent
+        .keys()
+        .chain(previous.keys())
+        .cloned()
+        .collect::<Vec<_>>();
+    modes.sort();
+    modes.dedup();
+
+    modes
+        .into_iter()
+        .map(|mode| {
+            let recent_counter = recent.get(&mode).cloned().unwrap_or_default();
+            let previous_counter = previous.get(&mode).cloned().unwrap_or_default();
+            let recent_success_rate = success_rate(recent_counter.success, recent_counter.total);
+            let previous_success_rate =
+                success_rate(previous_counter.success, previous_counter.total);
+
+            ProblemModeTrend {
+                mode,
+                recent_success_rate,
+                previous_success_rate,
+                success_rate_delta: recent_success_rate - previous_success_rate,
+                recent_attempts: recent_counter.total,
+                previous_attempts: previous_counter.total,
+            }
+        })
+        .collect()
+}
+
+fn success_rate(success: usize, total: usize) -> f64 {
+    if total == 0 {
+        0.0
+    } else {
+        success as f64 / total as f64
+    }
+}
+
 fn is_mastered(item: &ProblemRecord) -> bool {
     item.usage_count >= 2
         && item.success_count >= 2
