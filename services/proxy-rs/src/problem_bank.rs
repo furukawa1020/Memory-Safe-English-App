@@ -72,6 +72,46 @@ impl ProblemBank {
         matched
     }
 
+    pub fn activity(&self, request: ProblemActivityRequest) -> Vec<ProblemActivityEntry> {
+        let store = self.store.read().expect("problem bank read lock");
+        let mut entries = store
+            .by_id
+            .values()
+            .filter(|item| request.matches_problem(item))
+            .flat_map(|item| {
+                item.usage_history.iter().filter_map(|history| {
+                    if request.matches_history(history) {
+                        Some(ProblemActivityEntry {
+                            problem_id: item.id.clone(),
+                            title: item.title.clone(),
+                            mode: item.mode.clone(),
+                            level_band: item.level_band.clone(),
+                            topic: item.topic.clone(),
+                            target_context: item.target_context.clone(),
+                            source: item.source.clone(),
+                            pinned: item.pinned,
+                            successful: history.successful,
+                            occurred_at_unix: history.occurred_at_unix,
+                            note: history.note.clone(),
+                        })
+                    } else {
+                        None
+                    }
+                })
+            })
+            .collect::<Vec<_>>();
+
+        entries.sort_by(|a, b| {
+            b.occurred_at_unix
+                .cmp(&a.occurred_at_unix)
+                .then_with(|| a.problem_id.cmp(&b.problem_id))
+        });
+        if entries.len() > request.limit {
+            entries.truncate(request.limit);
+        }
+        entries
+    }
+
     pub fn history(&self, id: &str) -> Option<Vec<ProblemUsageHistory>> {
         let store = self.store.read().expect("problem bank read lock");
         store
@@ -460,6 +500,21 @@ pub struct ProblemRecord {
     pub usage_history: Vec<ProblemUsageHistory>,
 }
 
+#[derive(Clone, Debug, Serialize)]
+pub struct ProblemActivityEntry {
+    pub problem_id: String,
+    pub title: String,
+    pub mode: String,
+    pub level_band: String,
+    pub topic: String,
+    pub target_context: String,
+    pub source: String,
+    pub pinned: bool,
+    pub successful: bool,
+    pub occurred_at_unix: u64,
+    pub note: String,
+}
+
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ProblemGenerationRequest {
@@ -527,6 +582,96 @@ pub struct ProblemRecommendationRequest {
     pub topic: Option<String>,
     pub focus_tag: Option<String>,
     pub limit: usize,
+}
+
+#[derive(Clone, Debug)]
+pub struct ProblemActivityRequest {
+    pub mode: Option<String>,
+    pub level_band: Option<String>,
+    pub topic: Option<String>,
+    pub target_context: Option<String>,
+    pub source: Option<String>,
+    pub query: Option<String>,
+    pub successful: Option<bool>,
+    pub pinned_only: bool,
+    pub limit: usize,
+}
+
+impl Default for ProblemActivityRequest {
+    fn default() -> Self {
+        Self {
+            mode: None,
+            level_band: None,
+            topic: None,
+            target_context: None,
+            source: None,
+            query: None,
+            successful: None,
+            pinned_only: false,
+            limit: 20,
+        }
+    }
+}
+
+impl ProblemActivityRequest {
+    fn matches_problem(&self, item: &ProblemRecord) -> bool {
+        if self.pinned_only && !item.pinned {
+            return false;
+        }
+        if let Some(mode) = self.mode.as_deref() {
+            if !item.mode.eq_ignore_ascii_case(mode) {
+                return false;
+            }
+        }
+        if let Some(level_band) = self.level_band.as_deref() {
+            if !item.level_band.eq_ignore_ascii_case(level_band) {
+                return false;
+            }
+        }
+        if let Some(topic) = self.topic.as_deref() {
+            if !item.topic.eq_ignore_ascii_case(topic) {
+                return false;
+            }
+        }
+        if let Some(target_context) = self.target_context.as_deref() {
+            if !item.target_context.eq_ignore_ascii_case(target_context) {
+                return false;
+            }
+        }
+        if let Some(source) = self.source.as_deref() {
+            if !item.source.eq_ignore_ascii_case(source) {
+                return false;
+            }
+        }
+        if let Some(query) = self.query.as_deref() {
+            let lowered = query.to_ascii_lowercase();
+            let haystacks = [
+                item.title.as_str(),
+                item.prompt.as_str(),
+                item.notes.as_str(),
+                item.topic.as_str(),
+                item.target_context.as_str(),
+            ];
+            let tag_match = item
+                .tags
+                .iter()
+                .any(|tag| tag.to_ascii_lowercase().contains(&lowered));
+            let text_match = haystacks
+                .iter()
+                .any(|value| value.to_ascii_lowercase().contains(&lowered));
+            if !tag_match && !text_match {
+                return false;
+            }
+        }
+        true
+    }
+
+    fn matches_history(&self, history: &ProblemUsageHistory) -> bool {
+        match self.successful {
+            Some(successful) => history.successful == successful,
+            None => true,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
