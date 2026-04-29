@@ -936,7 +936,7 @@ pub struct GeneratedProblemSet {
     pub items: Vec<ProblemRecord>,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ProblemBankStats {
     pub total: usize,
     pub seeded: usize,
@@ -949,7 +949,7 @@ pub struct ProblemBankStats {
     pub by_source: HashMap<String, usize>,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ProblemBankInsights {
     pub total_history_entries: usize,
     pub successful_history_entries: usize,
@@ -963,13 +963,13 @@ pub struct ProblemBankInsights {
     pub top_used_problems: Vec<ProblemUsageSummary>,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ProblemTagActivity {
     pub tag: String,
     pub activity_count: usize,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ProblemUsageSummary {
     pub problem_id: String,
     pub title: String,
@@ -982,19 +982,19 @@ pub struct ProblemUsageSummary {
     pub pinned: bool,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ProblemWeaknessQueue {
     pub groups: Vec<ProblemWeaknessGroup>,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ProblemWeaknessGroup {
     pub mode: String,
     pub total_candidates: usize,
     pub items: Vec<ProblemRecord>,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ProblemBankDashboard {
     pub stats: ProblemBankStats,
     pub insights: ProblemBankInsights,
@@ -1004,12 +1004,12 @@ pub struct ProblemBankDashboard {
     pub stale_problems: Vec<ProblemStaleEntry>,
     pub mode_summary: Vec<ProblemModeSummary>,
     pub trend: ProblemTrend,
-    pub risk_level: &'static str,
+    pub risk_level: String,
     pub next_action: String,
     pub alerts: Vec<ProblemAlert>,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ProblemStaleEntry {
     pub problem_id: String,
     pub title: String,
@@ -1022,7 +1022,7 @@ pub struct ProblemStaleEntry {
     pub usage_count: u32,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ProblemModeSummary {
     pub mode: String,
     pub total_problems: usize,
@@ -1032,7 +1032,7 @@ pub struct ProblemModeSummary {
     pub success_rate: f64,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ProblemTrend {
     pub recent_window_days: u64,
     pub previous_window_days: u64,
@@ -1044,9 +1044,9 @@ pub struct ProblemTrend {
     pub by_mode: Vec<ProblemModeTrend>,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ProblemAlert {
-    pub level: &'static str,
+    pub level: String,
     pub code: String,
     pub message: String,
 }
@@ -1059,7 +1059,7 @@ pub struct ProblemBankSnapshot {
     pub dashboard: ProblemBankDashboard,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ProblemModeTrend {
     pub mode: String,
     pub recent_success_rate: f64,
