@@ -251,6 +251,32 @@ impl ProblemBank {
             .collect()
     }
 
+    pub fn review_queue(&self, request: ProblemRecommendationRequest) -> Vec<ProblemRecord> {
+        let store = self.store.read().expect("problem bank read lock");
+        let mut ranked = store
+            .all_items()
+            .into_iter()
+            .map(|item| {
+                let score = review_queue_score(&item, &request);
+                (score, item)
+            })
+            .filter(|(score, _)| *score > 0)
+            .collect::<Vec<_>>();
+
+        ranked.sort_by(|a, b| {
+            b.0.cmp(&a.0)
+                .then_with(|| b.1.last_used_unix.cmp(&a.1.last_used_unix))
+                .then_with(|| a.1.sort_order.cmp(&b.1.sort_order))
+                .then_with(|| a.1.id.cmp(&b.1.id))
+        });
+
+        ranked
+            .into_iter()
+            .take(request.limit.max(1).min(20))
+            .map(|(_, item)| item)
+            .collect()
+    }
+
     pub fn save_generated_set(
         &self,
         generated: &GeneratedProblemSet,
@@ -688,6 +714,8 @@ pub struct ProblemRecommendationRequest {
     pub level_band: Option<String>,
     pub topic: Option<String>,
     pub focus_tag: Option<String>,
+    pub prefer_review: bool,
+    pub avoid_mastered: bool,
     pub limit: usize,
 }
 
