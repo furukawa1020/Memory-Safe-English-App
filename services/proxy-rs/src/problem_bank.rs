@@ -33,8 +33,8 @@ impl ProblemBank {
             .unwrap_or_default();
         let snapshot_path = persisted_path
             .as_ref()
-            .map(derive_snapshot_path)
-            .filter(|path| !path.as_os_str().is_empty());
+            .map(|path| derive_snapshot_path(path.as_path()))
+            .filter(|path: &PathBuf| !path.as_os_str().is_empty());
         let snapshots = snapshot_path
             .as_ref()
             .and_then(|path| load_snapshots(path).ok())
@@ -369,7 +369,7 @@ impl ProblemBank {
         let risk_level = compute_risk_level(&review_queue, &stale_problems, &trend);
         let next_action = build_next_action(
             recommended_next_mode.as_deref(),
-            risk_level,
+            &risk_level,
             &review_queue,
             &stale_problems,
         );
