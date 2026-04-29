@@ -740,6 +740,9 @@ pub struct ProblemFilter {
     pub level_band: Option<String>,
     pub topic: Option<String>,
     pub target_context: Option<String>,
+    pub source: Option<String>,
+    pub tag: Option<String>,
+    pub pinned_only: bool,
     pub query: Option<String>,
     pub limit: usize,
 }
@@ -751,6 +754,9 @@ impl Default for ProblemFilter {
             level_band: None,
             topic: None,
             target_context: None,
+            source: None,
+            tag: None,
+            pinned_only: false,
             query: None,
             limit: 20,
         }
@@ -778,6 +784,23 @@ impl ProblemFilter {
             if !item.target_context.eq_ignore_ascii_case(target_context) {
                 return false;
             }
+        }
+        if let Some(source) = self.source.as_deref() {
+            if !item.source.eq_ignore_ascii_case(source) {
+                return false;
+            }
+        }
+        if let Some(tag) = self.tag.as_deref() {
+            if !item
+                .tags
+                .iter()
+                .any(|item_tag| item_tag.eq_ignore_ascii_case(tag))
+            {
+                return false;
+            }
+        }
+        if self.pinned_only && !item.pinned {
+            return false;
         }
         if let Some(query) = self.query.as_deref() {
             let lowered = query.to_ascii_lowercase();
