@@ -1010,9 +1010,55 @@ fn recommendation_score(item: &ProblemRecord, request: &ProblemRecommendationReq
     if item.pinned {
         score += 2;
     }
-    score += (item.success_count.min(3)) as i32;
+    if request.prefer_review {
+        score += review_signal(item);
+    } else {
+        score += (item.success_count.min(3)) as i32;
+    }
+    if request.avoid_mastered && is_mastered(item) {
+        score -= 6;
+    }
 
     score
+}
+
+fn review_queue_score(item: &ProblemRecord, request: &ProblemRecommendationRequest) -> i32 {
+    let mut score = recommendation_score(item, request);
+    score += review_signal(item);
+    if is_mastered(item) {
+        score -= if request.avoid_mastered { 10 } else { 4 };
+    }
+    if item.usage_count == 0 {
+        score += 2;
+    }
+    score
+}
+
+fn review_signal(item: &ProblemRecord) -> i32 {
+    let failures = item.usage_count.saturating_sub(item.success_count);
+    let mut score = 0i32;
+    score += (failures.min(3) * 2) as i32;
+    if last_usage_was_failure(item) {
+        score += 4;
+    }
+    if item.usage_count > 0 && item.success_count == 0 {
+        score += 2;
+    }
+    score
+}
+
+fn is_mastered(item: &ProblemRecord) -> bool {
+    item.usage_count >= 2
+        && item.success_count >= 2
+        && item.success_count.saturating_mul(10) >= item.usage_count.saturating_mul(8)
+}
+
+fn last_usage_was_failure(item: &ProblemRecord) -> bool {
+    item.usage_history
+        .iter()
+        .max_by_key(|entry| entry.occurred_at_unix)
+        .map(|entry| !entry.successful)
+        .unwrap_or(false)
 }
 
 fn group_by_source(items: &[ProblemRecord]) -> HashMap<String, usize> {
