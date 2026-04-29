@@ -1407,6 +1407,15 @@ fn load_custom_records(path: &Path) -> Result<Vec<ProblemRecord>, std::io::Error
     Ok(records)
 }
 
+fn load_snapshots(path: &Path) -> Result<Vec<ProblemBankSnapshot>, std::io::Error> {
+    if !path.exists() {
+        return Ok(Vec::new());
+    }
+    let raw = fs::read_to_string(path)?;
+    let snapshots = serde_json::from_str::<Vec<ProblemBankSnapshot>>(&raw).unwrap_or_default();
+    Ok(snapshots)
+}
+
 fn recommendation_score(item: &ProblemRecord, request: &ProblemRecommendationRequest) -> i32 {
     let mut score = 1;
 
@@ -1710,6 +1719,23 @@ fn persist_custom_records(path: &Path, records: &[ProblemRecord]) -> Result<(), 
     }
     let payload = serde_json::to_string_pretty(records)?;
     fs::write(path, payload).map_err(ProblemBankSaveError::Write)
+}
+
+fn persist_snapshots(path: &Path, snapshots: &[ProblemBankSnapshot]) -> Result<(), ProblemBankSaveError> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(ProblemBankSaveError::CreateDirectory)?;
+    }
+    let payload = serde_json::to_string_pretty(snapshots)?;
+    fs::write(path, payload).map_err(ProblemBankSaveError::Write)
+}
+
+fn derive_snapshot_path(problem_bank_path: &Path) -> PathBuf {
+    let parent = problem_bank_path.parent().map(Path::to_path_buf).unwrap_or_default();
+    let stem = problem_bank_path
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .unwrap_or("problem-bank");
+    parent.join(format!("{stem}.snapshots.json"))
 }
 
 fn saved_problem_id(base_id: &str, summary: &str, index: usize) -> String {
