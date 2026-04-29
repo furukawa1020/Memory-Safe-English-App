@@ -277,6 +277,26 @@ impl ProblemBank {
             .collect()
     }
 
+    pub fn weakness_queue(&self, request: ProblemRecommendationRequest) -> ProblemWeaknessQueue {
+        let modes = ["reading", "listening", "speaking", "rescue"];
+        let groups = modes
+            .into_iter()
+            .map(|mode| {
+                let mut mode_request = request.clone();
+                mode_request.preferred_mode = Some(mode.to_string());
+                let items = self.review_queue(mode_request);
+                ProblemWeaknessGroup {
+                    mode: mode.to_string(),
+                    total_candidates: items.len(),
+                    items,
+                }
+            })
+            .filter(|group| !group.items.is_empty())
+            .collect::<Vec<_>>();
+
+        ProblemWeaknessQueue { groups }
+    }
+
     pub fn save_generated_set(
         &self,
         generated: &GeneratedProblemSet,
@@ -678,6 +698,18 @@ pub struct ProblemUsageSummary {
     pub success_count: usize,
     pub last_used_unix: u64,
     pub pinned: bool,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct ProblemWeaknessQueue {
+    pub groups: Vec<ProblemWeaknessGroup>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct ProblemWeaknessGroup {
+    pub mode: String,
+    pub total_candidates: usize,
+    pub items: Vec<ProblemRecord>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -1877,6 +1909,53 @@ mod tests {
         assert!(!queue.is_empty());
         assert_eq!(queue[0].id, struggling_id);
         assert!(!queue.iter().any(|item| item.id == mastered_id));
+        let _ = fs::remove_file(temp_path);
+    }
+
+    #[test]
+    fn weakness_queue_groups_review_candidates_by_mode() {
+        let temp_path = temp_problem_bank_path();
+        let bank = ProblemBank::with_persisted_path(temp_path.clone());
+
+        let speaking = bank
+            .clone_problem("pb_speak_002", ProblemSaveSource::Reviewed)
+            .expect("clone speaking problem");
+        let reading = bank
+            .clone_problem("pb_read_001", ProblemSaveSource::Reviewed)
+            .expect("clone reading problem");
+
+        bank.record_usage(
+            &speaking.items[0].id,
+            ProblemUsageEvent {
+                successful: false,
+                occurred_at_unix: Some(700),
+                append_note: Some("speaking collapsed".to_string()),
+            },
+        )
+        .expect("record speaking usage");
+        bank.record_usage(
+            &reading.items[0].id,
+            ProblemUsageEvent {
+                successful: false,
+                occurred_at_unix: Some(800),
+                append_note: Some("lost the clause".to_string()),
+            },
+        )
+        .expect("record reading usage");
+
+        let queue = bank.weakness_queue(ProblemRecommendationRequest {
+            preferred_mode: None,
+            target_context: None,
+            level_band: None,
+            topic: None,
+            focus_tag: None,
+            prefer_review: true,
+            avoid_mastered: true,
+            limit: 3,
+        });
+
+        assert!(queue.groups.iter().any(|group| group.mode == "speaking"));
+        assert!(queue.groups.iter().any(|group| group.mode == "reading"));
         let _ = fs::remove_file(temp_path);
     }
 
