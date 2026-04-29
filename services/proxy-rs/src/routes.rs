@@ -769,6 +769,101 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn problem_bank_weakness_queue_groups_by_mode() {
+        let app = build_router(state());
+
+        let speaking_save = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/problem-bank/pb_speak_002/save")
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"source":"reviewed"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let speaking_body = to_bytes(speaking_save.into_body(), 4096).await.unwrap();
+        let speaking_text = String::from_utf8(speaking_body.to_vec()).unwrap();
+        let speaking_start = speaking_text
+            .find("\"id\":\"saved_")
+            .expect("saved speaking problem id");
+        let speaking_value = &speaking_text[speaking_start + 6..];
+        let speaking_end = speaking_value.find('"').expect("saved id end quote");
+        let speaking_id = &speaking_value[..speaking_end];
+
+        let reading_save = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/problem-bank/pb_read_001/save")
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"source":"reviewed"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let reading_body = to_bytes(reading_save.into_body(), 4096).await.unwrap();
+        let reading_text = String::from_utf8(reading_body.to_vec()).unwrap();
+        let reading_start = reading_text
+            .find("\"id\":\"saved_")
+            .expect("saved reading problem id");
+        let reading_value = &reading_text[reading_start + 6..];
+        let reading_end = reading_value.find('"').expect("saved id end quote");
+        let reading_id = &reading_value[..reading_end];
+
+        let _ = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/problem-bank/{speaking_id}/usage"))
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        r#"{"successful":false,"occurred_at_unix":777777777,"append_note":"speaking collapsed"}"#,
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        let _ = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/problem-bank/{reading_id}/usage"))
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        r#"{"successful":false,"occurred_at_unix":888888888,"append_note":"reading clause dropped"}"#,
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/problem-bank/weakness-queue?source=reviewed&limit=2")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = to_bytes(response.into_body(), 8192).await.unwrap();
+        let text = String::from_utf8(body.to_vec()).unwrap();
+        assert!(text.contains("\"mode\":\"speaking\""));
+        assert!(text.contains("\"mode\":\"reading\""));
+        assert!(text.contains(speaking_id));
+        assert!(text.contains(reading_id));
+    }
+
+    #[tokio::test]
     async fn problem_bank_save_persists_generated_items_in_memory() {
         let app = build_router(state());
 
