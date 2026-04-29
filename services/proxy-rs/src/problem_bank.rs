@@ -302,12 +302,69 @@ impl ProblemBank {
         recommendation: ProblemRecommendationRequest,
         activity: ProblemActivityRequest,
     ) -> ProblemBankDashboard {
+        let review_queue = self.review_queue(recommendation.clone());
+        let weakness_queue = self.weakness_queue(recommendation);
+        let recommended_next_mode = weakness_queue
+            .groups
+            .first()
+            .map(|group| group.mode.clone());
+        let stale_problems = self.stale_problems(ProblemStaleRequest::default());
+
         ProblemBankDashboard {
             stats: self.stats(),
             insights: self.insights(activity),
-            review_queue: self.review_queue(recommendation.clone()),
-            weakness_queue: self.weakness_queue(recommendation),
+            review_queue,
+            weakness_queue,
+            recommended_next_mode,
+            stale_problems,
         }
+    }
+
+    pub fn stale_problems(&self, request: ProblemStaleRequest) -> Vec<ProblemStaleEntry> {
+        let store = self.store.read().expect("problem bank read lock");
+        let now = current_unix_seconds();
+        let stale_after_seconds = request
+            .stale_after_days
+            .max(1)
+            .saturating_mul(24 * 60 * 60);
+
+        let mut items = store
+            .by_id
+            .values()
+            .filter(|item| request.matches(item))
+            .filter_map(|item| {
+                let idle_seconds = if item.last_used_unix == 0 {
+                    now
+                } else {
+                    now.saturating_sub(item.last_used_unix)
+                };
+                if idle_seconds < stale_after_seconds {
+                    return None;
+                }
+
+                Some(ProblemStaleEntry {
+                    problem_id: item.id.clone(),
+                    title: item.title.clone(),
+                    mode: item.mode.clone(),
+                    target_context: item.target_context.clone(),
+                    source: item.source.clone(),
+                    pinned: item.pinned,
+                    last_used_unix: item.last_used_unix,
+                    idle_days: idle_seconds / (24 * 60 * 60),
+                    usage_count: item.usage_count,
+                })
+            })
+            .collect::<Vec<_>>();
+
+        items.sort_by(|a, b| {
+            b.idle_days
+                .cmp(&a.idle_days)
+                .then_with(|| a.problem_id.cmp(&b.problem_id))
+        });
+        if items.len() > request.limit {
+            items.truncate(request.limit);
+        }
+        items
     }
 
     pub fn save_generated_set(
