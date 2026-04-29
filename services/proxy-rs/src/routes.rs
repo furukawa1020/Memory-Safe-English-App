@@ -926,6 +926,8 @@ mod tests {
         assert!(text.contains("\"focus_tag_bias\""));
         assert!(text.contains("\"mode_summary\""));
         assert!(text.contains("\"trend\""));
+        assert!(text.contains("\"risk_level\""));
+        assert!(text.contains("\"next_action\""));
         assert!(text.contains(saved_id));
     }
 
