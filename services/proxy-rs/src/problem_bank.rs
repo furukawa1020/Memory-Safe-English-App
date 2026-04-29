@@ -934,6 +934,53 @@ impl ProblemActivityRequest {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct ProblemStaleRequest {
+    pub mode: Option<String>,
+    pub target_context: Option<String>,
+    pub source: Option<String>,
+    pub pinned_only: bool,
+    pub stale_after_days: u64,
+    pub limit: usize,
+}
+
+impl Default for ProblemStaleRequest {
+    fn default() -> Self {
+        Self {
+            mode: None,
+            target_context: None,
+            source: None,
+            pinned_only: false,
+            stale_after_days: 7,
+            limit: 10,
+        }
+    }
+}
+
+impl ProblemStaleRequest {
+    fn matches(&self, item: &ProblemRecord) -> bool {
+        if self.pinned_only && !item.pinned {
+            return false;
+        }
+        if let Some(mode) = self.mode.as_deref() {
+            if !item.mode.eq_ignore_ascii_case(mode) {
+                return false;
+            }
+        }
+        if let Some(target_context) = self.target_context.as_deref() {
+            if !item.target_context.eq_ignore_ascii_case(target_context) {
+                return false;
+            }
+        }
+        if let Some(source) = self.source.as_deref() {
+            if !item.source.eq_ignore_ascii_case(source) {
+                return false;
+            }
+        }
+        true
+    }
+}
+
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ProblemSaveSource {
