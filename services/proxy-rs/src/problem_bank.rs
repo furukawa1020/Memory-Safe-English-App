@@ -57,6 +57,29 @@ impl ProblemBank {
         store.by_id.get(id).cloned()
     }
 
+    pub fn list_custom(&self, filter: ProblemFilter) -> Vec<ProblemRecord> {
+        let store = self.store.read().expect("problem bank read lock");
+        let mut matched = store
+            .custom
+            .values()
+            .filter(|item| filter.matches(item))
+            .cloned()
+            .collect::<Vec<_>>();
+        matched.sort_by(|a, b| a.sort_order.cmp(&b.sort_order).then_with(|| a.id.cmp(&b.id)));
+        if matched.len() > filter.limit {
+            matched.truncate(filter.limit);
+        }
+        matched
+    }
+
+    pub fn history(&self, id: &str) -> Option<Vec<ProblemUsageHistory>> {
+        let store = self.store.read().expect("problem bank read lock");
+        store
+            .by_id
+            .get(id)
+            .map(|item| item.usage_history.clone())
+    }
+
     pub fn stats(&self) -> ProblemBankStats {
         let store = self.store.read().expect("problem bank read lock");
         let mut by_mode = HashMap::new();
@@ -253,6 +276,11 @@ impl ProblemBank {
             item.success_count = item.success_count.saturating_add(1);
         }
         item.last_used_unix = event.occurred_at_unix.unwrap_or_else(current_unix_seconds);
+        item.usage_history.push(ProblemUsageHistory {
+            successful: event.successful,
+            occurred_at_unix: item.last_used_unix,
+            note: event.append_note.clone().unwrap_or_default(),
+        });
         if let Some(note) = event.append_note {
             if item.notes.is_empty() {
                 item.notes = note;
@@ -428,6 +456,8 @@ pub struct ProblemRecord {
     pub last_used_unix: u64,
     #[serde(default)]
     pub notes: String,
+    #[serde(default)]
+    pub usage_history: Vec<ProblemUsageHistory>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -480,6 +510,13 @@ pub struct ProblemUsageEvent {
     pub successful: bool,
     pub occurred_at_unix: Option<u64>,
     pub append_note: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ProblemUsageHistory {
+    pub successful: bool,
+    pub occurred_at_unix: u64,
+    pub note: String,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -768,6 +805,7 @@ fn problem(
         success_count: 0,
         last_used_unix: 0,
         notes: String::new(),
+        usage_history: Vec::new(),
     }
 }
 
@@ -802,6 +840,7 @@ fn generated_problem(
         success_count: 0,
         last_used_unix: 0,
         notes: String::new(),
+        usage_history: Vec::new(),
     }
 }
 
