@@ -10,9 +10,9 @@ use tokio::join;
 use crate::{
     http_response::with_standard_headers,
     problem_bank::{
-        GeneratedProblemSet, ProblemFilter, ProblemGenerationRequest, ProblemRecommendationRequest,
-        ProblemRecord, ProblemRecordUpdate, ProblemSaveSource, ProblemUsageEvent,
-        ProblemUsageHistory,
+        GeneratedProblemSet, ProblemActivityEntry, ProblemActivityRequest, ProblemFilter,
+        ProblemGenerationRequest, ProblemRecommendationRequest, ProblemRecord,
+        ProblemRecordUpdate, ProblemSaveSource, ProblemUsageEvent, ProblemUsageHistory,
     },
     request_id::resolve_request_id,
     response_headers::HeaderPolicy,
@@ -31,6 +31,9 @@ pub async fn list_problems(
         level_band: query.level_band,
         topic: query.topic,
         target_context: query.target_context,
+        source: query.source,
+        tag: query.tag,
+        pinned_only: query.pinned_only.unwrap_or(false),
         query: query.query,
         limit,
     });
@@ -63,6 +66,9 @@ pub async fn list_custom_problems(
         level_band: query.level_band,
         topic: query.topic,
         target_context: query.target_context,
+        source: query.source,
+        tag: query.tag,
+        pinned_only: query.pinned_only.unwrap_or(false),
         query: query.query,
         limit,
     });
@@ -71,6 +77,40 @@ pub async fn list_custom_problems(
         (
             StatusCode::OK,
             Json(ProblemBankListResponse {
+                total: items.len(),
+                items,
+            }),
+        )
+            .into_response(),
+        &request_id,
+        "miss",
+        &state.config.runtime_environment,
+        HeaderPolicy::Sensitive,
+    )
+}
+
+pub async fn problem_activity(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Query(query): Query<ProblemActivityQuery>,
+) -> impl IntoResponse {
+    let request_id = resolve_request_id(&headers);
+    let items = state.problem_bank.activity(ProblemActivityRequest {
+        mode: query.mode,
+        level_band: query.level_band,
+        topic: query.topic,
+        target_context: query.target_context,
+        source: query.source,
+        query: query.query,
+        successful: query.successful,
+        pinned_only: query.pinned_only.unwrap_or(false),
+        limit: query.limit.unwrap_or(20).clamp(1, 100),
+    });
+
+    with_standard_headers(
+        (
+            StatusCode::OK,
+            Json(ProblemActivityResponse {
                 total: items.len(),
                 items,
             }),
@@ -428,6 +468,22 @@ pub struct ProblemBankQuery {
     pub level_band: Option<String>,
     pub topic: Option<String>,
     pub target_context: Option<String>,
+    pub source: Option<String>,
+    pub tag: Option<String>,
+    pub pinned_only: Option<bool>,
+    pub query: Option<String>,
+    pub limit: Option<usize>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ProblemActivityQuery {
+    pub mode: Option<String>,
+    pub level_band: Option<String>,
+    pub topic: Option<String>,
+    pub target_context: Option<String>,
+    pub source: Option<String>,
+    pub pinned_only: Option<bool>,
+    pub successful: Option<bool>,
     pub query: Option<String>,
     pub limit: Option<usize>,
 }
@@ -452,6 +508,12 @@ struct ProblemBankListResponse {
 struct ProblemHistoryResponse {
     total: usize,
     history: Vec<ProblemUsageHistory>,
+}
+
+#[derive(Debug, Serialize)]
+struct ProblemActivityResponse {
+    total: usize,
+    items: Vec<ProblemActivityEntry>,
 }
 
 #[derive(Debug, Serialize)]
