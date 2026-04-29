@@ -1051,6 +1051,14 @@ pub struct ProblemAlert {
     pub message: String,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ProblemBankSnapshot {
+    pub id: String,
+    pub captured_at_unix: u64,
+    pub note: String,
+    pub dashboard: ProblemBankDashboard,
+}
+
 #[derive(Clone, Debug, Serialize)]
 pub struct ProblemModeTrend {
     pub mode: String,
