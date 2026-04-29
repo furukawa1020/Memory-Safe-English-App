@@ -1528,6 +1528,80 @@ mod tests {
     }
 
     #[test]
+    fn list_custom_can_filter_by_source_and_pinned() {
+        let temp_path = temp_problem_bank_path();
+        let bank = ProblemBank::with_persisted_path(temp_path.clone());
+        let saved = bank
+            .clone_problem("pb_speak_002", ProblemSaveSource::Reviewed)
+            .expect("clone seed problem");
+
+        bank.update_custom(
+            &saved.items[0].id,
+            ProblemRecordUpdate {
+                title: None,
+                prompt: None,
+                wm_support: None,
+                success_check: None,
+                tags: None,
+                notes: None,
+                pinned: Some(true),
+            },
+        )
+        .expect("pin custom problem");
+
+        let results = bank.list_custom(ProblemFilter {
+            source: Some("reviewed".to_string()),
+            pinned_only: true,
+            ..ProblemFilter::default()
+        });
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].source, "reviewed");
+        assert!(results[0].pinned);
+        let _ = fs::remove_file(temp_path);
+    }
+
+    #[test]
+    fn activity_returns_recent_entries_in_descending_order() {
+        let temp_path = temp_problem_bank_path();
+        let bank = ProblemBank::with_persisted_path(temp_path.clone());
+        let saved = bank
+            .clone_problem("pb_speak_002", ProblemSaveSource::Reviewed)
+            .expect("clone seed problem");
+        let saved_id = saved.items[0].id.clone();
+
+        bank.record_usage(
+            &saved_id,
+            ProblemUsageEvent {
+                successful: false,
+                occurred_at_unix: Some(100),
+                append_note: Some("first try".to_string()),
+            },
+        )
+        .expect("record first usage");
+        bank.record_usage(
+            &saved_id,
+            ProblemUsageEvent {
+                successful: true,
+                occurred_at_unix: Some(200),
+                append_note: Some("second try".to_string()),
+            },
+        )
+        .expect("record second usage");
+
+        let activity = bank.activity(ProblemActivityRequest {
+            successful: Some(true),
+            ..ProblemActivityRequest::default()
+        });
+
+        assert_eq!(activity.len(), 1);
+        assert_eq!(activity[0].problem_id, saved_id);
+        assert_eq!(activity[0].occurred_at_unix, 200);
+        assert!(activity[0].successful);
+        let _ = fs::remove_file(temp_path);
+    }
+
+    #[test]
     fn clones_seed_problem_into_custom_store() {
         let temp_path = temp_problem_bank_path();
         let bank = ProblemBank::with_persisted_path(temp_path.clone());
