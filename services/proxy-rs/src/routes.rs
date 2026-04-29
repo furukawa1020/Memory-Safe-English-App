@@ -673,6 +673,101 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn problem_bank_review_queue_prioritizes_recent_failures() {
+        let app = build_router(state());
+
+        let struggling_save = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/problem-bank/pb_speak_002/save")
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"source":"reviewed"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let struggling_body = to_bytes(struggling_save.into_body(), 4096).await.unwrap();
+        let struggling_text = String::from_utf8(struggling_body.to_vec()).unwrap();
+        let struggling_start = struggling_text
+            .find("\"id\":\"saved_")
+            .expect("saved struggling problem id");
+        let struggling_value = &struggling_text[struggling_start + 6..];
+        let struggling_end = struggling_value.find('"').expect("saved id end quote");
+        let struggling_id = &struggling_value[..struggling_end];
+
+        let mastered_save = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/problem-bank/pb_read_001/save")
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"source":"reviewed"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let mastered_body = to_bytes(mastered_save.into_body(), 4096).await.unwrap();
+        let mastered_text = String::from_utf8(mastered_body.to_vec()).unwrap();
+        let mastered_start = mastered_text
+            .find("\"id\":\"saved_")
+            .expect("saved mastered problem id");
+        let mastered_value = &mastered_text[mastered_start + 6..];
+        let mastered_end = mastered_value.find('"').expect("saved id end quote");
+        let mastered_id = &mastered_value[..mastered_end];
+
+        let _ = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/problem-bank/{struggling_id}/usage"))
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        r#"{"successful":false,"occurred_at_unix":666666666,"append_note":"lost the second step"}"#,
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        for occurred_at in [111111111_u64, 222222222_u64, 333333333_u64] {
+            let _ = app
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .method("POST")
+                        .uri(format!("/problem-bank/{mastered_id}/usage"))
+                        .header("content-type", "application/json")
+                        .body(Body::from(format!(
+                            "{{\"successful\":true,\"occurred_at_unix\":{occurred_at},\"append_note\":\"stable\"}}"
+                        )))
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+        }
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/problem-bank/review-queue?source=reviewed&avoid_mastered=true")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = to_bytes(response.into_body(), 8192).await.unwrap();
+        let text = String::from_utf8(body.to_vec()).unwrap();
+        assert!(text.contains(struggling_id));
+        assert!(!text.contains(mastered_id));
+    }
+
+    #[tokio::test]
     async fn problem_bank_save_persists_generated_items_in_memory() {
         let app = build_router(state());
 
