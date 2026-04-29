@@ -23,6 +23,8 @@ pub fn build_router(state: AppState) -> Router {
         .route("/problem-bank/activity", get(problems::problem_activity))
         .route("/problem-bank/dashboard", get(problems::problem_dashboard))
         .route("/problem-bank/insights", get(problems::problem_insights))
+        .route("/problem-bank/snapshots", get(problems::list_snapshots))
+        .route("/problem-bank/snapshots/capture", post(problems::capture_snapshot))
         .route("/problem-bank/stale", get(problems::stale_problems))
         .route("/problem-bank/recommend", get(problems::recommend_problems))
         .route("/problem-bank/review-queue", get(problems::review_queue))

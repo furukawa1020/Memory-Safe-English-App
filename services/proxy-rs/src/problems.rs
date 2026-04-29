@@ -596,6 +596,92 @@ pub async fn stale_problems(
     )
 }
 
+pub async fn list_snapshots(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Query(query): Query<SnapshotListQuery>,
+) -> impl IntoResponse {
+    let request_id = resolve_request_id(&headers);
+    let snapshots = state.problem_bank.list_snapshots(query.limit.unwrap_or(10));
+
+    with_standard_headers(
+        (
+            StatusCode::OK,
+            Json(SnapshotListResponse {
+                total: snapshots.len(),
+                items: snapshots,
+            }),
+        )
+            .into_response(),
+        &request_id,
+        "miss",
+        &state.config.runtime_environment,
+        HeaderPolicy::Sensitive,
+    )
+}
+
+pub async fn capture_snapshot(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Query(query): Query<ProblemDashboardQuery>,
+    Json(request): Json<CaptureSnapshotRequest>,
+) -> impl IntoResponse {
+    let request_id = resolve_request_id(&headers);
+    match state.problem_bank.capture_snapshot(
+        ProblemRecommendationRequest {
+            preferred_mode: query.preferred_mode.clone(),
+            target_context: query.target_context.clone(),
+            level_band: query.level_band.clone(),
+            topic: query.topic.clone(),
+            focus_tag: query.focus_tag.clone(),
+            prefer_review: query.prefer_review.unwrap_or(true),
+            avoid_mastered: query.avoid_mastered.unwrap_or(true),
+            limit: query.limit.unwrap_or(5),
+        },
+        ProblemActivityRequest {
+            mode: query.activity_mode,
+            level_band: query.activity_level_band,
+            topic: query.activity_topic,
+            target_context: query.activity_target_context,
+            source: query.activity_source,
+            query: query.activity_query,
+            successful: query.activity_successful,
+            pinned_only: query.activity_pinned_only.unwrap_or(false),
+            limit: query.activity_limit.unwrap_or(10).clamp(1, 100),
+        },
+        ProblemStaleRequest {
+            mode: query.stale_mode,
+            target_context: query.stale_target_context,
+            source: query.stale_source,
+            pinned_only: query.stale_pinned_only.unwrap_or(false),
+            stale_after_days: query.stale_after_days.unwrap_or(7),
+            limit: query.stale_limit.unwrap_or(10).clamp(1, 100),
+        },
+        request.note,
+    ) {
+        Ok(snapshot) => with_standard_headers(
+            (StatusCode::CREATED, Json(snapshot)).into_response(),
+            &request_id,
+            "miss",
+            &state.config.runtime_environment,
+            HeaderPolicy::Sensitive,
+        ),
+        Err(_) => with_standard_headers(
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ProblemBankErrorResponse {
+                    error: "problem_bank_snapshot_failed",
+                }),
+            )
+                .into_response(),
+            &request_id,
+            "miss",
+            &state.config.runtime_environment,
+            HeaderPolicy::Sensitive,
+        ),
+    }
+}
+
 pub async fn save_generated_problems(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -704,6 +790,17 @@ pub struct ProblemStaleQuery {
     pub limit: Option<usize>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct SnapshotListQuery {
+    pub limit: Option<usize>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CaptureSnapshotRequest {
+    pub note: Option<String>,
+}
+
 #[derive(Debug, Serialize)]
 struct ProblemBankListResponse {
     total: usize,
@@ -726,6 +823,12 @@ struct ProblemActivityResponse {
 struct StaleProblemResponse {
     total: usize,
     items: Vec<crate::problem_bank::ProblemStaleEntry>,
+}
+
+#[derive(Debug, Serialize)]
+struct SnapshotListResponse {
+    total: usize,
+    items: Vec<crate::problem_bank::ProblemBankSnapshot>,
 }
 
 #[derive(Debug, Serialize)]
