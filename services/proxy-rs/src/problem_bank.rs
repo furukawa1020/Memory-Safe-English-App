@@ -297,6 +297,19 @@ impl ProblemBank {
         ProblemWeaknessQueue { groups }
     }
 
+    pub fn dashboard(
+        &self,
+        recommendation: ProblemRecommendationRequest,
+        activity: ProblemActivityRequest,
+    ) -> ProblemBankDashboard {
+        ProblemBankDashboard {
+            stats: self.stats(),
+            insights: self.insights(activity),
+            review_queue: self.review_queue(recommendation.clone()),
+            weakness_queue: self.weakness_queue(recommendation),
+        }
+    }
+
     pub fn save_generated_set(
         &self,
         generated: &GeneratedProblemSet,
@@ -710,6 +723,14 @@ pub struct ProblemWeaknessGroup {
     pub mode: String,
     pub total_candidates: usize,
     pub items: Vec<ProblemRecord>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct ProblemBankDashboard {
+    pub stats: ProblemBankStats,
+    pub insights: ProblemBankInsights,
+    pub review_queue: Vec<ProblemRecord>,
+    pub weakness_queue: ProblemWeaknessQueue,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -1956,6 +1977,54 @@ mod tests {
 
         assert!(queue.groups.iter().any(|group| group.mode == "speaking"));
         assert!(queue.groups.iter().any(|group| group.mode == "reading"));
+        let _ = fs::remove_file(temp_path);
+    }
+
+    #[test]
+    fn dashboard_combines_stats_insights_and_queues() {
+        let temp_path = temp_problem_bank_path();
+        let bank = ProblemBank::with_persisted_path(temp_path.clone());
+        let saved = bank
+            .clone_problem("pb_speak_002", ProblemSaveSource::Reviewed)
+            .expect("clone seed problem");
+
+        bank.record_usage(
+            &saved.items[0].id,
+            ProblemUsageEvent {
+                successful: false,
+                occurred_at_unix: Some(900),
+                append_note: Some("dashboard failure".to_string()),
+            },
+        )
+        .expect("record usage");
+
+        let dashboard = bank.dashboard(
+            ProblemRecommendationRequest {
+                preferred_mode: Some("speaking".to_string()),
+                target_context: None,
+                level_band: None,
+                topic: None,
+                focus_tag: None,
+                prefer_review: true,
+                avoid_mastered: true,
+                limit: 3,
+            },
+            ProblemActivityRequest {
+                source: Some("reviewed".to_string()),
+                ..ProblemActivityRequest::default()
+            },
+        );
+
+        assert!(dashboard.stats.custom >= 1);
+        assert!(dashboard.insights.total_history_entries >= 1);
+        assert!(!dashboard.review_queue.is_empty());
+        assert!(
+            dashboard
+                .weakness_queue
+                .groups
+                .iter()
+                .any(|group| group.mode == "speaking")
+        );
         let _ = fs::remove_file(temp_path);
     }
 
