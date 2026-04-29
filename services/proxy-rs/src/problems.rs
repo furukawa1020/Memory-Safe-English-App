@@ -437,6 +437,41 @@ pub async fn recommend_problems(
         level_band: query.level_band,
         topic: query.topic,
         focus_tag: query.focus_tag,
+        prefer_review: query.prefer_review.unwrap_or(false),
+        avoid_mastered: query.avoid_mastered.unwrap_or(false),
+        limit: query.limit.unwrap_or(5),
+    });
+
+    with_standard_headers(
+        (
+            StatusCode::OK,
+            Json(ProblemBankListResponse {
+                total: items.len(),
+                items,
+            }),
+        )
+            .into_response(),
+        &request_id,
+        "miss",
+        &state.config.runtime_environment,
+        HeaderPolicy::Sensitive,
+    )
+}
+
+pub async fn review_queue(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Query(query): Query<ProblemRecommendationQuery>,
+) -> impl IntoResponse {
+    let request_id = resolve_request_id(&headers);
+    let items = state.problem_bank.review_queue(ProblemRecommendationRequest {
+        preferred_mode: query.preferred_mode,
+        target_context: query.target_context,
+        level_band: query.level_band,
+        topic: query.topic,
+        focus_tag: query.focus_tag,
+        prefer_review: query.prefer_review.unwrap_or(true),
+        avoid_mastered: query.avoid_mastered.unwrap_or(true),
         limit: query.limit.unwrap_or(5),
     });
 
@@ -522,6 +557,8 @@ pub struct ProblemRecommendationQuery {
     pub level_band: Option<String>,
     pub topic: Option<String>,
     pub focus_tag: Option<String>,
+    pub prefer_review: Option<bool>,
+    pub avoid_mastered: Option<bool>,
     pub limit: Option<usize>,
 }
 
