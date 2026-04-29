@@ -449,6 +449,12 @@ struct ProblemBankListResponse {
 }
 
 #[derive(Debug, Serialize)]
+struct ProblemHistoryResponse {
+    total: usize,
+    history: Vec<ProblemUsageHistory>,
+}
+
+#[derive(Debug, Serialize)]
 struct GeneratedProblemSetResponse {
     source_text: String,
     summary: String,
