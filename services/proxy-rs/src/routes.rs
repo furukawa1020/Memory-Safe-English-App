@@ -24,6 +24,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/problem-bank/insights", get(problems::problem_insights))
         .route("/problem-bank/recommend", get(problems::recommend_problems))
         .route("/problem-bank/review-queue", get(problems::review_queue))
+        .route("/problem-bank/weakness-queue", get(problems::weakness_queue))
         .route("/problem-bank/stats", get(problems::problem_bank_stats))
         .route(
             "/problem-bank/:id",
