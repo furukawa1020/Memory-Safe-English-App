@@ -12,7 +12,8 @@ use crate::{
     problem_bank::{
         GeneratedProblemSet, ProblemActivityEntry, ProblemActivityRequest, ProblemFilter,
         ProblemGenerationRequest, ProblemRecommendationRequest, ProblemRecord,
-        ProblemRecordUpdate, ProblemSaveSource, ProblemUsageEvent, ProblemUsageHistory,
+        ProblemRecordUpdate, ProblemSaveSource, ProblemStaleRequest, ProblemUsageEvent,
+        ProblemUsageHistory,
     },
     request_id::resolve_request_id,
     response_headers::HeaderPolicy,
@@ -545,10 +546,49 @@ pub async fn problem_dashboard(
             pinned_only: query.activity_pinned_only.unwrap_or(false),
             limit: query.activity_limit.unwrap_or(10).clamp(1, 100),
         },
+        ProblemStaleRequest {
+            mode: query.stale_mode,
+            target_context: query.stale_target_context,
+            source: query.stale_source,
+            pinned_only: query.stale_pinned_only.unwrap_or(false),
+            stale_after_days: query.stale_after_days.unwrap_or(7),
+            limit: query.stale_limit.unwrap_or(10).clamp(1, 100),
+        },
     );
 
     with_standard_headers(
         (StatusCode::OK, Json(dashboard)).into_response(),
+        &request_id,
+        "miss",
+        &state.config.runtime_environment,
+        HeaderPolicy::Sensitive,
+    )
+}
+
+pub async fn stale_problems(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Query(query): Query<ProblemStaleQuery>,
+) -> impl IntoResponse {
+    let request_id = resolve_request_id(&headers);
+    let items = state.problem_bank.stale_problems(ProblemStaleRequest {
+        mode: query.mode,
+        target_context: query.target_context,
+        source: query.source,
+        pinned_only: query.pinned_only.unwrap_or(false),
+        stale_after_days: query.stale_after_days.unwrap_or(7),
+        limit: query.limit.unwrap_or(10).clamp(1, 100),
+    });
+
+    with_standard_headers(
+        (
+            StatusCode::OK,
+            Json(StaleProblemResponse {
+                total: items.len(),
+                items,
+            }),
+        )
+            .into_response(),
         &request_id,
         "miss",
         &state.config.runtime_environment,
@@ -646,6 +686,22 @@ pub struct ProblemDashboardQuery {
     pub activity_successful: Option<bool>,
     pub activity_pinned_only: Option<bool>,
     pub activity_limit: Option<usize>,
+    pub stale_mode: Option<String>,
+    pub stale_target_context: Option<String>,
+    pub stale_source: Option<String>,
+    pub stale_pinned_only: Option<bool>,
+    pub stale_after_days: Option<u64>,
+    pub stale_limit: Option<usize>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ProblemStaleQuery {
+    pub mode: Option<String>,
+    pub target_context: Option<String>,
+    pub source: Option<String>,
+    pub pinned_only: Option<bool>,
+    pub stale_after_days: Option<u64>,
+    pub limit: Option<usize>,
 }
 
 #[derive(Debug, Serialize)]
@@ -664,6 +720,12 @@ struct ProblemHistoryResponse {
 struct ProblemActivityResponse {
     total: usize,
     items: Vec<ProblemActivityEntry>,
+}
+
+#[derive(Debug, Serialize)]
+struct StaleProblemResponse {
+    total: usize,
+    items: Vec<crate::problem_bank::ProblemStaleEntry>,
 }
 
 #[derive(Debug, Serialize)]
