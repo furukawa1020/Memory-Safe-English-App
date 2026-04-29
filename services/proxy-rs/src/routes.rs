@@ -991,6 +991,80 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn problem_bank_snapshots_capture_and_list() {
+        let app = build_router(state());
+
+        let save_response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/problem-bank/pb_speak_002/save")
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"source":"reviewed"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let save_body = to_bytes(save_response.into_body(), 4096).await.unwrap();
+        let save_text = String::from_utf8(save_body.to_vec()).unwrap();
+        let id_start = save_text.find("\"id\":\"saved_").expect("saved problem id");
+        let id_value = &save_text[id_start + 6..];
+        let end_quote = id_value.find('"').expect("saved id end quote");
+        let saved_id = &id_value[..end_quote];
+
+        let _ = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/problem-bank/{saved_id}/usage"))
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        r#"{"successful":false,"occurred_at_unix":1234567890,"append_note":"snapshot route"}"#,
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        let capture_response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/problem-bank/snapshots/capture?preferred_mode=speaking&activity_source=reviewed")
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"note":"route snapshot"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(capture_response.status(), StatusCode::CREATED);
+        let capture_body = to_bytes(capture_response.into_body(), 32768).await.unwrap();
+        let capture_text = String::from_utf8(capture_body.to_vec()).unwrap();
+        assert!(capture_text.contains("\"note\":\"route snapshot\""));
+        assert!(capture_text.contains("\"dashboard\""));
+
+        let list_response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/problem-bank/snapshots?limit=5")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(list_response.status(), StatusCode::OK);
+        let list_body = to_bytes(list_response.into_body(), 32768).await.unwrap();
+        let list_text = String::from_utf8(list_body.to_vec()).unwrap();
+        assert!(list_text.contains("\"total\":1"));
+        assert!(list_text.contains("\"route snapshot\""));
+    }
+
+    #[tokio::test]
     async fn problem_bank_save_persists_generated_items_in_memory() {
         let app = build_router(state());
 
