@@ -19,6 +19,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/ready", get(readiness::ready))
         .route("/bootstrap/mobile", get(frontend::mobile_bootstrap))
         .route("/problem-bank", get(problems::list_problems))
+        .route("/problem-bank/custom", get(problems::list_custom_problems))
         .route("/problem-bank/recommend", get(problems::recommend_problems))
         .route("/problem-bank/stats", get(problems::problem_bank_stats))
         .route(
@@ -27,6 +28,7 @@ pub fn build_router(state: AppState) -> Router {
                 .patch(problems::update_problem)
                 .delete(problems::delete_problem),
         )
+        .route("/problem-bank/:id/history", get(problems::problem_history))
         .route("/problem-bank/:id/save", post(problems::clone_problem))
         .route("/problem-bank/:id/usage", post(problems::record_problem_usage))
         .route("/problem-bank/generate", post(problems::generate_problems))
