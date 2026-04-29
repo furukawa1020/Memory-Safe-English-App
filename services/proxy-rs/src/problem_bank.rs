@@ -2765,6 +2765,58 @@ mod tests {
     }
 
     #[test]
+    fn capture_snapshot_persists_and_lists_snapshots() {
+        let temp_path = temp_problem_bank_path();
+        let bank = ProblemBank::with_persisted_path(temp_path.clone());
+        let saved = bank
+            .clone_problem("pb_speak_002", ProblemSaveSource::Reviewed)
+            .expect("clone seed problem");
+
+        bank.record_usage(
+            &saved.items[0].id,
+            ProblemUsageEvent {
+                successful: false,
+                occurred_at_unix: Some(current_unix_seconds().saturating_sub(60)),
+                append_note: Some("snapshot capture".to_string()),
+            },
+        )
+        .expect("record usage");
+
+        let snapshot = bank
+            .capture_snapshot(
+                ProblemRecommendationRequest {
+                    preferred_mode: Some("speaking".to_string()),
+                    target_context: None,
+                    level_band: None,
+                    topic: None,
+                    focus_tag: None,
+                    prefer_review: true,
+                    avoid_mastered: true,
+                    limit: 3,
+                },
+                ProblemActivityRequest {
+                    source: Some("reviewed".to_string()),
+                    ..ProblemActivityRequest::default()
+                },
+                ProblemStaleRequest {
+                    source: Some("reviewed".to_string()),
+                    ..ProblemStaleRequest::default()
+                },
+                Some("daily capture".to_string()),
+            )
+            .expect("capture snapshot");
+
+        assert_eq!(snapshot.note, "daily capture");
+        let snapshots = bank.list_snapshots(10);
+        assert_eq!(snapshots.len(), 1);
+        assert_eq!(snapshots[0].id, snapshot.id);
+        let snapshot_path = derive_snapshot_path(&temp_path);
+        assert!(snapshot_path.exists());
+        let _ = fs::remove_file(temp_path);
+        let _ = fs::remove_file(snapshot_path);
+    }
+
+    #[test]
     fn clones_seed_problem_into_custom_store() {
         let temp_path = temp_problem_bank_path();
         let bank = ProblemBank::with_persisted_path(temp_path.clone());
