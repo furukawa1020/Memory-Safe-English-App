@@ -788,6 +788,21 @@ pub struct ProblemBankDashboard {
     pub insights: ProblemBankInsights,
     pub review_queue: Vec<ProblemRecord>,
     pub weakness_queue: ProblemWeaknessQueue,
+    pub recommended_next_mode: Option<String>,
+    pub stale_problems: Vec<ProblemStaleEntry>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct ProblemStaleEntry {
+    pub problem_id: String,
+    pub title: String,
+    pub mode: String,
+    pub target_context: String,
+    pub source: String,
+    pub pinned: bool,
+    pub last_used_unix: u64,
+    pub idle_days: u64,
+    pub usage_count: u32,
 }
 
 #[derive(Clone, Debug, Deserialize)]
