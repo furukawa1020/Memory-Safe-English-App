@@ -2315,6 +2315,38 @@ mod tests {
     }
 
     #[test]
+    fn mode_summary_reports_usage_failure_and_stale_counts() {
+        let temp_path = temp_problem_bank_path();
+        let bank = ProblemBank::with_persisted_path(temp_path.clone());
+        let saved = bank
+            .clone_problem("pb_speak_002", ProblemSaveSource::Reviewed)
+            .expect("clone seed problem");
+        let saved_id = saved.items[0].id.clone();
+
+        bank.record_usage(
+            &saved_id,
+            ProblemUsageEvent {
+                successful: false,
+                occurred_at_unix: Some(1),
+                append_note: Some("old speaking failure".to_string()),
+            },
+        )
+        .expect("record old speaking usage");
+
+        let mode_summary = bank.mode_summary();
+        let speaking = mode_summary
+            .iter()
+            .find(|entry| entry.mode == "speaking")
+            .expect("speaking summary");
+
+        assert!(speaking.total_problems >= 1);
+        assert!(speaking.total_usage >= 1);
+        assert!(speaking.recent_failures >= 1);
+        assert!(speaking.stale_count >= 1);
+        let _ = fs::remove_file(temp_path);
+    }
+
+    #[test]
     fn clones_seed_problem_into_custom_store() {
         let temp_path = temp_problem_bank_path();
         let bank = ProblemBank::with_persisted_path(temp_path.clone());
