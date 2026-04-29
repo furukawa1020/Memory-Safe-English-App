@@ -354,6 +354,7 @@ impl ProblemBank {
                     .map(|group| group.mode.clone())
             });
         let stale_problems = self.stale_problems(stale);
+        let mode_summary = self.mode_summary();
 
         ProblemBankDashboard {
             stats: self.stats(),
@@ -362,6 +363,7 @@ impl ProblemBank {
             weakness_queue,
             recommended_next_mode,
             stale_problems,
+            mode_summary,
         }
     }
 
@@ -410,6 +412,59 @@ impl ProblemBank {
             items.truncate(request.limit);
         }
         items
+    }
+
+    pub fn mode_summary(&self) -> Vec<ProblemModeSummary> {
+        let store = self.store.read().expect("problem bank read lock");
+        let now = current_unix_seconds();
+        let stale_after_seconds = 7_u64 * 24 * 60 * 60;
+        let modes = ["reading", "listening", "speaking", "rescue"];
+
+        let mut summary = modes
+            .into_iter()
+            .map(|mode| {
+                let items = store
+                    .by_id
+                    .values()
+                    .filter(|item| item.mode.eq_ignore_ascii_case(mode))
+                    .collect::<Vec<_>>();
+
+                let total_problems = items.len();
+                let total_usage = items.iter().map(|item| item.usage_count as usize).sum::<usize>();
+                let total_success = items.iter().map(|item| item.success_count as usize).sum::<usize>();
+                let recent_failures = items
+                    .iter()
+                    .filter(|item| last_usage_was_failure(item))
+                    .count();
+                let stale_count = items
+                    .iter()
+                    .filter(|item| {
+                        let idle_seconds = if item.last_used_unix == 0 {
+                            now
+                        } else {
+                            now.saturating_sub(item.last_used_unix)
+                        };
+                        idle_seconds >= stale_after_seconds
+                    })
+                    .count();
+
+                ProblemModeSummary {
+                    mode: mode.to_string(),
+                    total_problems,
+                    total_usage,
+                    recent_failures,
+                    stale_count,
+                    success_rate: if total_usage == 0 {
+                        0.0
+                    } else {
+                        total_success as f64 / total_usage as f64
+                    },
+                }
+            })
+            .collect::<Vec<_>>();
+
+        summary.sort_by(|a, b| a.mode.cmp(&b.mode));
+        summary
     }
 
     pub fn save_generated_set(
@@ -843,6 +898,7 @@ pub struct ProblemBankDashboard {
     pub weakness_queue: ProblemWeaknessQueue,
     pub recommended_next_mode: Option<String>,
     pub stale_problems: Vec<ProblemStaleEntry>,
+    pub mode_summary: Vec<ProblemModeSummary>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -856,6 +912,16 @@ pub struct ProblemStaleEntry {
     pub last_used_unix: u64,
     pub idle_days: u64,
     pub usage_count: u32,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct ProblemModeSummary {
+    pub mode: String,
+    pub total_problems: usize,
+    pub total_usage: usize,
+    pub recent_failures: usize,
+    pub stale_count: usize,
+    pub success_rate: f64,
 }
 
 #[derive(Clone, Debug, Deserialize)]
