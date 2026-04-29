@@ -914,6 +914,59 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn problem_bank_custom_supports_pinned_source_filters() {
+        let app = build_router(state());
+
+        let save_response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/problem-bank/pb_speak_002/save")
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"source":"reviewed"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let save_body = to_bytes(save_response.into_body(), 4096).await.unwrap();
+        let save_text = String::from_utf8(save_body.to_vec()).unwrap();
+        let id_start = save_text.find("\"id\":\"saved_").expect("saved problem id");
+        let id_value = &save_text[id_start + 6..];
+        let end_quote = id_value.find('"').expect("saved id end quote");
+        let saved_id = &id_value[..end_quote];
+
+        let _ = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("PATCH")
+                    .uri(format!("/problem-bank/{saved_id}"))
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"pinned":true}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/problem-bank/custom?source=reviewed&pinned_only=true")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = to_bytes(response.into_body(), 4096).await.unwrap();
+        let text = String::from_utf8(body.to_vec()).unwrap();
+        assert!(text.contains("\"pinned\":true"));
+        assert!(text.contains("\"source\":\"reviewed\""));
+    }
+
+    #[tokio::test]
     async fn problem_bank_usage_updates_saved_item() {
         let app = build_router(state());
 
@@ -1038,6 +1091,76 @@ mod tests {
         assert!(history_text.contains("\"total\":1"));
         assert!(history_text.contains("\"successful\":true"));
         assert!(history_text.contains("\"occurred_at_unix\":222222222"));
+    }
+
+    #[tokio::test]
+    async fn problem_bank_activity_returns_recent_usage_feed() {
+        let app = build_router(state());
+
+        let save_response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/problem-bank/pb_speak_002/save")
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"source":"reviewed"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let save_body = to_bytes(save_response.into_body(), 4096).await.unwrap();
+        let save_text = String::from_utf8(save_body.to_vec()).unwrap();
+        let id_start = save_text.find("\"id\":\"saved_").expect("saved problem id");
+        let id_value = &save_text[id_start + 6..];
+        let end_quote = id_value.find('"').expect("saved id end quote");
+        let saved_id = &id_value[..end_quote];
+
+        let _ = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("PATCH")
+                    .uri(format!("/problem-bank/{saved_id}"))
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"pinned":true}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        let _ = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/problem-bank/{saved_id}/usage"))
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        r#"{"successful":true,"occurred_at_unix":333333333,"append_note":"worked well in rehearsal"}"#,
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/problem-bank/activity?source=reviewed&pinned_only=true&successful=true")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = to_bytes(response.into_body(), 4096).await.unwrap();
+        let text = String::from_utf8(body.to_vec()).unwrap();
+        assert!(text.contains("\"total\":1"));
+        assert!(text.contains("\"successful\":true"));
+        assert!(text.contains("\"occurred_at_unix\":333333333"));
+        assert!(text.contains("worked well in rehearsal"));
     }
 
     fn state_with_urls(api_base_url: String, worker_base_url: String) -> AppState {
