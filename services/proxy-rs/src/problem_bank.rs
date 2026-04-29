@@ -363,6 +363,7 @@ impl ProblemBank {
             &review_queue,
             &stale_problems,
         );
+        let alerts = build_alerts(&mode_summary, &trend, &stale_problems, &review_queue);
 
         ProblemBankDashboard {
             stats: self.stats(),
@@ -375,6 +376,7 @@ impl ProblemBank {
             trend,
             risk_level,
             next_action,
+            alerts,
         }
     }
 
@@ -958,6 +960,7 @@ pub struct ProblemBankDashboard {
     pub trend: ProblemTrend,
     pub risk_level: &'static str,
     pub next_action: String,
+    pub alerts: Vec<ProblemAlert>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -993,6 +996,13 @@ pub struct ProblemTrend {
     pub recent_total_attempts: usize,
     pub previous_total_attempts: usize,
     pub by_mode: Vec<ProblemModeTrend>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct ProblemAlert {
+    pub level: &'static str,
+    pub code: String,
+    pub message: String,
 }
 
 #[derive(Clone, Debug, Serialize)]
