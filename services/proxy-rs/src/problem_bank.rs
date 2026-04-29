@@ -799,7 +799,15 @@ pub struct ProblemBankInsights {
     pub by_mode_activity: HashMap<String, usize>,
     pub by_context_activity: HashMap<String, usize>,
     pub by_source_activity: HashMap<String, usize>,
+    pub failure_rate_by_mode: HashMap<String, f64>,
+    pub focus_tag_bias: Vec<ProblemTagActivity>,
     pub top_used_problems: Vec<ProblemUsageSummary>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct ProblemTagActivity {
+    pub tag: String,
+    pub activity_count: usize,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -2040,6 +2048,13 @@ mod tests {
         assert_eq!(insights.top_used_problems.len(), 1);
         assert_eq!(insights.top_used_problems[0].problem_id, saved_id);
         assert_eq!(insights.top_used_problems[0].usage_count, 2);
+        assert_eq!(insights.failure_rate_by_mode.get("speaking"), Some(&0.5));
+        assert!(
+            insights
+                .focus_tag_bias
+                .iter()
+                .any(|entry| entry.tag == "status_update")
+        );
         let _ = fs::remove_file(temp_path);
     }
 

@@ -922,6 +922,8 @@ mod tests {
         assert!(text.contains("\"weakness_queue\""));
         assert!(text.contains("\"recommended_next_mode\":\"speaking\""));
         assert!(text.contains("\"stale_problems\""));
+        assert!(text.contains("\"failure_rate_by_mode\""));
+        assert!(text.contains("\"focus_tag_bias\""));
         assert!(text.contains(saved_id));
     }
 
