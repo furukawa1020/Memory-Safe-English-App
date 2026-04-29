@@ -1827,6 +1827,60 @@ mod tests {
     }
 
     #[test]
+    fn review_queue_prioritizes_recent_failures_over_mastered_items() {
+        let temp_path = temp_problem_bank_path();
+        let bank = ProblemBank::with_persisted_path(temp_path.clone());
+
+        let struggling = bank
+            .clone_problem("pb_speak_002", ProblemSaveSource::Reviewed)
+            .expect("clone struggling problem");
+        let mastered = bank
+            .clone_problem("pb_read_001", ProblemSaveSource::Reviewed)
+            .expect("clone mastered problem");
+
+        let struggling_id = struggling.items[0].id.clone();
+        let mastered_id = mastered.items[0].id.clone();
+
+        bank.record_usage(
+            &struggling_id,
+            ProblemUsageEvent {
+                successful: false,
+                occurred_at_unix: Some(400),
+                append_note: Some("lost the second step".to_string()),
+            },
+        )
+        .expect("record struggling usage");
+
+        for occurred_at_unix in [100_u64, 200_u64, 300_u64] {
+            bank.record_usage(
+                &mastered_id,
+                ProblemUsageEvent {
+                    successful: true,
+                    occurred_at_unix: Some(occurred_at_unix),
+                    append_note: Some("stable".to_string()),
+                },
+            )
+            .expect("record mastered usage");
+        }
+
+        let queue = bank.review_queue(ProblemRecommendationRequest {
+            preferred_mode: None,
+            target_context: None,
+            level_band: None,
+            topic: None,
+            focus_tag: None,
+            prefer_review: true,
+            avoid_mastered: true,
+            limit: 5,
+        });
+
+        assert!(!queue.is_empty());
+        assert_eq!(queue[0].id, struggling_id);
+        assert!(!queue.iter().any(|item| item.id == mastered_id));
+        let _ = fs::remove_file(temp_path);
+    }
+
+    #[test]
     fn clones_seed_problem_into_custom_store() {
         let temp_path = temp_problem_bank_path();
         let bank = ProblemBank::with_persisted_path(temp_path.clone());
