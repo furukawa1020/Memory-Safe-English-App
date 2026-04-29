@@ -144,6 +144,88 @@ impl ProblemBank {
         }
     }
 
+    pub fn insights(&self, request: ProblemActivityRequest) -> ProblemBankInsights {
+        let store = self.store.read().expect("problem bank read lock");
+        let matched_problems = store
+            .by_id
+            .values()
+            .filter(|item| request.matches_problem(item))
+            .cloned()
+            .collect::<Vec<_>>();
+
+        let mut total_history_entries = 0usize;
+        let mut successful_history_entries = 0usize;
+        let mut by_mode_activity = HashMap::new();
+        let mut by_context_activity = HashMap::new();
+        let mut by_source_activity = HashMap::new();
+        let mut top_used_problems = Vec::new();
+
+        for item in matched_problems {
+            let matched_history = item
+                .usage_history
+                .iter()
+                .filter(|history| request.matches_history(history))
+                .cloned()
+                .collect::<Vec<_>>();
+
+            if matched_history.is_empty() {
+                continue;
+            }
+
+            let successful = matched_history.iter().filter(|entry| entry.successful).count();
+            total_history_entries += matched_history.len();
+            successful_history_entries += successful;
+            *by_mode_activity.entry(item.mode.clone()).or_insert(0) += matched_history.len();
+            *by_context_activity
+                .entry(item.target_context.clone())
+                .or_insert(0) += matched_history.len();
+            *by_source_activity.entry(item.source.clone()).or_insert(0) += matched_history.len();
+
+            let last_used_unix = matched_history
+                .iter()
+                .map(|entry| entry.occurred_at_unix)
+                .max()
+                .unwrap_or(0);
+            top_used_problems.push(ProblemUsageSummary {
+                problem_id: item.id,
+                title: item.title,
+                mode: item.mode,
+                target_context: item.target_context,
+                source: item.source,
+                usage_count: matched_history.len(),
+                success_count: successful,
+                last_used_unix,
+                pinned: item.pinned,
+            });
+        }
+
+        top_used_problems.sort_by(|a, b| {
+            b.usage_count
+                .cmp(&a.usage_count)
+                .then_with(|| b.success_count.cmp(&a.success_count))
+                .then_with(|| b.last_used_unix.cmp(&a.last_used_unix))
+                .then_with(|| a.problem_id.cmp(&b.problem_id))
+        });
+        if top_used_problems.len() > request.limit {
+            top_used_problems.truncate(request.limit);
+        }
+
+        ProblemBankInsights {
+            total_history_entries,
+            successful_history_entries,
+            failed_history_entries: total_history_entries.saturating_sub(successful_history_entries),
+            overall_success_rate: if total_history_entries == 0 {
+                0.0
+            } else {
+                successful_history_entries as f64 / total_history_entries as f64
+            },
+            by_mode_activity,
+            by_context_activity,
+            by_source_activity,
+            top_used_problems,
+        }
+    }
+
     pub fn recommend(&self, request: ProblemRecommendationRequest) -> Vec<ProblemRecord> {
         let store = self.store.read().expect("problem bank read lock");
         let mut ranked = store
@@ -545,6 +627,31 @@ pub struct ProblemBankStats {
     pub by_level_band: HashMap<String, usize>,
     pub by_context: HashMap<String, usize>,
     pub by_source: HashMap<String, usize>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct ProblemBankInsights {
+    pub total_history_entries: usize,
+    pub successful_history_entries: usize,
+    pub failed_history_entries: usize,
+    pub overall_success_rate: f64,
+    pub by_mode_activity: HashMap<String, usize>,
+    pub by_context_activity: HashMap<String, usize>,
+    pub by_source_activity: HashMap<String, usize>,
+    pub top_used_problems: Vec<ProblemUsageSummary>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct ProblemUsageSummary {
+    pub problem_id: String,
+    pub title: String,
+    pub mode: String,
+    pub target_context: String,
+    pub source: String,
+    pub usage_count: usize,
+    pub success_count: usize,
+    pub last_used_unix: u64,
+    pub pinned: bool,
 }
 
 #[derive(Clone, Debug, Deserialize)]
