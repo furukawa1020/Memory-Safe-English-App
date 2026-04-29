@@ -1546,17 +1546,17 @@ fn compute_risk_level(
     review_queue: &[ProblemRecord],
     stale_problems: &[ProblemStaleEntry],
     trend: &ProblemTrend,
-) -> &'static str {
+) -> String {
     let urgent_review = review_queue.len() >= 3;
     let many_stale = stale_problems.len() >= 5;
     let worsening_trend = trend.success_rate_delta < -0.15;
 
     if worsening_trend || (urgent_review && many_stale) {
-        "high"
+        "high".to_string()
     } else if urgent_review || many_stale || trend.success_rate_delta < 0.0 {
-        "medium"
+        "medium".to_string()
     } else {
-        "low"
+        "low".to_string()
     }
 }
 
@@ -1602,8 +1602,8 @@ fn build_alerts(
     let mut alerts = Vec::new();
 
     if trend.success_rate_delta < -0.10 {
-        alerts.push(ProblemAlert {
-            level: "high",
+            alerts.push(ProblemAlert {
+            level: "high".to_string(),
             code: "overall_worsening".to_string(),
             message: "Recent success rate is lower than the previous week. Reduce load and review core steps first.".to_string(),
         });
@@ -1612,7 +1612,7 @@ fn build_alerts(
     for mode in &trend.by_mode {
         if mode.success_rate_delta < -0.20 && mode.recent_attempts > 0 {
             alerts.push(ProblemAlert {
-                level: "high",
+                level: "high".to_string(),
                 code: format!("{}_worsening", mode.mode),
                 message: format!(
                     "{} performance is dropping. Use shorter units and review one stable problem first.",
@@ -1625,7 +1625,7 @@ fn build_alerts(
     for summary in mode_summary {
         if summary.stale_count >= 3 {
             alerts.push(ProblemAlert {
-                level: "medium",
+                level: "medium".to_string(),
                 code: format!("{}_stale", summary.mode),
                 message: format!(
                     "{} has {} stale problems. Revisit one before adding new material.",
@@ -1636,7 +1636,7 @@ fn build_alerts(
         }
         if summary.recent_failures >= 2 {
             alerts.push(ProblemAlert {
-                level: "medium",
+                level: "medium".to_string(),
                 code: format!("{}_recent_failures", summary.mode),
                 message: format!(
                     "{} shows repeated recent failures. Slow down and protect the main point first.",
@@ -1648,7 +1648,7 @@ fn build_alerts(
 
     if stale_problems.len() >= 5 {
         alerts.push(ProblemAlert {
-            level: "medium",
+            level: "medium".to_string(),
             code: "stale_backlog".to_string(),
             message: "There is a backlog of stale problems. Recycle one old problem before starting a new set.".to_string(),
         });
@@ -1656,7 +1656,7 @@ fn build_alerts(
 
     if review_queue.len() >= 4 {
         alerts.push(ProblemAlert {
-            level: "medium",
+            level: "medium".to_string(),
             code: "review_backlog".to_string(),
             message: "Review backlog is growing. Finish one unstable problem before exploring more.".to_string(),
         });
@@ -1664,7 +1664,7 @@ fn build_alerts(
 
     if alerts.is_empty() {
         alerts.push(ProblemAlert {
-            level: "low",
+            level: "low".to_string(),
             code: "stable_progress".to_string(),
             message: "Current load looks stable. Keep sessions short and continue with the next recommended mode.".to_string(),
         });
