@@ -6,6 +6,7 @@ import '../../analysis/presentation/analysis_controller.dart';
 import '../model/chunking_result.dart';
 import '../model/content_item.dart';
 import '../model/problem_item.dart';
+import '../model/rust_problem_dashboard.dart';
 import 'content_catalog_controller.dart';
 import 'reader_screen.dart';
 
@@ -111,6 +112,18 @@ class _ContentHomeTabState extends State<_ContentHomeTab> {
                 ),
                 const SizedBox(height: 18),
                 const _QuickStartPanel(),
+                const SizedBox(height: 18),
+                Text('Rust Dashboard', style: Theme.of(context).textTheme.titleLarge),
+                const SizedBox(height: 12),
+                _RustDashboardPanel(
+                  dashboard: widget.controller.rustDashboard,
+                  snapshots: widget.controller.rustSnapshots,
+                  errorText: widget.controller.rustDashboardErrorText,
+                  isCapturingSnapshot: widget.controller.isCapturingSnapshot,
+                  onCaptureSnapshot: () => widget.controller.captureSnapshot(
+                    note: 'Captured from mobile home',
+                  ),
+                ),
                 const SizedBox(height: 18),
                 Text('Rust Problem Picks', style: Theme.of(context).textTheme.titleLarge),
                 const SizedBox(height: 12),
@@ -568,6 +581,153 @@ class _ProblemTile extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _RustDashboardPanel extends StatelessWidget {
+  const _RustDashboardPanel({
+    required this.dashboard,
+    required this.snapshots,
+    required this.errorText,
+    required this.isCapturingSnapshot,
+    required this.onCaptureSnapshot,
+  });
+
+  final RustProblemDashboard? dashboard;
+  final List<RustProblemSnapshot> snapshots;
+  final String? errorText;
+  final bool isCapturingSnapshot;
+  final VoidCallback onCaptureSnapshot;
+
+  @override
+  Widget build(BuildContext context) {
+    if (dashboard == null) {
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Text(errorText ?? 'Rust dashboard is not ready yet.'),
+        ),
+      );
+    }
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Risk: ${dashboard!.riskLevel}',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+                FilledButton.tonal(
+                  onPressed: isCapturingSnapshot ? null : onCaptureSnapshot,
+                  child: Text(
+                    isCapturingSnapshot ? 'Saving...' : 'Capture snapshot',
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(dashboard!.nextAction),
+            if (dashboard!.recommendedNextMode != null) ...[
+              const SizedBox(height: 12),
+              _Pill(label: 'next ${dashboard!.recommendedNextMode}'),
+            ],
+            const SizedBox(height: 14),
+            if (dashboard!.alerts.isNotEmpty) ...[
+              const _PlanSectionLabel(
+                title: 'Alerts',
+                subtitle: 'Short warnings from the Rust problem database.',
+              ),
+              const SizedBox(height: 8),
+              for (final alert in dashboard!.alerts.take(3)) ...[
+                Text('${alert.level.toUpperCase()}: ${alert.message}'),
+                const SizedBox(height: 6),
+              ],
+              const SizedBox(height: 10),
+            ],
+            const _PlanSectionLabel(
+              title: 'Mode summary',
+              subtitle: 'Quick counts for each mode.',
+            ),
+            const SizedBox(height: 8),
+            for (final summary in dashboard!.modeSummary) ...[
+              _RustModeSummaryTile(summary: summary),
+              const SizedBox(height: 8),
+            ],
+            const SizedBox(height: 10),
+            Text(
+              'Trend: ${(dashboard!.trend.successRateDelta * 100).toStringAsFixed(0)} pts '
+              '(${dashboard!.trend.recentAttempts} recent attempts)',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            if (dashboard!.staleProblems.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              const _PlanSectionLabel(
+                title: 'Stale problems',
+                subtitle: 'Problems that have not been revisited recently.',
+              ),
+              const SizedBox(height: 8),
+              for (final stale in dashboard!.staleProblems.take(3)) ...[
+                Text('${stale.title} (${stale.mode}, ${stale.idleDays} days idle)'),
+                const SizedBox(height: 4),
+              ],
+            ],
+            if (snapshots.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              const _PlanSectionLabel(
+                title: 'Recent snapshots',
+                subtitle: 'Saved dashboard snapshots from the Rust proxy.',
+              ),
+              const SizedBox(height: 8),
+              for (final snapshot in snapshots.take(3)) ...[
+                Text(
+                  '${snapshot.riskLevel.toUpperCase()} ・ ${snapshot.recommendedNextMode ?? 'read'}'
+                  '${snapshot.note.isNotEmpty ? ' ・ ${snapshot.note}' : ''}',
+                ),
+                const SizedBox(height: 4),
+              ],
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RustModeSummaryTile extends StatelessWidget {
+  const _RustModeSummaryTile({required this.summary});
+
+  final RustModeSummary summary;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              summary.mode,
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+          ),
+          Text(
+            'problems ${summary.totalProblems} ・ fail ${summary.recentFailures} ・ stale ${summary.staleCount}',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ],
       ),
     );
   }
