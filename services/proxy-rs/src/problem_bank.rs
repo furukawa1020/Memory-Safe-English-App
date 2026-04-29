@@ -1709,6 +1709,48 @@ mod tests {
     }
 
     #[test]
+    fn insights_summarize_success_and_top_used_problems() {
+        let temp_path = temp_problem_bank_path();
+        let bank = ProblemBank::with_persisted_path(temp_path.clone());
+        let saved = bank
+            .clone_problem("pb_speak_002", ProblemSaveSource::Reviewed)
+            .expect("clone seed problem");
+        let saved_id = saved.items[0].id.clone();
+
+        bank.record_usage(
+            &saved_id,
+            ProblemUsageEvent {
+                successful: true,
+                occurred_at_unix: Some(100),
+                append_note: Some("first success".to_string()),
+            },
+        )
+        .expect("record first usage");
+        bank.record_usage(
+            &saved_id,
+            ProblemUsageEvent {
+                successful: false,
+                occurred_at_unix: Some(200),
+                append_note: Some("second try".to_string()),
+            },
+        )
+        .expect("record second usage");
+
+        let insights = bank.insights(ProblemActivityRequest {
+            source: Some("reviewed".to_string()),
+            ..ProblemActivityRequest::default()
+        });
+
+        assert_eq!(insights.total_history_entries, 2);
+        assert_eq!(insights.successful_history_entries, 1);
+        assert_eq!(insights.failed_history_entries, 1);
+        assert_eq!(insights.top_used_problems.len(), 1);
+        assert_eq!(insights.top_used_problems[0].problem_id, saved_id);
+        assert_eq!(insights.top_used_problems[0].usage_count, 2);
+        let _ = fs::remove_file(temp_path);
+    }
+
+    #[test]
     fn clones_seed_problem_into_custom_store() {
         let temp_path = temp_problem_bank_path();
         let bank = ProblemBank::with_persisted_path(temp_path.clone());
