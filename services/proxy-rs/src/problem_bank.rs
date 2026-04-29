@@ -356,6 +356,13 @@ impl ProblemBank {
         let stale_problems = self.stale_problems(stale);
         let mode_summary = self.mode_summary();
         let trend = self.trend();
+        let risk_level = compute_risk_level(&review_queue, &stale_problems, &trend);
+        let next_action = build_next_action(
+            recommended_next_mode.as_deref(),
+            risk_level,
+            &review_queue,
+            &stale_problems,
+        );
 
         ProblemBankDashboard {
             stats: self.stats(),
@@ -366,6 +373,8 @@ impl ProblemBank {
             stale_problems,
             mode_summary,
             trend,
+            risk_level,
+            next_action,
         }
     }
 
@@ -947,6 +956,8 @@ pub struct ProblemBankDashboard {
     pub stale_problems: Vec<ProblemStaleEntry>,
     pub mode_summary: Vec<ProblemModeSummary>,
     pub trend: ProblemTrend,
+    pub risk_level: &'static str,
+    pub next_action: String,
 }
 
 #[derive(Clone, Debug, Serialize)]
