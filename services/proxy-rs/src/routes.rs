@@ -20,6 +20,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/bootstrap/mobile", get(frontend::mobile_bootstrap))
         .route("/problem-bank", get(problems::list_problems))
         .route("/problem-bank/custom", get(problems::list_custom_problems))
+        .route("/problem-bank/activity", get(problems::problem_activity))
         .route("/problem-bank/recommend", get(problems::recommend_problems))
         .route("/problem-bank/stats", get(problems::problem_bank_stats))
         .route(
