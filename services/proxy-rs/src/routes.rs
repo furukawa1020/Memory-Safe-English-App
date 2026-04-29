@@ -925,6 +925,7 @@ mod tests {
         assert!(text.contains("\"failure_rate_by_mode\""));
         assert!(text.contains("\"focus_tag_bias\""));
         assert!(text.contains("\"mode_summary\""));
+        assert!(text.contains("\"trend\""));
         assert!(text.contains(saved_id));
     }
 

@@ -2476,6 +2476,51 @@ mod tests {
     }
 
     #[test]
+    fn trend_compares_recent_and_previous_windows() {
+        let temp_path = temp_problem_bank_path();
+        let bank = ProblemBank::with_persisted_path(temp_path.clone());
+        let saved = bank
+            .clone_problem("pb_speak_002", ProblemSaveSource::Reviewed)
+            .expect("clone seed problem");
+        let saved_id = saved.items[0].id.clone();
+        let now = current_unix_seconds();
+        let day = 24_u64 * 60 * 60;
+
+        bank.record_usage(
+            &saved_id,
+            ProblemUsageEvent {
+                successful: false,
+                occurred_at_unix: Some(now.saturating_sub(10 * day)),
+                append_note: Some("previous window failure".to_string()),
+            },
+        )
+        .expect("record previous window usage");
+        bank.record_usage(
+            &saved_id,
+            ProblemUsageEvent {
+                successful: true,
+                occurred_at_unix: Some(now.saturating_sub(2 * day)),
+                append_note: Some("recent window success".to_string()),
+            },
+        )
+        .expect("record recent window usage");
+
+        let trend = bank.trend();
+        assert_eq!(trend.recent_window_days, 7);
+        assert_eq!(trend.previous_window_days, 7);
+        assert_eq!(trend.recent_total_attempts, 1);
+        assert_eq!(trend.previous_total_attempts, 1);
+        assert!(trend.success_rate_delta > 0.0);
+        assert!(
+            trend
+                .by_mode
+                .iter()
+                .any(|entry| entry.mode == "speaking" && entry.success_rate_delta > 0.0)
+        );
+        let _ = fs::remove_file(temp_path);
+    }
+
+    #[test]
     fn clones_seed_problem_into_custom_store() {
         let temp_path = temp_problem_bank_path();
         let bank = ProblemBank::with_persisted_path(temp_path.clone());
