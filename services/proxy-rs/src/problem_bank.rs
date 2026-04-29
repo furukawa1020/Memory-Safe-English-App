@@ -13,6 +13,7 @@ use sha2::{Digest, Sha256};
 pub struct ProblemBank {
     store: Arc<RwLock<ProblemStore>>,
     persisted_path: Option<PathBuf>,
+    snapshot_path: Option<PathBuf>,
 }
 
 impl ProblemBank {
@@ -30,11 +31,20 @@ impl ProblemBank {
             .as_ref()
             .and_then(|path| load_custom_records(path).ok())
             .unwrap_or_default();
-        let store = ProblemStore::new(seeded, custom);
+        let snapshot_path = persisted_path
+            .as_ref()
+            .map(derive_snapshot_path)
+            .filter(|path| !path.as_os_str().is_empty());
+        let snapshots = snapshot_path
+            .as_ref()
+            .and_then(|path| load_snapshots(path).ok())
+            .unwrap_or_default();
+        let store = ProblemStore::new(seeded, custom, snapshots);
 
         Self {
             store: Arc::new(RwLock::new(store)),
             persisted_path,
+            snapshot_path,
         }
     }
 
@@ -378,6 +388,40 @@ impl ProblemBank {
             next_action,
             alerts,
         }
+    }
+
+    pub fn capture_snapshot(
+        &self,
+        recommendation: ProblemRecommendationRequest,
+        activity: ProblemActivityRequest,
+        stale: ProblemStaleRequest,
+        note: Option<String>,
+    ) -> Result<ProblemBankSnapshot, ProblemBankSaveError> {
+        let dashboard = self.dashboard(recommendation, activity, stale);
+        let snapshot = ProblemBankSnapshot {
+            id: format!("pbsnap_{}", current_unix_seconds()),
+            captured_at_unix: current_unix_seconds(),
+            note: note.unwrap_or_default(),
+            dashboard,
+        };
+
+        let mut store = self.store.write().expect("problem bank write lock");
+        store.snapshots.push(snapshot.clone());
+        store.snapshots.sort_by(|a, b| b.captured_at_unix.cmp(&a.captured_at_unix));
+
+        if let Some(path) = self.snapshot_path.as_ref() {
+            persist_snapshots(path, &store.snapshots)?;
+        }
+
+        Ok(snapshot)
+    }
+
+    pub fn list_snapshots(&self, limit: usize) -> Vec<ProblemBankSnapshot> {
+        let store = self.store.read().expect("problem bank read lock");
+        let mut snapshots = store.snapshots.clone();
+        snapshots.sort_by(|a, b| b.captured_at_unix.cmp(&a.captured_at_unix));
+        snapshots.truncate(limit.max(1).min(100));
+        snapshots
     }
 
     pub fn stale_problems(&self, request: ProblemStaleRequest) -> Vec<ProblemStaleEntry> {
@@ -784,14 +828,16 @@ struct ProblemStore {
     seeded: Vec<ProblemRecord>,
     custom: HashMap<String, ProblemRecord>,
     by_id: HashMap<String, ProblemRecord>,
+    snapshots: Vec<ProblemBankSnapshot>,
 }
 
 impl ProblemStore {
-    fn new(seeded: Vec<ProblemRecord>, custom: Vec<ProblemRecord>) -> Self {
+    fn new(seeded: Vec<ProblemRecord>, custom: Vec<ProblemRecord>, snapshots: Vec<ProblemBankSnapshot>) -> Self {
         let mut store = Self {
             seeded,
             custom: HashMap::new(),
             by_id: HashMap::new(),
+            snapshots,
         };
         for item in custom {
             store.custom.insert(item.id.clone(), item);
