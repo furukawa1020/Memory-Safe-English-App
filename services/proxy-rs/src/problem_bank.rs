@@ -355,6 +355,7 @@ impl ProblemBank {
             });
         let stale_problems = self.stale_problems(stale);
         let mode_summary = self.mode_summary();
+        let trend = self.trend();
 
         ProblemBankDashboard {
             stats: self.stats(),
@@ -364,6 +365,7 @@ impl ProblemBank {
             recommended_next_mode,
             stale_problems,
             mode_summary,
+            trend,
         }
     }
 
@@ -465,6 +467,51 @@ impl ProblemBank {
 
         summary.sort_by(|a, b| a.mode.cmp(&b.mode));
         summary
+    }
+
+    pub fn trend(&self) -> ProblemTrend {
+        let store = self.store.read().expect("problem bank read lock");
+        let now = current_unix_seconds();
+        let window = 7_u64 * 24 * 60 * 60;
+        let recent_start = now.saturating_sub(window);
+        let previous_start = now.saturating_sub(window * 2);
+
+        let mut recent_total = 0usize;
+        let mut recent_success = 0usize;
+        let mut previous_total = 0usize;
+        let mut previous_success = 0usize;
+        let mut recent_by_mode = HashMap::new();
+        let mut previous_by_mode = HashMap::new();
+
+        for item in store.by_id.values() {
+            for history in &item.usage_history {
+                if history.occurred_at_unix >= recent_start {
+                    recent_total += 1;
+                    if history.successful {
+                        recent_success += 1;
+                    }
+                    accumulate_mode_window(&mut recent_by_mode, &item.mode, history.successful);
+                } else if history.occurred_at_unix >= previous_start {
+                    previous_total += 1;
+                    if history.successful {
+                        previous_success += 1;
+                    }
+                    accumulate_mode_window(&mut previous_by_mode, &item.mode, history.successful);
+                }
+            }
+        }
+
+        ProblemTrend {
+            recent_window_days: 7,
+            previous_window_days: 7,
+            recent_success_rate: success_rate(recent_success, recent_total),
+            previous_success_rate: success_rate(previous_success, previous_total),
+            success_rate_delta: success_rate(recent_success, recent_total)
+                - success_rate(previous_success, previous_total),
+            recent_total_attempts: recent_total,
+            previous_total_attempts: previous_total,
+            by_mode: build_mode_trend(recent_by_mode, previous_by_mode),
+        }
     }
 
     pub fn save_generated_set(
@@ -899,6 +946,7 @@ pub struct ProblemBankDashboard {
     pub recommended_next_mode: Option<String>,
     pub stale_problems: Vec<ProblemStaleEntry>,
     pub mode_summary: Vec<ProblemModeSummary>,
+    pub trend: ProblemTrend,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -922,6 +970,28 @@ pub struct ProblemModeSummary {
     pub recent_failures: usize,
     pub stale_count: usize,
     pub success_rate: f64,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct ProblemTrend {
+    pub recent_window_days: u64,
+    pub previous_window_days: u64,
+    pub recent_success_rate: f64,
+    pub previous_success_rate: f64,
+    pub success_rate_delta: f64,
+    pub recent_total_attempts: usize,
+    pub previous_total_attempts: usize,
+    pub by_mode: Vec<ProblemModeTrend>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct ProblemModeTrend {
+    pub mode: String,
+    pub recent_success_rate: f64,
+    pub previous_success_rate: f64,
+    pub success_rate_delta: f64,
+    pub recent_attempts: usize,
+    pub previous_attempts: usize,
 }
 
 #[derive(Clone, Debug, Deserialize)]
