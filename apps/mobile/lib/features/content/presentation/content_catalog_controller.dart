@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../data/content_repository.dart';
 import '../model/content_item.dart';
 import '../model/problem_item.dart';
+import '../model/rust_problem_dashboard.dart';
 
 class ContentCatalogController extends ChangeNotifier {
   ContentCatalogController(this._repository);
@@ -11,7 +12,11 @@ class ContentCatalogController extends ChangeNotifier {
 
   List<ContentItem> items = const [];
   List<ProblemItem> recommendedItems = const [];
+  RustProblemDashboard? rustDashboard;
+  List<RustProblemSnapshot> rustSnapshots = const [];
   bool isLoading = false;
+  bool isCapturingSnapshot = false;
+  String? rustDashboardErrorText;
   String? problemActionErrorText;
   String? errorText;
 
@@ -29,11 +34,17 @@ class ContentCatalogController extends ChangeNotifier {
         focusTag: 'status_update',
         limit: 4,
       );
+      final dashboardFuture = _repository.fetchProblemDashboard();
+      final snapshotsFuture = _repository.fetchProblemSnapshots(limit: 5);
       items = await contentsFuture;
       recommendedItems = await recommendedFuture;
+      rustDashboard = await dashboardFuture;
+      rustSnapshots = await snapshotsFuture;
       problemActionErrorText = null;
+      rustDashboardErrorText = null;
     } catch (_) {
       errorText = 'Could not load content yet. Please try again.';
+      rustDashboardErrorText = 'Could not load the Rust dashboard yet.';
     } finally {
       isLoading = false;
       notifyListeners();
@@ -92,6 +103,22 @@ class ContentCatalogController extends ChangeNotifier {
     } catch (_) {
       problemActionErrorText = 'Could not save notes yet.';
     } finally {
+      notifyListeners();
+    }
+  }
+
+  Future<void> captureSnapshot({String? note}) async {
+    isCapturingSnapshot = true;
+    notifyListeners();
+    try {
+      await _repository.captureProblemSnapshot(note: note);
+      rustDashboard = await _repository.fetchProblemDashboard();
+      rustSnapshots = await _repository.fetchProblemSnapshots(limit: 5);
+      rustDashboardErrorText = null;
+    } catch (_) {
+      rustDashboardErrorText = 'Could not capture the Rust snapshot yet.';
+    } finally {
+      isCapturingSnapshot = false;
       notifyListeners();
     }
   }
