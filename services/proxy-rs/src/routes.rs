@@ -914,7 +914,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::OK);
-        let body = to_bytes(response.into_body(), 16384).await.unwrap();
+        let body = to_bytes(response.into_body(), 32768).await.unwrap();
         let text = String::from_utf8(body.to_vec()).unwrap();
         assert!(text.contains("\"stats\""));
         assert!(text.contains("\"insights\""));

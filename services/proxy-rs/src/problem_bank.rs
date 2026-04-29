@@ -305,10 +305,15 @@ impl ProblemBank {
     ) -> ProblemBankDashboard {
         let review_queue = self.review_queue(recommendation.clone());
         let weakness_queue = self.weakness_queue(recommendation);
-        let recommended_next_mode = weakness_queue
-            .groups
+        let recommended_next_mode = review_queue
             .first()
-            .map(|group| group.mode.clone());
+            .map(|item| item.mode.clone())
+            .or_else(|| {
+                weakness_queue
+                    .groups
+            .first()
+                    .map(|group| group.mode.clone())
+            });
         let stale_problems = self.stale_problems(stale);
 
         ProblemBankDashboard {
