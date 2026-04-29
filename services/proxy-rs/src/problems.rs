@@ -517,6 +517,45 @@ pub async fn weakness_queue(
     )
 }
 
+pub async fn problem_dashboard(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Query(query): Query<ProblemDashboardQuery>,
+) -> impl IntoResponse {
+    let request_id = resolve_request_id(&headers);
+    let dashboard = state.problem_bank.dashboard(
+        ProblemRecommendationRequest {
+            preferred_mode: query.preferred_mode.clone(),
+            target_context: query.target_context.clone(),
+            level_band: query.level_band.clone(),
+            topic: query.topic.clone(),
+            focus_tag: query.focus_tag.clone(),
+            prefer_review: query.prefer_review.unwrap_or(true),
+            avoid_mastered: query.avoid_mastered.unwrap_or(true),
+            limit: query.limit.unwrap_or(5),
+        },
+        ProblemActivityRequest {
+            mode: query.activity_mode,
+            level_band: query.activity_level_band,
+            topic: query.activity_topic,
+            target_context: query.activity_target_context,
+            source: query.activity_source,
+            query: query.activity_query,
+            successful: query.activity_successful,
+            pinned_only: query.activity_pinned_only.unwrap_or(false),
+            limit: query.activity_limit.unwrap_or(10).clamp(1, 100),
+        },
+    );
+
+    with_standard_headers(
+        (StatusCode::OK, Json(dashboard)).into_response(),
+        &request_id,
+        "miss",
+        &state.config.runtime_environment,
+        HeaderPolicy::Sensitive,
+    )
+}
+
 pub async fn save_generated_problems(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -586,6 +625,27 @@ pub struct ProblemRecommendationQuery {
     pub prefer_review: Option<bool>,
     pub avoid_mastered: Option<bool>,
     pub limit: Option<usize>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ProblemDashboardQuery {
+    pub preferred_mode: Option<String>,
+    pub target_context: Option<String>,
+    pub level_band: Option<String>,
+    pub topic: Option<String>,
+    pub focus_tag: Option<String>,
+    pub prefer_review: Option<bool>,
+    pub avoid_mastered: Option<bool>,
+    pub limit: Option<usize>,
+    pub activity_mode: Option<String>,
+    pub activity_level_band: Option<String>,
+    pub activity_topic: Option<String>,
+    pub activity_target_context: Option<String>,
+    pub activity_source: Option<String>,
+    pub activity_query: Option<String>,
+    pub activity_successful: Option<bool>,
+    pub activity_pinned_only: Option<bool>,
+    pub activity_limit: Option<usize>,
 }
 
 #[derive(Debug, Serialize)]
