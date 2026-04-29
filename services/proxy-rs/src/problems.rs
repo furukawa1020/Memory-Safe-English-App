@@ -491,6 +491,32 @@ pub async fn review_queue(
     )
 }
 
+pub async fn weakness_queue(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Query(query): Query<ProblemRecommendationQuery>,
+) -> impl IntoResponse {
+    let request_id = resolve_request_id(&headers);
+    let queue = state.problem_bank.weakness_queue(ProblemRecommendationRequest {
+        preferred_mode: query.preferred_mode,
+        target_context: query.target_context,
+        level_band: query.level_band,
+        topic: query.topic,
+        focus_tag: query.focus_tag,
+        prefer_review: query.prefer_review.unwrap_or(true),
+        avoid_mastered: query.avoid_mastered.unwrap_or(true),
+        limit: query.limit.unwrap_or(3),
+    });
+
+    with_standard_headers(
+        (StatusCode::OK, Json(queue)).into_response(),
+        &request_id,
+        "miss",
+        &state.config.runtime_environment,
+        HeaderPolicy::Sensitive,
+    )
+}
+
 pub async fn save_generated_problems(
     State(state): State<AppState>,
     headers: HeaderMap,
