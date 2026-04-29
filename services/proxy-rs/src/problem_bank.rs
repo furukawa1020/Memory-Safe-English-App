@@ -1478,6 +1478,57 @@ fn success_rate(success: usize, total: usize) -> f64 {
     }
 }
 
+fn compute_risk_level(
+    review_queue: &[ProblemRecord],
+    stale_problems: &[ProblemStaleEntry],
+    trend: &ProblemTrend,
+) -> &'static str {
+    let urgent_review = review_queue.len() >= 3;
+    let many_stale = stale_problems.len() >= 5;
+    let worsening_trend = trend.success_rate_delta < -0.15;
+
+    if worsening_trend || (urgent_review && many_stale) {
+        "high"
+    } else if urgent_review || many_stale || trend.success_rate_delta < 0.0 {
+        "medium"
+    } else {
+        "low"
+    }
+}
+
+fn build_next_action(
+    recommended_next_mode: Option<&str>,
+    risk_level: &str,
+    review_queue: &[ProblemRecord],
+    stale_problems: &[ProblemStaleEntry],
+) -> String {
+    let mode = recommended_next_mode.unwrap_or("reading");
+    let queue_title = review_queue
+        .first()
+        .map(|item| item.title.as_str())
+        .unwrap_or("a short review problem");
+    match risk_level {
+        "high" => format!(
+            "Start with a short {} review using '{}', then avoid adding extra detail until the core feels stable.",
+            mode, queue_title
+        ),
+        "medium" => {
+            if let Some(stale) = stale_problems.first() {
+                format!(
+                    "Do one {} review first, then revisit stale problem '{}'.",
+                    mode, stale.title
+                )
+            } else {
+                format!("Do one focused {} review first with '{}'.", mode, queue_title)
+            }
+        }
+        _ => format!(
+            "Keep momentum with one {} problem, then move on if '{}' feels stable.",
+            mode, queue_title
+        ),
+    }
+}
+
 fn is_mastered(item: &ProblemRecord) -> bool {
     item.usage_count >= 2
         && item.success_count >= 2
@@ -2412,6 +2463,8 @@ mod tests {
             dashboard.recommended_next_mode.as_deref(),
             Some("speaking")
         );
+        assert_eq!(dashboard.risk_level, "medium");
+        assert!(dashboard.next_action.contains("speaking"));
         assert!(
             dashboard
                 .weakness_queue
