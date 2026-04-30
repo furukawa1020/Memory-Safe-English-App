@@ -721,8 +721,8 @@ class _RustDashboardPanel extends StatelessWidget {
               const SizedBox(height: 8),
               for (final snapshot in snapshots.take(3)) ...[
                 Text(
-                  '${snapshot.riskLevel.toUpperCase()} ・ ${snapshot.recommendedNextMode ?? 'read'}'
-                  '${snapshot.note.isNotEmpty ? ' ・ ${snapshot.note}' : ''}',
+                  '${snapshot.riskLevel.toUpperCase()} - ${snapshot.recommendedNextMode ?? 'read'}'
+                  '${snapshot.note.isNotEmpty ? ' - ${snapshot.note}' : ''}',
                 ),
                 const SizedBox(height: 4),
               ],
@@ -756,7 +756,7 @@ class _RustModeSummaryTile extends StatelessWidget {
             ),
           ),
           Text(
-            'problems ${summary.totalProblems} ・ fail ${summary.recentFailures} ・ stale ${summary.staleCount}',
+            'problems ${summary.totalProblems} - fail ${summary.recentFailures} - stale ${summary.staleCount}',
             style: Theme.of(context).textTheme.bodySmall,
           ),
         ],
