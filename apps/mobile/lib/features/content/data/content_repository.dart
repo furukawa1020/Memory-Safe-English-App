@@ -90,6 +90,24 @@ class ContentRepository {
         .toList();
   }
 
+  Future<List<ProblemItem>> fetchCustomProblems({
+    String? source,
+    bool pinnedOnly = false,
+    int limit = 30,
+  }) async {
+    final query = <String>[
+      if (source != null && source.isNotEmpty)
+        'source=${Uri.encodeQueryComponent(source)}',
+      'pinned_only=$pinnedOnly',
+      'limit=$limit',
+    ].join('&');
+    final response = await _apiClient.get('/problem-bank/custom?$query');
+    final items = response['items'] as List<dynamic>? ?? const [];
+    return items
+        .map((item) => ProblemItem.fromJson(item as Map<String, dynamic>))
+        .toList(growable: false);
+  }
+
   Future<ProblemItem> saveProblem(String problemId) async {
     final response = await _apiClient.post(
       '/problem-bank/$problemId/save',
