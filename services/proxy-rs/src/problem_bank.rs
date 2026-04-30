@@ -424,6 +424,183 @@ impl ProblemBank {
         snapshots
     }
 
+    pub fn compare_snapshots(
+        &self,
+        base_snapshot_id: &str,
+        target_snapshot_id: &str,
+    ) -> Result<ProblemSnapshotComparison, ProblemBankSnapshotError> {
+        let store = self.store.read().expect("problem bank read lock");
+        let base = store
+            .snapshots
+            .iter()
+            .find(|snapshot| snapshot.id == base_snapshot_id)
+            .cloned()
+            .ok_or(ProblemBankSnapshotError::NotFound)?;
+        let target = store
+            .snapshots
+            .iter()
+            .find(|snapshot| snapshot.id == target_snapshot_id)
+            .cloned()
+            .ok_or(ProblemBankSnapshotError::NotFound)?;
+
+        let base_mode_map = base
+            .dashboard
+            .mode_summary
+            .iter()
+            .map(|summary| (summary.mode.clone(), summary))
+            .collect::<HashMap<_, _>>();
+        let target_mode_map = target
+            .dashboard
+            .mode_summary
+            .iter()
+            .map(|summary| (summary.mode.clone(), summary))
+            .collect::<HashMap<_, _>>();
+        let mut modes = base_mode_map
+            .keys()
+            .chain(target_mode_map.keys())
+            .cloned()
+            .collect::<Vec<_>>();
+        modes.sort();
+        modes.dedup();
+
+        let mut mode_deltas = modes
+            .into_iter()
+            .map(|mode| {
+                let base_summary = base_mode_map.get(&mode);
+                let target_summary = target_mode_map.get(&mode);
+                ProblemModeSummaryDelta {
+                    mode,
+                    total_problems_delta: delta_usize(
+                        target_summary.map(|summary| summary.total_problems).unwrap_or(0),
+                        base_summary.map(|summary| summary.total_problems).unwrap_or(0),
+                    ),
+                    total_usage_delta: delta_usize(
+                        target_summary.map(|summary| summary.total_usage).unwrap_or(0),
+                        base_summary.map(|summary| summary.total_usage).unwrap_or(0),
+                    ),
+                    recent_failures_delta: delta_usize(
+                        target_summary.map(|summary| summary.recent_failures).unwrap_or(0),
+                        base_summary.map(|summary| summary.recent_failures).unwrap_or(0),
+                    ),
+                    stale_count_delta: delta_usize(
+                        target_summary.map(|summary| summary.stale_count).unwrap_or(0),
+                        base_summary.map(|summary| summary.stale_count).unwrap_or(0),
+                    ),
+                    success_rate_delta: target_summary
+                        .map(|summary| summary.success_rate)
+                        .unwrap_or(0.0)
+                        - base_summary.map(|summary| summary.success_rate).unwrap_or(0.0),
+                }
+            })
+            .collect::<Vec<_>>();
+        mode_deltas.sort_by(|a, b| a.mode.cmp(&b.mode));
+
+        let base_alert_map = base
+            .dashboard
+            .alerts
+            .iter()
+            .map(|alert| (alert.code.clone(), alert.clone()))
+            .collect::<HashMap<_, _>>();
+        let target_alert_map = target
+            .dashboard
+            .alerts
+            .iter()
+            .map(|alert| (alert.code.clone(), alert.clone()))
+            .collect::<HashMap<_, _>>();
+
+        let mut alerts_added = target_alert_map
+            .iter()
+            .filter_map(|(code, alert)| {
+                if base_alert_map.contains_key(code) {
+                    None
+                } else {
+                    Some(alert.clone())
+                }
+            })
+            .collect::<Vec<_>>();
+        alerts_added.sort_by(|a, b| a.code.cmp(&b.code));
+
+        let mut alerts_resolved = base_alert_map
+            .iter()
+            .filter_map(|(code, alert)| {
+                if target_alert_map.contains_key(code) {
+                    None
+                } else {
+                    Some(alert.clone())
+                }
+            })
+            .collect::<Vec<_>>();
+        alerts_resolved.sort_by(|a, b| a.code.cmp(&b.code));
+
+        Ok(ProblemSnapshotComparison {
+            base_snapshot_id: base.id.clone(),
+            target_snapshot_id: target.id.clone(),
+            base_captured_at_unix: base.captured_at_unix,
+            target_captured_at_unix: target.captured_at_unix,
+            base_note: base.note.clone(),
+            target_note: target.note.clone(),
+            base_risk_level: base.dashboard.risk_level.clone(),
+            target_risk_level: target.dashboard.risk_level.clone(),
+            risk_level_changed: base.dashboard.risk_level != target.dashboard.risk_level,
+            base_recommended_next_mode: base.dashboard.recommended_next_mode.clone(),
+            target_recommended_next_mode: target.dashboard.recommended_next_mode.clone(),
+            recommended_next_mode_changed:
+                base.dashboard.recommended_next_mode != target.dashboard.recommended_next_mode,
+            total_problems_delta: delta_usize(
+                target.dashboard.stats.total,
+                base.dashboard.stats.total,
+            ),
+            custom_problems_delta: delta_usize(
+                target.dashboard.stats.custom,
+                base.dashboard.stats.custom,
+            ),
+            total_usage_delta: delta_usize(
+                target.dashboard.stats.total_usage,
+                base.dashboard.stats.total_usage,
+            ),
+            overall_success_rate_delta: target.dashboard.insights.overall_success_rate
+                - base.dashboard.insights.overall_success_rate,
+            trend_success_rate_delta: target.dashboard.trend.success_rate_delta
+                - base.dashboard.trend.success_rate_delta,
+            recent_attempts_delta: delta_usize(
+                target.dashboard.trend.recent_total_attempts,
+                base.dashboard.trend.recent_total_attempts,
+            ),
+            review_queue_delta: delta_usize(
+                target.dashboard.review_queue.len(),
+                base.dashboard.review_queue.len(),
+            ),
+            stale_problems_delta: delta_usize(
+                target.dashboard.stale_problems.len(),
+                base.dashboard.stale_problems.len(),
+            ),
+            mode_deltas,
+            alerts_added,
+            alerts_resolved,
+        })
+    }
+
+    pub fn delete_snapshot(
+        &self,
+        snapshot_id: &str,
+    ) -> Result<DeletedProblemSnapshot, ProblemBankSnapshotError> {
+        let mut store = self.store.write().expect("problem bank write lock");
+        let before = store.snapshots.len();
+        store.snapshots.retain(|snapshot| snapshot.id != snapshot_id);
+        if store.snapshots.len() == before {
+            return Err(ProblemBankSnapshotError::NotFound);
+        }
+
+        if let Some(path) = self.snapshot_path.as_ref() {
+            persist_snapshots(path, &store.snapshots).map_err(ProblemBankSnapshotError::Persist)?;
+        }
+
+        Ok(DeletedProblemSnapshot {
+            id: snapshot_id.to_string(),
+            remaining_snapshots: store.snapshots.len(),
+        })
+    }
+
     pub fn stale_problems(&self, request: ProblemStaleRequest) -> Vec<ProblemStaleEntry> {
         let store = self.store.read().expect("problem bank read lock");
         let now = current_unix_seconds();
