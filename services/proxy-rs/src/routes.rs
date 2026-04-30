@@ -1067,6 +1067,169 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn problem_bank_snapshots_compare_reports_deltas() {
+        let app = build_router(state());
+
+        let save_response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/problem-bank/pb_speak_002/save")
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"source":"reviewed"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let save_body = to_bytes(save_response.into_body(), 4096).await.unwrap();
+        let save_text = String::from_utf8(save_body.to_vec()).unwrap();
+        let id_start = save_text.find("\"id\":\"saved_").expect("saved problem id");
+        let id_value = &save_text[id_start + 6..];
+        let end_quote = id_value.find('"').expect("saved id end quote");
+        let saved_id = &id_value[..end_quote];
+
+        let first_capture = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/problem-bank/snapshots/capture?preferred_mode=speaking&activity_source=reviewed")
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"note":"before review"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(first_capture.status(), StatusCode::CREATED);
+        let first_body = to_bytes(first_capture.into_body(), 32768).await.unwrap();
+        let first_text = String::from_utf8(first_body.to_vec()).unwrap();
+        let first_id_start = first_text
+            .find("\"id\":\"pbsnap_")
+            .expect("first snapshot id start");
+        let first_id_value = &first_text[first_id_start + 6..];
+        let first_id_end = first_id_value.find('"').expect("first snapshot id end");
+        let first_snapshot_id = &first_id_value[..first_id_end];
+
+        let _ = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/problem-bank/{saved_id}/usage"))
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        r#"{"successful":true,"occurred_at_unix":1234567890,"append_note":"compare route"}"#,
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        let second_capture = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/problem-bank/snapshots/capture?preferred_mode=speaking&activity_source=reviewed")
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"note":"after review"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(second_capture.status(), StatusCode::CREATED);
+        let second_body = to_bytes(second_capture.into_body(), 32768).await.unwrap();
+        let second_text = String::from_utf8(second_body.to_vec()).unwrap();
+        let second_id_start = second_text
+            .find("\"id\":\"pbsnap_")
+            .expect("second snapshot id start");
+        let second_id_value = &second_text[second_id_start + 6..];
+        let second_id_end = second_id_value.find('"').expect("second snapshot id end");
+        let second_snapshot_id = &second_id_value[..second_id_end];
+
+        let compare_response = app
+            .oneshot(
+                Request::builder()
+                    .uri(format!(
+                        "/problem-bank/snapshots/compare?base_snapshot_id={first_snapshot_id}&target_snapshot_id={second_snapshot_id}"
+                    ))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(compare_response.status(), StatusCode::OK);
+        let compare_body = to_bytes(compare_response.into_body(), 32768).await.unwrap();
+        let compare_text = String::from_utf8(compare_body.to_vec()).unwrap();
+        assert!(compare_text.contains("\"base_snapshot_id\""));
+        assert!(compare_text.contains("\"target_snapshot_id\""));
+        assert!(compare_text.contains("\"total_usage_delta\":1"));
+        assert!(compare_text.contains("\"target_note\":\"after review\""));
+    }
+
+    #[tokio::test]
+    async fn problem_bank_snapshots_delete_removes_snapshot() {
+        let app = build_router(state());
+
+        let capture_response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/problem-bank/snapshots/capture?preferred_mode=speaking")
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"note":"delete me"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(capture_response.status(), StatusCode::CREATED);
+        let capture_body = to_bytes(capture_response.into_body(), 32768).await.unwrap();
+        let capture_text = String::from_utf8(capture_body.to_vec()).unwrap();
+        let id_start = capture_text
+            .find("\"id\":\"pbsnap_")
+            .expect("snapshot id start");
+        let id_value = &capture_text[id_start + 6..];
+        let end_quote = id_value.find('"').expect("snapshot id end");
+        let snapshot_id = &id_value[..end_quote];
+
+        let delete_response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("DELETE")
+                    .uri(format!("/problem-bank/snapshots/{snapshot_id}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(delete_response.status(), StatusCode::OK);
+        let delete_body = to_bytes(delete_response.into_body(), 8192).await.unwrap();
+        let delete_text = String::from_utf8(delete_body.to_vec()).unwrap();
+        assert!(delete_text.contains("\"remaining_snapshots\":0"));
+
+        let list_response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/problem-bank/snapshots?limit=5")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(list_response.status(), StatusCode::OK);
+        let list_body = to_bytes(list_response.into_body(), 32768).await.unwrap();
+        let list_text = String::from_utf8(list_body.to_vec()).unwrap();
+        assert!(list_text.contains("\"total\":0"));
+    }
+
+    #[tokio::test]
     async fn problem_bank_save_persists_generated_items_in_memory() {
         let app = build_router(state());
 
