@@ -10,10 +10,10 @@ use tokio::join;
 use crate::{
     http_response::with_standard_headers,
     problem_bank::{
-        GeneratedProblemSet, ProblemActivityEntry, ProblemActivityRequest, ProblemFilter,
-        ProblemGenerationRequest, ProblemRecommendationRequest, ProblemRecord,
-        ProblemRecordUpdate, ProblemSaveSource, ProblemStaleRequest, ProblemUsageEvent,
-        ProblemUsageHistory,
+        DeletedProblemSnapshot, GeneratedProblemSet, ProblemActivityEntry,
+        ProblemActivityRequest, ProblemFilter, ProblemGenerationRequest,
+        ProblemRecommendationRequest, ProblemRecord, ProblemRecordUpdate, ProblemSaveSource,
+        ProblemSnapshotComparison, ProblemStaleRequest, ProblemUsageEvent, ProblemUsageHistory,
     },
     request_id::resolve_request_id,
     response_headers::HeaderPolicy,
@@ -620,6 +620,126 @@ pub async fn list_snapshots(
     )
 }
 
+pub async fn compare_snapshots(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Query(query): Query<SnapshotCompareQuery>,
+) -> impl IntoResponse {
+    let request_id = resolve_request_id(&headers);
+    let Some(base_snapshot_id) = query.base_snapshot_id else {
+        return with_standard_headers(
+            (
+                StatusCode::BAD_REQUEST,
+                Json(ProblemBankErrorResponse {
+                    error: "missing_base_snapshot_id",
+                }),
+            )
+                .into_response(),
+            &request_id,
+            "miss",
+            &state.config.runtime_environment,
+            HeaderPolicy::Sensitive,
+        );
+    };
+    let Some(target_snapshot_id) = query.target_snapshot_id else {
+        return with_standard_headers(
+            (
+                StatusCode::BAD_REQUEST,
+                Json(ProblemBankErrorResponse {
+                    error: "missing_target_snapshot_id",
+                }),
+            )
+                .into_response(),
+            &request_id,
+            "miss",
+            &state.config.runtime_environment,
+            HeaderPolicy::Sensitive,
+        );
+    };
+
+    match state
+        .problem_bank
+        .compare_snapshots(&base_snapshot_id, &target_snapshot_id)
+    {
+        Ok(comparison) => with_standard_headers(
+            (StatusCode::OK, Json(comparison)).into_response(),
+            &request_id,
+            "miss",
+            &state.config.runtime_environment,
+            HeaderPolicy::Sensitive,
+        ),
+        Err(crate::problem_bank::ProblemBankSnapshotError::NotFound) => with_standard_headers(
+            (
+                StatusCode::NOT_FOUND,
+                Json(ProblemBankErrorResponse {
+                    error: "snapshot_not_found",
+                }),
+            )
+                .into_response(),
+            &request_id,
+            "miss",
+            &state.config.runtime_environment,
+            HeaderPolicy::Sensitive,
+        ),
+        Err(crate::problem_bank::ProblemBankSnapshotError::Persist(_)) => with_standard_headers(
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ProblemBankErrorResponse {
+                    error: "problem_bank_snapshot_compare_failed",
+                }),
+            )
+                .into_response(),
+            &request_id,
+            "miss",
+            &state.config.runtime_environment,
+            HeaderPolicy::Sensitive,
+        ),
+    }
+}
+
+pub async fn delete_snapshot(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> impl IntoResponse {
+    let request_id = resolve_request_id(&headers);
+    match state.problem_bank.delete_snapshot(&id) {
+        Ok(deleted) => with_standard_headers(
+            (StatusCode::OK, Json(deleted)).into_response(),
+            &request_id,
+            "miss",
+            &state.config.runtime_environment,
+            HeaderPolicy::Sensitive,
+        ),
+        Err(crate::problem_bank::ProblemBankSnapshotError::NotFound) => with_standard_headers(
+            (
+                StatusCode::NOT_FOUND,
+                Json(ProblemBankErrorResponse {
+                    error: "snapshot_not_found",
+                }),
+            )
+                .into_response(),
+            &request_id,
+            "miss",
+            &state.config.runtime_environment,
+            HeaderPolicy::Sensitive,
+        ),
+        Err(crate::problem_bank::ProblemBankSnapshotError::Persist(_)) => with_standard_headers(
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ProblemBankErrorResponse {
+                    error: "problem_bank_snapshot_delete_failed",
+                }),
+            )
+                .into_response(),
+            &request_id,
+            "miss",
+            &state.config.runtime_environment,
+            HeaderPolicy::Sensitive,
+        ),
+    }
+}
+
 pub async fn capture_snapshot(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -793,6 +913,12 @@ pub struct ProblemStaleQuery {
 #[derive(Debug, Deserialize)]
 pub struct SnapshotListQuery {
     pub limit: Option<usize>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SnapshotCompareQuery {
+    pub base_snapshot_id: Option<String>,
+    pub target_snapshot_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

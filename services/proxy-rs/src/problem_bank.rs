@@ -1237,6 +1237,49 @@ pub struct ProblemBankSnapshot {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ProblemSnapshotComparison {
+    pub base_snapshot_id: String,
+    pub target_snapshot_id: String,
+    pub base_captured_at_unix: u64,
+    pub target_captured_at_unix: u64,
+    pub base_note: String,
+    pub target_note: String,
+    pub base_risk_level: String,
+    pub target_risk_level: String,
+    pub risk_level_changed: bool,
+    pub base_recommended_next_mode: Option<String>,
+    pub target_recommended_next_mode: Option<String>,
+    pub recommended_next_mode_changed: bool,
+    pub total_problems_delta: i64,
+    pub custom_problems_delta: i64,
+    pub total_usage_delta: i64,
+    pub overall_success_rate_delta: f64,
+    pub trend_success_rate_delta: f64,
+    pub recent_attempts_delta: i64,
+    pub review_queue_delta: i64,
+    pub stale_problems_delta: i64,
+    pub mode_deltas: Vec<ProblemModeSummaryDelta>,
+    pub alerts_added: Vec<ProblemAlert>,
+    pub alerts_resolved: Vec<ProblemAlert>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ProblemModeSummaryDelta {
+    pub mode: String,
+    pub total_problems_delta: i64,
+    pub total_usage_delta: i64,
+    pub recent_failures_delta: i64,
+    pub stale_count_delta: i64,
+    pub success_rate_delta: f64,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct DeletedProblemSnapshot {
+    pub id: String,
+    pub remaining_snapshots: usize,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ProblemModeTrend {
     pub mode: String,
     pub recent_success_rate: f64,
@@ -1482,6 +1525,14 @@ pub enum ProblemBankUpdateError {
     Persist(#[source] ProblemBankSaveError),
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum ProblemBankSnapshotError {
+    #[error("snapshot not found")]
+    NotFound,
+    #[error("failed to persist snapshot store")]
+    Persist(#[source] ProblemBankSaveError),
+}
+
 #[derive(Clone, Debug)]
 pub struct ProblemFilter {
     pub mode: Option<String>,
@@ -1591,6 +1642,10 @@ fn load_snapshots(path: &Path) -> Result<Vec<ProblemBankSnapshot>, std::io::Erro
     let raw = fs::read_to_string(path)?;
     let snapshots = serde_json::from_str::<Vec<ProblemBankSnapshot>>(&raw).unwrap_or_default();
     Ok(snapshots)
+}
+
+fn delta_usize(current: usize, previous: usize) -> i64 {
+    current as i64 - previous as i64
 }
 
 fn recommendation_score(item: &ProblemRecord, request: &ProblemRecommendationRequest) -> i32 {
