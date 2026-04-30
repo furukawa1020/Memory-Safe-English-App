@@ -211,7 +211,9 @@ class _ProblemBankScreenState extends State<ProblemBankScreen> {
   Widget build(BuildContext context) {
     return DefaultTabController(
       length: 2,
-      initialIndex: widget.initialTabIndex.clamp(0, 1),
+      initialIndex: widget.initialTabIndex < 0
+          ? 0
+          : (widget.initialTabIndex > 1 ? 1 : widget.initialTabIndex),
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Rust Problem Bank'),
