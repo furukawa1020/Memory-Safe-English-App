@@ -8,6 +8,7 @@ import '../model/content_item.dart';
 import '../model/problem_item.dart';
 import '../model/rust_problem_dashboard.dart';
 import 'content_catalog_controller.dart';
+import 'problem_bank_screen.dart';
 import 'reader_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -123,6 +124,8 @@ class _ContentHomeTabState extends State<_ContentHomeTab> {
                   onCaptureSnapshot: () => widget.controller.captureSnapshot(
                     note: 'Captured from mobile home',
                   ),
+                  onOpenProblemBank: () => _openProblemBank(0),
+                  onOpenSnapshots: () => _openProblemBank(1),
                 ),
                 const SizedBox(height: 18),
                 Text('Rust Problem Picks', style: Theme.of(context).textTheme.titleLarge),
@@ -270,6 +273,14 @@ class _ContentHomeTabState extends State<_ContentHomeTab> {
       return;
     }
     await widget.controller.updateProblemNotes(item, nextValue);
+  }
+
+  void _openProblemBank(int initialTabIndex) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ProblemBankScreen(initialTabIndex: initialTabIndex),
+      ),
+    );
   }
 }
 
@@ -593,6 +604,8 @@ class _RustDashboardPanel extends StatelessWidget {
     required this.errorText,
     required this.isCapturingSnapshot,
     required this.onCaptureSnapshot,
+    required this.onOpenProblemBank,
+    required this.onOpenSnapshots,
   });
 
   final RustProblemDashboard? dashboard;
@@ -600,6 +613,8 @@ class _RustDashboardPanel extends StatelessWidget {
   final String? errorText;
   final bool isCapturingSnapshot;
   final VoidCallback onCaptureSnapshot;
+  final VoidCallback onOpenProblemBank;
+  final VoidCallback onOpenSnapshots;
 
   @override
   Widget build(BuildContext context) {
@@ -640,6 +655,23 @@ class _RustDashboardPanel extends StatelessWidget {
               const SizedBox(height: 12),
               _Pill(label: 'next ${dashboard!.recommendedNextMode}'),
             ],
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: onOpenProblemBank,
+                  icon: const Icon(Icons.inventory_2_outlined),
+                  label: const Text('My Problem Bank'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: onOpenSnapshots,
+                  icon: const Icon(Icons.history_outlined),
+                  label: const Text('Snapshot History'),
+                ),
+              ],
+            ),
             const SizedBox(height: 14),
             if (dashboard!.alerts.isNotEmpty) ...[
               const _PlanSectionLabel(
