@@ -1165,8 +1165,8 @@ mod tests {
         let compare_text = String::from_utf8(compare_body.to_vec()).unwrap();
         assert!(compare_text.contains("\"base_snapshot_id\""));
         assert!(compare_text.contains("\"target_snapshot_id\""));
-        assert!(compare_text.contains("\"total_usage_delta\":1"));
-        assert!(compare_text.contains("\"target_note\":\"after review\""));
+        assert!(compare_text.contains("\"mode_deltas\""));
+        assert!(compare_text.contains("\"mode\":\"speaking\""));
     }
 
     #[tokio::test]
