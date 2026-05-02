@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from app.adaptive_session import AdaptiveSessionService
 from app.analytics_summary import AnalyticsSummaryService
 from app.assessment import AssessmentService
 from app.analysis import AnalysisService
@@ -31,6 +32,7 @@ class Application:
     collapse_pattern_service: CollapsePatternService
     analytics_summary_service: AnalyticsSummaryService
     practice_set_service: PracticeSetService
+    adaptive_session_service: AdaptiveSessionService
     analysis_service: AnalysisService
     rate_limiter: SlidingWindowRateLimiter
 
@@ -61,6 +63,10 @@ def build_application(settings: Settings | None = None) -> Application:
         assessment_service=assessment_service,
         collapse_pattern_service=collapse_pattern_service,
     )
+    adaptive_session_service = AdaptiveSessionService(
+        analytics_summary_service=analytics_summary_service,
+        practice_set_service=practice_set_service,
+    )
     return Application(
         settings=resolved_settings,
         chunking_service=chunking_service,
@@ -73,6 +79,7 @@ def build_application(settings: Settings | None = None) -> Application:
         collapse_pattern_service=collapse_pattern_service,
         analytics_summary_service=analytics_summary_service,
         practice_set_service=practice_set_service,
+        adaptive_session_service=adaptive_session_service,
         analysis_service=AnalysisService(
             chunk_analyzer=chunking_service,
             skeleton_analyzer=skeleton_service,
@@ -84,6 +91,7 @@ def build_application(settings: Settings | None = None) -> Application:
             collapse_pattern_analyzer=collapse_pattern_service,
             analytics_summary_analyzer=analytics_summary_service,
             practice_set_analyzer=practice_set_service,
+            adaptive_session_analyzer=adaptive_session_service,
         ),
         rate_limiter=SlidingWindowRateLimiter(
             max_requests=resolved_settings.rate_limit_max_requests,
