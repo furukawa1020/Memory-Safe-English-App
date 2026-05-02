@@ -5,6 +5,7 @@ from typing import Protocol
 
 from app.analysis.models import AnalyzeTextInput
 from app.models import (
+    AdaptiveSessionResult,
     AssessmentProfileResult,
     AnalyticsSummaryResult,
     CollapsePatternResult,
@@ -90,6 +91,19 @@ class PracticeSetAnalyzer(Protocol):
     ) -> PracticeSetResult: ...
 
 
+class AdaptiveSessionAnalyzer(Protocol):
+    def build(
+        self,
+        text: str,
+        *,
+        language: str = "en",
+        target_context: str = "general",
+        self_reported_difficulties: list[str] | None = None,
+        fatigue_level: str = "unknown",
+        session_events: list[dict[str, str | int | float]] | None = None,
+    ) -> AdaptiveSessionResult: ...
+
+
 @dataclass(frozen=True, slots=True)
 class AnalysisRoute:
     path: str
@@ -109,8 +123,9 @@ class AnalysisService:
     collapse_pattern_analyzer: CollapsePatternAnalyzer
     analytics_summary_analyzer: AnalyticsSummaryAnalyzer
     practice_set_analyzer: PracticeSetAnalyzer
+    adaptive_session_analyzer: AdaptiveSessionAnalyzer
 
-    def analyze(self, operation: str, request: AnalyzeTextInput) -> ChunkingResult | SkeletonResult | ReaderPlanResult | ListeningPlanResult | SpeakingPlanResult | RescuePlanResult | AssessmentProfileResult | CollapsePatternResult | AnalyticsSummaryResult | PracticeSetResult:
+    def analyze(self, operation: str, request: AnalyzeTextInput) -> ChunkingResult | SkeletonResult | ReaderPlanResult | ListeningPlanResult | SpeakingPlanResult | RescuePlanResult | AssessmentProfileResult | CollapsePatternResult | AnalyticsSummaryResult | PracticeSetResult | AdaptiveSessionResult:
         if operation == "chunking":
             return self.chunk_analyzer.chunk_text(text=request.text, language=request.language)
         if operation == "skeleton":
@@ -171,6 +186,15 @@ class AnalysisService:
                 fatigue_level=request.fatigue_level,
                 session_events=request.session_events,
             )
+        if operation == "adaptive_session":
+            return self.adaptive_session_analyzer.build(
+                text=request.text,
+                language=request.language,
+                target_context=request.target_context,
+                self_reported_difficulties=request.self_reported_difficulties,
+                fatigue_level=request.fatigue_level,
+                session_events=request.session_events,
+            )
         raise ValueError(f"unsupported analysis operation: {operation}")
 
     @staticmethod
@@ -186,4 +210,5 @@ class AnalysisService:
             AnalysisRoute(path="/analyze/collapse-patterns", audit_name="collapse_patterns_analyzed", operation="collapse_patterns"),
             AnalysisRoute(path="/analyze/analytics-summary", audit_name="analytics_summary_analyzed", operation="analytics_summary"),
             AnalysisRoute(path="/analyze/practice-set", audit_name="practice_set_analyzed", operation="practice_set"),
+            AnalysisRoute(path="/analyze/adaptive-session", audit_name="adaptive_session_analyzed", operation="adaptive_session"),
         )
