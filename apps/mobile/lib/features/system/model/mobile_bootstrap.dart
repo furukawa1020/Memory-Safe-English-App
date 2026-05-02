@@ -97,6 +97,7 @@ class FrontendRoutes {
     required this.listeningPlan,
     required this.speakingPlan,
     required this.rescuePlan,
+    required this.adaptiveSession,
   });
 
   final String readiness;
@@ -111,6 +112,7 @@ class FrontendRoutes {
   final String listeningPlan;
   final String speakingPlan;
   final String rescuePlan;
+  final String adaptiveSession;
 
   factory FrontendRoutes.fromJson(Map<String, dynamic> json) {
     return FrontendRoutes(
@@ -126,6 +128,7 @@ class FrontendRoutes {
       listeningPlan: json['listening_plan'] as String? ?? '',
       speakingPlan: json['speaking_plan'] as String? ?? '',
       rescuePlan: json['rescue_plan'] as String? ?? '',
+      adaptiveSession: json['adaptive_session'] as String? ?? '',
     );
   }
 }
@@ -140,6 +143,7 @@ class FrontendCapabilities {
     required this.rescuePlan,
     required this.onboardingAssessment,
     required this.analyticsSummary,
+    required this.adaptiveSession,
   });
 
   final bool chunkReader;
@@ -150,6 +154,7 @@ class FrontendCapabilities {
   final bool rescuePlan;
   final bool onboardingAssessment;
   final bool analyticsSummary;
+  final bool adaptiveSession;
 
   factory FrontendCapabilities.fromJson(Map<String, dynamic> json) {
     bool readBool(String key) => json[key] as bool? ?? false;
@@ -163,6 +168,7 @@ class FrontendCapabilities {
       rescuePlan: readBool('rescue_plan'),
       onboardingAssessment: readBool('onboarding_assessment'),
       analyticsSummary: readBool('analytics_summary'),
+      adaptiveSession: readBool('adaptive_session'),
     );
   }
 }

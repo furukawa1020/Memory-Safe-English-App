@@ -795,6 +795,106 @@ class _RustModeSummaryTile extends StatelessWidget {
   }
 }
 
+class _AdaptiveSessionPanel extends StatelessWidget {
+  const _AdaptiveSessionPanel({
+    required this.result,
+    required this.onOpenAdaptive,
+    this.compact = true,
+  });
+
+  final AdaptiveSessionResultItem result;
+  final VoidCallback onOpenAdaptive;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final firstSection =
+        result.practiceSet.sections.isNotEmpty ? result.practiceSet.sections.first : null;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Adaptive session start',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+                _Pill(label: result.recommendedEntryMode),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(result.sessionPlanNote),
+            const SizedBox(height: 12),
+            _PlanSectionLabel(
+              title: 'Next focus',
+              subtitle: result.analyticsSummary.nextFocus,
+            ),
+            const SizedBox(height: 8),
+            for (final item
+                in result.analyticsSummary.recommendations.take(compact ? 2 : 4)) ...[
+              Text(item.title),
+              const SizedBox(height: 4),
+              Text(
+                item.reason,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 8),
+            ],
+            if (firstSection != null) ...[
+              const SizedBox(height: 4),
+              _PlanSectionLabel(
+                title: 'Start with ${firstSection.mode}',
+                subtitle: firstSection.goal,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                firstSection.whyThisWorks,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 10),
+              for (final task in firstSection.tasks.take(compact ? 2 : 4)) ...[
+                Card(
+                  elevation: 0,
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(task.title),
+                        const SizedBox(height: 6),
+                        Text(task.prompt),
+                        const SizedBox(height: 6),
+                        Text(
+                          task.wmSupport,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
+            ],
+            if (compact) ...[
+              const SizedBox(height: 4),
+              FilledButton.tonal(
+                onPressed: onOpenAdaptive,
+                child: const Text('Open adaptive session'),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _ContentSection {
   const _ContentSection({
     required this.title,
