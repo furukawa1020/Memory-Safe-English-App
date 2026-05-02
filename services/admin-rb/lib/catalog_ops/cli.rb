@@ -1,0 +1,98 @@
+# frozen_string_literal: true
+
+require "json"
+require "optparse"
+require "fileutils"
+
+require_relative "catalog_loader"
+require_relative "stats"
+require_relative "renderers/go_seed_renderer"
+require_relative "renderers/sql_seed_renderer"
+
+module CatalogOps
+  class CLI
+    def initialize(argv)
+      @argv = argv.dup
+    end
+
+    def run
+      command = @argv.shift
+      case command
+      when "validate" then validate
+      when "stats" then stats
+      when "build-go" then build_go
+      when "build-sql" then build_sql
+      else
+        warn usage
+        exit 1
+      end
+    rescue ArgumentError => e
+      warn "error: #{e.message}"
+      exit 1
+    end
+
+    private
+
+    def validate
+      path = fetch_path!
+      records = CatalogLoader.load(path)
+      puts "ok: #{records.size} records validated"
+    end
+
+    def stats
+      path = fetch_path!
+      records = CatalogLoader.load(path)
+      puts JSON.pretty_generate(Stats.new(records).to_h)
+    end
+
+    def build_go
+      options = {
+        package_name: "memory",
+        function_name: "generatedRubySeedCatalog"
+      }
+      parser = OptionParser.new do |opts|
+        opts.on("--package NAME") { |value| options[:package_name] = value }
+        opts.on("--function NAME") { |value| options[:function_name] = value }
+      end
+      parser.parse!(@argv)
+      input = fetch_path!
+      output = fetch_path!
+      records = CatalogLoader.load(input)
+      rendered = Renderers::GoSeedRenderer.new(
+        records,
+        package_name: options[:package_name],
+        function_name: options[:function_name]
+      ).render
+      write_output(output, rendered)
+      puts "wrote Go seed: #{output}"
+    end
+
+    def build_sql
+      input = fetch_path!
+      output = fetch_path!
+      records = CatalogLoader.load(input)
+      rendered = Renderers::SqlSeedRenderer.new(records).render
+      write_output(output, rendered)
+      puts "wrote SQL seed: #{output}"
+    end
+
+    def fetch_path!
+      @argv.shift || raise(ArgumentError, "missing path argument")
+    end
+
+    def write_output(path, content)
+      FileUtils.mkdir_p(File.dirname(path))
+      File.write(path, content)
+    end
+
+    def usage
+      <<~USAGE
+        usage:
+          ruby bin/catalog_ops validate <catalog.yml>
+          ruby bin/catalog_ops stats <catalog.yml>
+          ruby bin/catalog_ops build-go [--package NAME] [--function NAME] <catalog.yml> <output.go>
+          ruby bin/catalog_ops build-sql <catalog.yml> <output.sql>
+      USAGE
+    end
+  end
+end

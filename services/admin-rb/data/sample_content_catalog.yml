@@ -1,25 +1,25 @@
 contents:
   - id: cnt_ruby_001
-    title: Research Reading: Main Claim First
+    title: "Research Reading: Main Claim First"
     content_type: reading
     level: intermediate
     topic: research
     language: en
     raw_text: We tested whether smaller chunks reduce overload during reading.
-    summary_text: Main claim about chunk size
+    summary_text: "Main claim about chunk size"
   - id: cnt_ruby_002
-    title: Meeting Listening: One Decision
+    title: "Meeting Listening: One Decision"
     content_type: listening
     level: upper_intermediate
     topic: meeting
     language: en
     raw_text: The client approved the new schedule, but the delivery date still needs confirmation.
-    summary_text: Meeting update with one confirmed decision
+    summary_text: "Meeting update with one confirmed decision"
   - id: cnt_ruby_003
-    title: Rescue: Ask for the Main Point
+    title: "Rescue: Ask for the Main Point"
     content_type: rescue
     level: intro
     topic: rescue
     language: en
     raw_text: Could you tell me the main point first?
-    summary_text: Rescue phrase for main-point-first listening
+    summary_text: "Rescue phrase for main-point-first listening"
