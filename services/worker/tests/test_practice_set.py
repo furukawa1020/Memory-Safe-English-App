@@ -38,9 +38,12 @@ def test_practice_set_builds_multi_mode_tasks() -> None:
     assert result.sections[0].mode == result.suggested_order[0]
     assert result.sections[0].why_this_works
     assert result.sections[0].tasks
-    assert result.sections[1].mode == "listening"
-    assert result.sections[2].mode == "speaking"
-    assert result.sections[3].mode == "rescue"
+    assert {section.mode for section in result.sections} == {
+        "reading",
+        "listening",
+        "speaking",
+        "rescue",
+    }
     assert all(section.tasks for section in result.sections)
     first_task = result.sections[0].tasks[0]
     assert first_task.problem_type
