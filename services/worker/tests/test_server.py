@@ -247,3 +247,26 @@ def test_practice_set_endpoint() -> None:
         assert payload["suggested_order"]
         assert payload["sections"]
         assert payload["sections"][0]["tasks"]
+
+
+def test_adaptive_session_endpoint() -> None:
+    with running_server(make_settings()) as server:
+        body = {
+            "text": "The client approved the design draft, but the delivery schedule is still under review.",
+            "target_context": "meeting",
+            "self_reported_difficulties": ["audio_tracking", "speech_breakdown"],
+            "fatigue_level": "high",
+            "session_events": [
+                {"event_type": "audio_restart", "chunk_order": 1, "seconds": 0},
+                {"event_type": "audio_pause", "chunk_order": 1, "seconds": 1.2},
+                {"event_type": "speed_down", "chunk_order": 2, "seconds": 0},
+            ],
+        }
+        body_text = json.dumps(body)
+        response, payload = post_json(server.server_port, "/analyze/adaptive-session", body, signed_headers(body_text))
+
+        assert response.status == HTTPStatus.OK
+        assert payload["recommended_entry_mode"] == "listening"
+        assert payload["session_plan_note"]
+        assert payload["analytics_summary"]["next_focus"]
+        assert payload["practice_set"]["suggested_order"][0] == "listening"
