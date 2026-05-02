@@ -4,6 +4,7 @@ import '../data/content_repository.dart';
 import '../model/content_item.dart';
 import '../model/problem_item.dart';
 import '../model/rust_problem_dashboard.dart';
+import '../model/chunking_result.dart';
 
 class ContentCatalogController extends ChangeNotifier {
   ContentCatalogController(this._repository);
@@ -14,6 +15,7 @@ class ContentCatalogController extends ChangeNotifier {
   List<ProblemItem> recommendedItems = const [];
   RustProblemDashboard? rustDashboard;
   List<RustProblemSnapshot> rustSnapshots = const [];
+  AdaptiveSessionResultItem? adaptiveSession;
   bool isLoading = false;
   bool isCapturingSnapshot = false;
   String? rustDashboardErrorText;
@@ -34,10 +36,14 @@ class ContentCatalogController extends ChangeNotifier {
         focusTag: 'status_update',
         limit: 4,
       );
+      final adaptiveSessionFuture = _repository.fetchAdaptiveSession(
+        'The client approved the design draft, but the delivery schedule is still under review.',
+      );
       final dashboardFuture = _repository.fetchProblemDashboard();
       final snapshotsFuture = _repository.fetchProblemSnapshots(limit: 5);
       items = await contentsFuture;
       recommendedItems = await recommendedFuture;
+      adaptiveSession = await adaptiveSessionFuture;
       rustDashboard = await dashboardFuture;
       rustSnapshots = await snapshotsFuture;
       problemActionErrorText = null;

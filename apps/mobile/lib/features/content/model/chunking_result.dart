@@ -345,3 +345,210 @@ class SpeakingPlanResult {
     );
   }
 }
+
+class PracticeRecommendationItem {
+  const PracticeRecommendationItem({
+    required this.area,
+    required this.title,
+    required this.reason,
+    required this.priority,
+  });
+
+  final String area;
+  final String title;
+  final String reason;
+  final int priority;
+
+  factory PracticeRecommendationItem.fromJson(Map<String, dynamic> json) {
+    return PracticeRecommendationItem(
+      area: json['area'] as String? ?? '',
+      title: json['title'] as String? ?? '',
+      reason: json['reason'] as String? ?? '',
+      priority: json['priority'] as int? ?? 0,
+    );
+  }
+}
+
+class AnalyticsSummaryResultItem {
+  const AnalyticsSummaryResultItem({
+    required this.version,
+    required this.language,
+    required this.targetContext,
+    required this.nextFocus,
+    required this.recommendations,
+  });
+
+  final String version;
+  final String language;
+  final String targetContext;
+  final String nextFocus;
+  final List<PracticeRecommendationItem> recommendations;
+
+  factory AnalyticsSummaryResultItem.fromJson(Map<String, dynamic> json) {
+    final recommendationList =
+        json['recommendations'] as List<dynamic>? ?? const [];
+    return AnalyticsSummaryResultItem(
+      version: json['version'] as String? ?? '',
+      language: json['language'] as String? ?? 'en',
+      targetContext: json['target_context'] as String? ?? 'general',
+      nextFocus: json['next_focus'] as String? ?? '',
+      recommendations: recommendationList
+          .map(
+            (item) => PracticeRecommendationItem.fromJson(
+              item as Map<String, dynamic>,
+            ),
+          )
+          .toList(),
+    );
+  }
+}
+
+class PracticeTaskItem {
+  const PracticeTaskItem({
+    required this.taskId,
+    required this.mode,
+    required this.problemType,
+    required this.title,
+    required this.prompt,
+    required this.expectedFocus,
+    required this.support,
+    required this.difficulty,
+    required this.wmSupport,
+    required this.successCheck,
+  });
+
+  final String taskId;
+  final String mode;
+  final String problemType;
+  final String title;
+  final String prompt;
+  final String expectedFocus;
+  final String support;
+  final String difficulty;
+  final String wmSupport;
+  final String successCheck;
+
+  factory PracticeTaskItem.fromJson(Map<String, dynamic> json) {
+    return PracticeTaskItem(
+      taskId: json['task_id'] as String? ?? '',
+      mode: json['mode'] as String? ?? '',
+      problemType: json['problem_type'] as String? ?? '',
+      title: json['title'] as String? ?? '',
+      prompt: json['prompt'] as String? ?? '',
+      expectedFocus: json['expected_focus'] as String? ?? '',
+      support: json['support'] as String? ?? '',
+      difficulty: json['difficulty'] as String? ?? '',
+      wmSupport: json['wm_support'] as String? ?? '',
+      successCheck: json['success_check'] as String? ?? '',
+    );
+  }
+}
+
+class PracticeSectionItem {
+  const PracticeSectionItem({
+    required this.mode,
+    required this.goal,
+    required this.whyThisWorks,
+    required this.tasks,
+  });
+
+  final String mode;
+  final String goal;
+  final String whyThisWorks;
+  final List<PracticeTaskItem> tasks;
+
+  factory PracticeSectionItem.fromJson(Map<String, dynamic> json) {
+    final taskList = json['tasks'] as List<dynamic>? ?? const [];
+    return PracticeSectionItem(
+      mode: json['mode'] as String? ?? '',
+      goal: json['goal'] as String? ?? '',
+      whyThisWorks: json['why_this_works'] as String? ?? '',
+      tasks: taskList
+          .map((item) => PracticeTaskItem.fromJson(item as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+}
+
+class AdaptiveSessionResultItem {
+  const AdaptiveSessionResultItem({
+    required this.version,
+    required this.language,
+    required this.targetContext,
+    required this.recommendedEntryMode,
+    required this.sessionPlanNote,
+    required this.analyticsSummary,
+    required this.practiceSet,
+  });
+
+  final String version;
+  final String language;
+  final String targetContext;
+  final String recommendedEntryMode;
+  final String sessionPlanNote;
+  final AnalyticsSummaryResultItem analyticsSummary;
+  final PracticeSetResult practiceSet;
+
+  factory AdaptiveSessionResultItem.fromJson(Map<String, dynamic> json) {
+    return AdaptiveSessionResultItem(
+      version: json['version'] as String? ?? '',
+      language: json['language'] as String? ?? 'en',
+      targetContext: json['target_context'] as String? ?? 'general',
+      recommendedEntryMode: json['recommended_entry_mode'] as String? ?? '',
+      sessionPlanNote: json['session_plan_note'] as String? ?? '',
+      analyticsSummary: AnalyticsSummaryResultItem.fromJson(
+        json['analytics_summary'] as Map<String, dynamic>? ??
+            const <String, dynamic>{},
+      ),
+      practiceSet: PracticeSetResult.fromJson(
+        json['practice_set'] as Map<String, dynamic>? ??
+            const <String, dynamic>{},
+      ),
+    );
+  }
+}
+
+class PracticeSetResult {
+  const PracticeSetResult({
+    required this.version,
+    required this.language,
+    required this.targetContext,
+    required this.summary,
+    required this.suggestedOrder,
+    required this.profileNote,
+    required this.detectedWeakMode,
+    required this.collapseSummary,
+    required this.adaptiveReason,
+    required this.sections,
+  });
+
+  final String version;
+  final String language;
+  final String targetContext;
+  final String summary;
+  final List<String> suggestedOrder;
+  final String profileNote;
+  final String detectedWeakMode;
+  final String collapseSummary;
+  final String adaptiveReason;
+  final List<PracticeSectionItem> sections;
+
+  factory PracticeSetResult.fromJson(Map<String, dynamic> json) {
+    final sectionList = json['sections'] as List<dynamic>? ?? const [];
+    final orderList = json['suggested_order'] as List<dynamic>? ?? const [];
+    return PracticeSetResult(
+      version: json['version'] as String? ?? '',
+      language: json['language'] as String? ?? 'en',
+      targetContext: json['target_context'] as String? ?? 'general',
+      summary: json['summary'] as String? ?? '',
+      suggestedOrder: orderList.map((item) => item.toString()).toList(),
+      profileNote: json['profile_note'] as String? ?? '',
+      detectedWeakMode: json['detected_weak_mode'] as String? ?? '',
+      collapseSummary: json['collapse_summary'] as String? ?? '',
+      adaptiveReason: json['adaptive_reason'] as String? ?? '',
+      sections: sectionList
+          .map((item) => PracticeSectionItem.fromJson(item as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+}

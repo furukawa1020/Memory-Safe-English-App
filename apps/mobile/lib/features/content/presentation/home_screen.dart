@@ -48,6 +48,10 @@ class _HomeScreenState extends State<HomeScreen> {
           analysisController.setMode(AnalysisMode.speaking);
           setState(() => _index = 1);
         },
+        onOpenAdaptive: () {
+          analysisController.setMode(AnalysisMode.adaptive);
+          setState(() => _index = 1);
+        },
       ),
       _AnalysisTab(controller: analysisController),
       _SettingsTab(sessionController: scope.sessionController),
@@ -73,11 +77,13 @@ class _ContentHomeTab extends StatefulWidget {
     required this.controller,
     required this.onOpenListening,
     required this.onOpenSpeaking,
+    required this.onOpenAdaptive,
   });
 
   final ContentCatalogController controller;
   final VoidCallback onOpenListening;
   final VoidCallback onOpenSpeaking;
+  final VoidCallback onOpenAdaptive;
 
   @override
   State<_ContentHomeTab> createState() => _ContentHomeTabState();
@@ -110,8 +116,16 @@ class _ContentHomeTabState extends State<_ContentHomeTab> {
                 _PracticeDoorwaysPanel(
                   onOpenListening: widget.onOpenListening,
                   onOpenSpeaking: widget.onOpenSpeaking,
+                  onOpenAdaptive: widget.onOpenAdaptive,
                 ),
                 const SizedBox(height: 18),
+                if (widget.controller.adaptiveSession != null) ...[
+                  _AdaptiveSessionPanel(
+                    result: widget.controller.adaptiveSession!,
+                    onOpenAdaptive: widget.onOpenAdaptive,
+                  ),
+                  const SizedBox(height: 18),
+                ],
                 const _QuickStartPanel(),
                 const SizedBox(height: 18),
                 Text('Rust Dashboard', style: Theme.of(context).textTheme.titleLarge),
@@ -313,6 +327,7 @@ class _AnalysisTabState extends State<_AnalysisTab> {
           final chunkResult = widget.controller.chunkResult;
           final listeningResult = widget.controller.listeningResult;
           final speakingResult = widget.controller.speakingResult;
+          final adaptiveSessionResult = widget.controller.adaptiveSessionResult;
           return ListView(
             padding: const EdgeInsets.all(20),
             children: [
@@ -337,6 +352,11 @@ class _AnalysisTabState extends State<_AnalysisTab> {
                     value: AnalysisMode.speaking,
                     icon: Icon(Icons.record_voice_over_outlined),
                     label: Text('Speaking'),
+                  ),
+                  ButtonSegment(
+                    value: AnalysisMode.adaptive,
+                    icon: Icon(Icons.auto_awesome_outlined),
+                    label: Text('Adaptive'),
                   ),
                 ],
                 selected: {widget.controller.mode},
@@ -365,6 +385,7 @@ class _AnalysisTabState extends State<_AnalysisTab> {
                             AnalysisMode.chunks => 'Analyze chunks',
                             AnalysisMode.listening => 'Build listening plan',
                             AnalysisMode.speaking => 'Build speaking plan',
+                            AnalysisMode.adaptive => 'Build adaptive session',
                           },
                   ),
                 ),
@@ -392,6 +413,15 @@ class _AnalysisTabState extends State<_AnalysisTab> {
                   widget.controller.mode == AnalysisMode.speaking) ...[
                 const SizedBox(height: 18),
                 _SpeakingPlanCard(result: speakingResult),
+              ],
+              if (adaptiveSessionResult != null &&
+                  widget.controller.mode == AnalysisMode.adaptive) ...[
+                const SizedBox(height: 18),
+                _AdaptiveSessionPanel(
+                  result: adaptiveSessionResult,
+                  onOpenAdaptive: () {},
+                  compact: false,
+                ),
               ],
             ],
           );
@@ -803,10 +833,12 @@ class _PracticeDoorwaysPanel extends StatelessWidget {
   const _PracticeDoorwaysPanel({
     required this.onOpenListening,
     required this.onOpenSpeaking,
+    required this.onOpenAdaptive,
   });
 
   final VoidCallback onOpenListening;
   final VoidCallback onOpenSpeaking;
+  final VoidCallback onOpenAdaptive;
 
   @override
   Widget build(BuildContext context) {
@@ -835,6 +867,13 @@ class _PracticeDoorwaysPanel extends StatelessWidget {
               ),
             ),
           ],
+        ),
+        const SizedBox(height: 12),
+        _DoorwayCard(
+          icon: Icons.auto_awesome_outlined,
+          title: 'Adaptive session',
+          subtitle: 'Open the recommended start mode, next focus, and first tasks in one view.',
+          onTap: onOpenAdaptive,
         ),
       ],
     );
