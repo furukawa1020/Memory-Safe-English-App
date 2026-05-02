@@ -33,6 +33,7 @@ def _build_analysis_service() -> AnalysisService:
             speaking_plan_service=SpeakingPlanService(chunking_service=chunking_service),
             rescue_plan_service=RescuePlanService(chunking_service=chunking_service),
             assessment_service=assessment_service,
+            collapse_pattern_service=CollapsePatternService(chunking_service=chunking_service),
         ),
     )
 
@@ -168,4 +169,6 @@ def test_analysis_service_dispatches_practice_set() -> None:
 
     assert result.summary
     assert result.suggested_order
+    assert result.detected_weak_mode
+    assert result.adaptive_reason
     assert result.sections
