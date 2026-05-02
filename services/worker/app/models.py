@@ -342,6 +342,9 @@ class PracticeSetResult:
     summary: str
     suggested_order: list[str]
     profile_note: str
+    detected_weak_mode: str
+    collapse_summary: str
+    adaptive_reason: str
     sections: list[PracticeSection]
 
     def to_dict(self) -> dict[str, Any]:
@@ -352,6 +355,9 @@ class PracticeSetResult:
             "summary": self.summary,
             "suggested_order": self.suggested_order,
             "profile_note": self.profile_note,
+            "detected_weak_mode": self.detected_weak_mode,
+            "collapse_summary": self.collapse_summary,
+            "adaptive_reason": self.adaptive_reason,
             "sections": [section.to_dict() for section in self.sections],
         }
 
