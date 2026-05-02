@@ -35,7 +35,7 @@ def test_practice_set_builds_multi_mode_tasks() -> None:
     assert result.adaptive_reason
     assert result.profile_note.startswith(f"Start with {result.suggested_order[0]}")
     assert len(result.sections) == 4
-    assert result.sections[0].mode == "reading"
+    assert result.sections[0].mode == result.suggested_order[0]
     assert result.sections[0].why_this_works
     assert result.sections[0].tasks
     assert result.sections[1].mode == "listening"

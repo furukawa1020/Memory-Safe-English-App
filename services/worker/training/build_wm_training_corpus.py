@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 from app.assessment import AssessmentService
+from app.collapse_patterns import CollapsePatternService
 from app.chunking import ChunkingService
 from app.listening_plan import ListeningPlanService
 from app.practice_set import PracticeSetService
@@ -69,12 +70,14 @@ class WMTrainingBuilder:
         self._speaking_plan_service = SpeakingPlanService(chunking_service=chunking_service)
         self._rescue_plan_service = RescuePlanService(chunking_service=chunking_service)
         self._assessment_service = AssessmentService()
+        self._collapse_pattern_service = CollapsePatternService(chunking_service=chunking_service)
         self._practice_set_service = PracticeSetService(
             reader_plan_service=self._reader_plan_service,
             listening_plan_service=self._listening_plan_service,
             speaking_plan_service=self._speaking_plan_service,
             rescue_plan_service=self._rescue_plan_service,
             assessment_service=self._assessment_service,
+            collapse_pattern_service=self._collapse_pattern_service,
         )
 
     def build_records(self, corpus_record: CorpusRecord, *, tasks: tuple[str, ...]) -> list[dict[str, object]]:
