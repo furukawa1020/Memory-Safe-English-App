@@ -382,3 +382,25 @@ class AnalyticsSummaryResult:
             "collapse_patterns": self.collapse_patterns.to_dict(),
             "recommendations": [item.to_dict() for item in self.recommendations],
         }
+
+
+@dataclass(slots=True)
+class AdaptiveSessionResult:
+    version: str
+    language: str
+    target_context: str
+    recommended_entry_mode: str
+    session_plan_note: str
+    analytics_summary: AnalyticsSummaryResult
+    practice_set: PracticeSetResult
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "version": self.version,
+            "language": self.language,
+            "target_context": self.target_context,
+            "recommended_entry_mode": self.recommended_entry_mode,
+            "session_plan_note": self.session_plan_note,
+            "analytics_summary": self.analytics_summary.to_dict(),
+            "practice_set": self.practice_set.to_dict(),
+        }
