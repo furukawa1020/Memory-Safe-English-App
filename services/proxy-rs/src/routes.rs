@@ -504,7 +504,9 @@ mod tests {
         assert!(text.contains("\"login\":\"/auth/login\""));
         assert!(text.contains("\"refresh\":\"/auth/refresh\""));
         assert!(text.contains("\"reader_plan\":\"/analysis/reader-plan\""));
+        assert!(text.contains("\"adaptive_session\":\"/analysis/adaptive-session\""));
         assert!(text.contains("\"analytics_summary\":true"));
+        assert!(text.contains("\"adaptive_session\":true"));
         assert!(text.contains("\"environment\":\"development\""));
     }
 
