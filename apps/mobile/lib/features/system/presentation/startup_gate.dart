@@ -95,13 +95,13 @@ class _StartupGateState extends State<StartupGate> {
                               _InfoPanel(
                                 title: 'Frontend route map',
                                 body:
-                                    'login ${bootstrap.routes.login}\nrefresh ${bootstrap.routes.refresh}\ncontents ${bootstrap.routes.contents}\nchunks ${bootstrap.routes.chunkAnalysis}\nreader plan ${bootstrap.routes.readerPlan}\nlistening ${bootstrap.routes.listeningPlan}',
+                                    'login ${bootstrap.routes.login}\nrefresh ${bootstrap.routes.refresh}\ncontents ${bootstrap.routes.contents}\nchunks ${bootstrap.routes.chunkAnalysis}\nreader plan ${bootstrap.routes.readerPlan}\nlistening ${bootstrap.routes.listeningPlan}\nadaptive ${bootstrap.routes.adaptiveSession}',
                               ),
                               const SizedBox(height: 12),
                               _InfoPanel(
                                 title: 'Available features',
                                 body:
-                                    'chunk reader ${bootstrap.capabilities.chunkReader}\nskeleton reader ${bootstrap.capabilities.skeletonReader}\nreader plan ${bootstrap.capabilities.readerPlan}\nlistening plan ${bootstrap.capabilities.listeningPlan}\nspeaking plan ${bootstrap.capabilities.speakingPlan}\nrescue plan ${bootstrap.capabilities.rescuePlan}\nanalytics ${bootstrap.capabilities.analyticsSummary}',
+                                    'chunk reader ${bootstrap.capabilities.chunkReader}\nskeleton reader ${bootstrap.capabilities.skeletonReader}\nreader plan ${bootstrap.capabilities.readerPlan}\nlistening plan ${bootstrap.capabilities.listeningPlan}\nspeaking plan ${bootstrap.capabilities.speakingPlan}\nrescue plan ${bootstrap.capabilities.rescuePlan}\nanalytics ${bootstrap.capabilities.analyticsSummary}\nadaptive session ${bootstrap.capabilities.adaptiveSession}',
                               ),
                               const SizedBox(height: 12),
                             ],
