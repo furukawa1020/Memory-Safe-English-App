@@ -86,6 +86,7 @@ class PracticeSetAnalyzer(Protocol):
         target_context: str = "general",
         self_reported_difficulties: list[str] | None = None,
         fatigue_level: str = "unknown",
+        session_events: list[dict[str, str | int | float]] | None = None,
     ) -> PracticeSetResult: ...
 
 
@@ -168,6 +169,7 @@ class AnalysisService:
                 target_context=request.target_context,
                 self_reported_difficulties=request.self_reported_difficulties,
                 fatigue_level=request.fatigue_level,
+                session_events=request.session_events,
             )
         raise ValueError(f"unsupported analysis operation: {operation}")
 
