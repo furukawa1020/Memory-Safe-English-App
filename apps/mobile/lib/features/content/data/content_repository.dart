@@ -54,6 +54,41 @@ class ContentRepository {
     return SpeakingPlanResult.fromJson(response);
   }
 
+  Future<AdaptiveSessionResultItem> fetchAdaptiveSession(
+    String text, {
+    String targetContext = 'meeting',
+    List<String> selfReportedDifficulties = const [
+      'audio_tracking',
+      'speech_breakdown',
+    ],
+    String fatigueLevel = 'medium',
+    List<Map<String, dynamic>> sessionEvents = const [
+      <String, dynamic>{
+        'event_type': 'audio_pause',
+        'chunk_order': 1,
+        'seconds': 1.2,
+      },
+      <String, dynamic>{
+        'event_type': 'repeat',
+        'chunk_order': 2,
+        'seconds': 0.0,
+      },
+    ],
+  }) async {
+    final response = await _apiClient.post(
+      '/analysis/adaptive-session',
+      body: <String, dynamic>{
+        'text': text,
+        'language': 'en',
+        'target_context': targetContext,
+        'self_reported_difficulties': selfReportedDifficulties,
+        'fatigue_level': fatigueLevel,
+        'session_events': sessionEvents,
+      },
+    );
+    return AdaptiveSessionResultItem.fromJson(response);
+  }
+
   Future<ChunkingResult> analyzeText(String text) async {
     final response = await _apiClient.post(
       '/analysis/chunks',
