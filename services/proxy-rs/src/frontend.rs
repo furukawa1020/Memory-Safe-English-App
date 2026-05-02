@@ -102,6 +102,7 @@ struct FrontendRoutes {
     listening_plan: &'static str,
     speaking_plan: &'static str,
     rescue_plan: &'static str,
+    adaptive_session: &'static str,
 }
 
 impl Default for FrontendRoutes {
@@ -119,6 +120,7 @@ impl Default for FrontendRoutes {
             listening_plan: "/analysis/listening-plan",
             speaking_plan: "/analysis/speaking-plan",
             rescue_plan: "/analysis/rescue-plan",
+            adaptive_session: "/analysis/adaptive-session",
         }
     }
 }
@@ -133,6 +135,7 @@ struct FrontendCapabilities {
     rescue_plan: bool,
     onboarding_assessment: bool,
     analytics_summary: bool,
+    adaptive_session: bool,
 }
 
 impl Default for FrontendCapabilities {
@@ -146,6 +149,7 @@ impl Default for FrontendCapabilities {
             rescue_plan: true,
             onboarding_assessment: true,
             analytics_summary: true,
+            adaptive_session: true,
         }
     }
 }
