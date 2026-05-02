@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../../content/data/content_repository.dart';
 import '../../content/model/chunking_result.dart';
 
-enum AnalysisMode { chunks, listening, speaking }
+enum AnalysisMode { chunks, listening, speaking, adaptive }
 
 class AnalysisController extends ChangeNotifier {
   AnalysisController(this._repository);
@@ -16,6 +16,7 @@ class AnalysisController extends ChangeNotifier {
   ChunkingResult? chunkResult;
   ListeningPlanResult? listeningResult;
   SpeakingPlanResult? speakingResult;
+  AdaptiveSessionResultItem? adaptiveSessionResult;
 
   void setMode(AnalysisMode value) {
     mode = value;
@@ -44,6 +45,9 @@ class AnalysisController extends ChangeNotifier {
           break;
         case AnalysisMode.speaking:
           speakingResult = await _repository.fetchSpeakingPlan(text);
+          break;
+        case AnalysisMode.adaptive:
+          adaptiveSessionResult = await _repository.fetchAdaptiveSession(text);
           break;
       }
     } catch (_) {
