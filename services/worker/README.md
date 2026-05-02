@@ -21,6 +21,7 @@ NLP backend は 2 系統あります。
 services/worker
 |- app/
 |  |- analysis/
+|  |- adaptive_session/
 |  |- analytics_summary/
 |  |- assessment/
 |  |- collapse_patterns/
@@ -68,6 +69,8 @@ services/worker
   診断結果と崩れ方をまとめて、次回のおすすめを返します。
 - `app/practice_set/`
   1 本の英文から、読む・聞く・話す・レスキューの練習セットを生成します。
+- `app/adaptive_session/`
+  弱点要約と次の練習セットを 1 回で返します。
 
 ## 利用できる endpoint
 
@@ -82,6 +85,7 @@ services/worker
 - `POST /analyze/collapse-patterns`
 - `POST /analyze/analytics-summary`
 - `POST /analyze/practice-set`
+- `POST /analyze/adaptive-session`
 
 ## 返せる分析
 
@@ -103,6 +107,9 @@ services/worker
   1 本の英文から、読む・聞く・話す・レスキューの小さな練習タスク群を返します。
   各 task には `problem_type`、`wm_support`、`success_check` が付き、何を伸ばす問題かを明示します。
   `session_events` を渡した場合は、最近の崩れ方を使って `suggested_order`、`detected_weak_mode`、`adaptive_reason` も変わります。
+- `adaptive-session`
+  `analytics-summary` と adaptive `practice-set` をまとめて返します。
+  `recommended_entry_mode` と `session_plan_note` が付くので、UI 側でそのまま「今どこから始めるか」を出しやすいです。
 
 ## `target_context`
 
@@ -202,7 +209,7 @@ docker build -t mse-worker services/worker
 }
 ```
 
-`assessment`、`analytics-summary`、`practice-set` では必要に応じて次も渡せます。
+`assessment`、`analytics-summary`、`practice-set`、`adaptive-session` では必要に応じて次も渡せます。
 
 - `self_reported_difficulties`
 - `fatigue_level`
