@@ -59,6 +59,7 @@ def build_application(settings: Settings | None = None) -> Application:
         speaking_plan_service=speaking_plan_service,
         rescue_plan_service=rescue_plan_service,
         assessment_service=assessment_service,
+        collapse_pattern_service=collapse_pattern_service,
     )
     return Application(
         settings=resolved_settings,
