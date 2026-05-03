@@ -11,6 +11,7 @@
 - PostgreSQL 用 SQL seed 生成
 - 既存 SQL seed の YAML 化
 - 複数 SQL seed の一括統合
+- YAML から Go / SQL / stats の一括再生成
 
 ## ディレクトリ
 
@@ -82,6 +83,18 @@ ruby bin/catalog_ops build-go data/sample_content_catalog.yml tmp/generated_seed
 ruby bin/catalog_ops build-sql data/sample_content_catalog.yml tmp/generated_seed.sql
 ```
 
+### YAML から Go / SQL / stats をまとめて生成
+
+```bash
+ruby bin/catalog_ops build-all data/sample_content_catalog.yml tmp/build --package memory --function generatedRubySeedCatalog
+```
+
+出力されるもの:
+
+- `generated_seed.go`
+- `generated_seed.sql`
+- `catalog_stats.json`
+
 ### 既存 SQL seed を YAML へ変換
 
 ```bash
@@ -95,6 +108,22 @@ ruby bin/catalog_ops import-sql-dir ../../infra/postgres/init tmp/all_catalog.ym
 ```
 
 重複した `id` が見つかった場合は、その場で失敗して止まります。
+
+## 推奨フロー
+
+既存 seed を Ruby 管理へ寄せたいときは、この順が扱いやすいです。
+
+1. SQL seed 群を YAML に統合
+
+```bash
+ruby bin/catalog_ops import-sql-dir ../../infra/postgres/init tmp/all_catalog.yml --pattern "*seed*.sql"
+```
+
+2. 統合した YAML から Go / SQL / stats を再生成
+
+```bash
+ruby bin/catalog_ops build-all tmp/all_catalog.yml tmp/build --package memory --function generatedRubySeedCatalog
+```
 
 ## テスト
 

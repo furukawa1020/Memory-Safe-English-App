@@ -25,6 +25,7 @@ module CatalogOps
       when "stats" then stats
       when "build-go" then build_go
       when "build-sql" then build_sql
+      when "build-all" then build_all
       when "import-sql" then import_sql
       when "import-sql-dir" then import_sql_dir
       else
@@ -81,6 +82,50 @@ module CatalogOps
       rendered = Renderers::SqlSeedRenderer.new(records).render
       write_output(output, rendered)
       puts "wrote SQL seed: #{output}"
+    end
+
+    def build_all
+      options = {
+        package_name: "memory",
+        function_name: "generatedRubySeedCatalog",
+        go_filename: "generated_seed.go",
+        sql_filename: "generated_seed.sql",
+        stats_filename: "catalog_stats.json"
+      }
+      parser = OptionParser.new do |opts|
+        opts.on("--package NAME") { |value| options[:package_name] = value }
+        opts.on("--function NAME") { |value| options[:function_name] = value }
+        opts.on("--go-file NAME") { |value| options[:go_filename] = value }
+        opts.on("--sql-file NAME") { |value| options[:sql_filename] = value }
+        opts.on("--stats-file NAME") { |value| options[:stats_filename] = value }
+      end
+      parser.permute!(@argv)
+      input = fetch_path!
+      output_dir = fetch_path!
+      records = CatalogLoader.load(input)
+      RecordCollection.ensure_unique_ids!(records)
+
+      FileUtils.mkdir_p(output_dir)
+
+      go_output = File.join(output_dir, options[:go_filename])
+      sql_output = File.join(output_dir, options[:sql_filename])
+      stats_output = File.join(output_dir, options[:stats_filename])
+
+      write_output(
+        go_output,
+        Renderers::GoSeedRenderer.new(
+          records,
+          package_name: options[:package_name],
+          function_name: options[:function_name]
+        ).render
+      )
+      write_output(sql_output, Renderers::SqlSeedRenderer.new(records).render)
+      write_output(stats_output, JSON.pretty_generate(Stats.new(records).to_h))
+
+      puts "wrote build bundle:"
+      puts "  Go seed: #{go_output}"
+      puts "  SQL seed: #{sql_output}"
+      puts "  Stats: #{stats_output}"
     end
 
     def import_sql
@@ -150,6 +195,7 @@ module CatalogOps
           ruby bin/catalog_ops stats <catalog.yml>
           ruby bin/catalog_ops build-go [--package NAME] [--function NAME] <catalog.yml> <output.go>
           ruby bin/catalog_ops build-sql <catalog.yml> <output.sql>
+          ruby bin/catalog_ops build-all [--package NAME] [--function NAME] <catalog.yml> <output_dir>
           ruby bin/catalog_ops import-sql <seed.sql> <output.yml>
           ruby bin/catalog_ops import-sql-dir [--pattern GLOB] <seed_dir> <output.yml>
       USAGE
