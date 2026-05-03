@@ -774,15 +774,10 @@ func (s *Store) seedContents() {
 			UpdatedAt:   now,
 		},
 	}
-	items = append(items, additionalSeedCatalog(now)...)
-	items = append(items, additionalSeedCatalogMore(now)...)
-	items = append(items, additionalSeedCatalogBulk(now)...)
-	items = append(items, additionalSeedCatalogBulk2(now)...)
-	items = append(items, additionalSeedCatalogBulk3(now)...)
-	items = append(items, additionalSeedCatalogBulk4(now)...)
-	items = append(items, additionalSeedCatalogBulk5(now)...)
-	items = append(items, additionalSeedCatalogBulk6(now)...)
-	items = append(items, additionalSeedCatalogBulk7(now)...)
+	// Ruby-generated seed catalog is the main source for the large content set.
+	// The small inline starter set above remains as a safe fallback and can
+	// override or complement generated records through the final map assignment.
+	items = append(items, generatedRubySeedCatalog(now)...)
 	for _, item := range items {
 		s.contents[item.ID] = item
 	}
