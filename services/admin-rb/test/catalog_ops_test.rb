@@ -10,8 +10,10 @@ $LOAD_PATH.unshift(File.join(ROOT, "lib"))
 require "catalog_ops/catalog_loader"
 require "catalog_ops/cli"
 require "catalog_ops/stats"
+require "catalog_ops/importers/sql_seed_importer"
 require "catalog_ops/renderers/go_seed_renderer"
 require "catalog_ops/renderers/sql_seed_renderer"
+require "catalog_ops/renderers/yaml_catalog_renderer"
 
 class CatalogOpsTest < Minitest::Test
   SAMPLE_PATH = File.join(ROOT, "data", "sample_content_catalog.yml")
@@ -63,16 +65,43 @@ class CatalogOpsTest < Minitest::Test
     assert_includes output, "It''s okay."
   end
 
+  def test_sql_importer_reads_seed_rows
+    sql = <<~SQL
+      INSERT INTO contents (id, title, content_type, level, topic, raw_text, summary_text, language)
+      VALUES
+        ('cnt_1', 'Title One', 'reading', 'intro', 'daily', 'It''s okay.', 'Summary One', 'en'),
+        ('cnt_2', 'Title Two', 'listening', 'upper_intermediate', 'meeting', 'One detail first.', 'Summary Two', 'en');
+    SQL
+
+    records = CatalogOps::Importers::SqlSeedImporter.new(sql).import
+
+    assert_equal 2, records.length
+    assert_equal "cnt_1", records.first.id
+    assert_equal "It's okay.", records.first.raw_text
+    assert_equal "meeting", records.last.topic
+  end
+
+  def test_yaml_renderer_outputs_contents_root
+    records = CatalogOps::CatalogLoader.load(SAMPLE_PATH)
+    output = CatalogOps::Renderers::YamlCatalogRenderer.new(records).render
+
+    assert_includes output, "contents:"
+    assert_includes output, "cnt_ruby_001"
+  end
+
   def test_cli_can_build_outputs
     Dir.mktmpdir do |dir|
       go_path = File.join(dir, "generated.go")
       sql_path = File.join(dir, "generated.sql")
+      yaml_path = File.join(dir, "imported.yml")
 
       CatalogOps::CLI.new(["build-go", SAMPLE_PATH, go_path]).run
       CatalogOps::CLI.new(["build-sql", SAMPLE_PATH, sql_path]).run
+      CatalogOps::CLI.new(["import-sql", sql_path, yaml_path]).run
 
       assert File.exist?(go_path)
       assert File.exist?(sql_path)
+      assert File.exist?(yaml_path)
     end
   end
 end
