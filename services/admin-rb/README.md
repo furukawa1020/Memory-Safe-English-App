@@ -10,6 +10,7 @@
 - Go の in-memory seed ファイル生成
 - PostgreSQL 用 SQL seed 生成
 - 既存 SQL seed の YAML 化
+- 複数 SQL seed の一括統合
 
 ## ディレクトリ
 
@@ -86,6 +87,14 @@ ruby bin/catalog_ops build-sql data/sample_content_catalog.yml tmp/generated_see
 ```bash
 ruby bin/catalog_ops import-sql ../../infra/postgres/init/010_seed_catalog_bulk7.sql tmp/imported_catalog.yml
 ```
+
+### 複数 SQL seed を 1 つの YAML に統合
+
+```bash
+ruby bin/catalog_ops import-sql-dir ../../infra/postgres/init tmp/all_catalog.yml --pattern "*seed*.sql"
+```
+
+重複した `id` が見つかった場合は、その場で失敗して止まります。
 
 ## テスト
 

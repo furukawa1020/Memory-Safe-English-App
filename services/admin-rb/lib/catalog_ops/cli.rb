@@ -5,6 +5,7 @@ require "optparse"
 require "fileutils"
 
 require_relative "catalog_loader"
+require_relative "record_collection"
 require_relative "stats"
 require_relative "importers/sql_seed_importer"
 require_relative "renderers/go_seed_renderer"
@@ -25,6 +26,7 @@ module CatalogOps
       when "build-go" then build_go
       when "build-sql" then build_sql
       when "import-sql" then import_sql
+      when "import-sql-dir" then import_sql_dir
       else
         warn usage
         exit 1
@@ -61,6 +63,7 @@ module CatalogOps
       input = fetch_path!
       output = fetch_path!
       records = CatalogLoader.load(input)
+      RecordCollection.ensure_unique_ids!(records)
       rendered = Renderers::GoSeedRenderer.new(
         records,
         package_name: options[:package_name],
@@ -74,6 +77,7 @@ module CatalogOps
       input = fetch_path!
       output = fetch_path!
       records = CatalogLoader.load(input)
+      RecordCollection.ensure_unique_ids!(records)
       rendered = Renderers::SqlSeedRenderer.new(records).render
       write_output(output, rendered)
       puts "wrote SQL seed: #{output}"
@@ -84,9 +88,32 @@ module CatalogOps
       output = fetch_path!
       sql_text = File.read(input)
       records = Importers::SqlSeedImporter.new(sql_text).import
+      RecordCollection.ensure_unique_ids!(records)
       rendered = Renderers::YamlCatalogRenderer.new(records).render
       write_output(output, rendered)
       puts "wrote YAML catalog: #{output}"
+    end
+
+    def import_sql_dir
+      options = {
+        pattern: "*.sql"
+      }
+      parser = OptionParser.new do |opts|
+        opts.on("--pattern GLOB") { |value| options[:pattern] = value }
+      end
+      parser.parse!(@argv)
+      input_dir = fetch_path!
+      output = fetch_path!
+      sql_paths = Dir[File.join(input_dir, options[:pattern])].sort
+      raise ArgumentError, "no SQL files matched in #{input_dir}" if sql_paths.empty?
+
+      records = sql_paths.flat_map do |path|
+        Importers::SqlSeedImporter.new(File.read(path)).import
+      end
+      RecordCollection.ensure_unique_ids!(records)
+      rendered = Renderers::YamlCatalogRenderer.new(records).render
+      write_output(output, rendered)
+      puts "wrote merged YAML catalog: #{output} (#{records.length} records from #{sql_paths.length} files)"
     end
 
     def fetch_path!
@@ -106,6 +133,7 @@ module CatalogOps
           ruby bin/catalog_ops build-go [--package NAME] [--function NAME] <catalog.yml> <output.go>
           ruby bin/catalog_ops build-sql <catalog.yml> <output.sql>
           ruby bin/catalog_ops import-sql <seed.sql> <output.yml>
+          ruby bin/catalog_ops import-sql-dir [--pattern GLOB] <seed_dir> <output.yml>
       USAGE
     end
   end
