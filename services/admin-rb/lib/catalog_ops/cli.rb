@@ -6,8 +6,10 @@ require "fileutils"
 
 require_relative "catalog_loader"
 require_relative "stats"
+require_relative "importers/sql_seed_importer"
 require_relative "renderers/go_seed_renderer"
 require_relative "renderers/sql_seed_renderer"
+require_relative "renderers/yaml_catalog_renderer"
 
 module CatalogOps
   class CLI
@@ -22,6 +24,7 @@ module CatalogOps
       when "stats" then stats
       when "build-go" then build_go
       when "build-sql" then build_sql
+      when "import-sql" then import_sql
       else
         warn usage
         exit 1
@@ -76,6 +79,16 @@ module CatalogOps
       puts "wrote SQL seed: #{output}"
     end
 
+    def import_sql
+      input = fetch_path!
+      output = fetch_path!
+      sql_text = File.read(input)
+      records = Importers::SqlSeedImporter.new(sql_text).import
+      rendered = Renderers::YamlCatalogRenderer.new(records).render
+      write_output(output, rendered)
+      puts "wrote YAML catalog: #{output}"
+    end
+
     def fetch_path!
       @argv.shift || raise(ArgumentError, "missing path argument")
     end
@@ -92,6 +105,7 @@ module CatalogOps
           ruby bin/catalog_ops stats <catalog.yml>
           ruby bin/catalog_ops build-go [--package NAME] [--function NAME] <catalog.yml> <output.go>
           ruby bin/catalog_ops build-sql <catalog.yml> <output.sql>
+          ruby bin/catalog_ops import-sql <seed.sql> <output.yml>
       USAGE
     end
   end
