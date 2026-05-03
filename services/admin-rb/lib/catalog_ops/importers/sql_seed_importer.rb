@@ -5,15 +5,15 @@ require_relative "../content_record"
 module CatalogOps
   module Importers
     class SqlSeedImporter
-      EXPECTED_FIELDS = %w[
+      REQUIRED_FIELDS = %w[
         id
         title
         content_type
         level
         topic
+        language
         raw_text
         summary_text
-        language
       ].freeze
 
       def initialize(sql_text)
@@ -21,16 +21,38 @@ module CatalogOps
       end
 
       def import
+        columns = extract_columns(@sql_text)
+        validate_columns!(columns)
         values_block = extract_values_block(@sql_text)
         parse_rows(values_block).map do |values|
-          raise ArgumentError, "expected #{EXPECTED_FIELDS.length} values, got #{values.length}" unless values.length == EXPECTED_FIELDS.length
+          raise ArgumentError, "expected #{columns.length} values, got #{values.length}" unless values.length == columns.length
 
-          attributes = EXPECTED_FIELDS.zip(values).to_h
+          attributes = columns.zip(values).to_h
           ContentRecord.new(attributes)
         end
       end
 
       private
+
+      def extract_columns(sql_text)
+        match = sql_text.match(/INSERT\s+INTO\s+contents\s*\((.+?)\)\s*VALUES/im)
+        raise ArgumentError, "could not find INSERT INTO contents column list" unless match
+
+        match[1]
+          .split(",")
+          .map { |value| value.strip.downcase }
+      end
+
+      def validate_columns!(columns)
+        missing = REQUIRED_FIELDS - columns
+        extra = columns - REQUIRED_FIELDS
+        return if missing.empty? && extra.empty?
+
+        parts = []
+        parts << "missing columns: #{missing.join(', ')}" unless missing.empty?
+        parts << "unexpected columns: #{extra.join(', ')}" unless extra.empty?
+        raise ArgumentError, parts.join("; ")
+      end
 
       def extract_values_block(sql_text)
         match = sql_text.match(

@@ -68,10 +68,10 @@ class CatalogOpsTest < Minitest::Test
 
   def test_sql_importer_reads_seed_rows
     sql = <<~SQL
-      INSERT INTO contents (id, title, content_type, level, topic, raw_text, summary_text, language)
+      INSERT INTO contents (id, title, content_type, level, topic, language, raw_text, summary_text)
       VALUES
-        ('cnt_1', 'Title One', 'reading', 'intro', 'daily', 'It''s okay.', 'Summary One', 'en'),
-        ('cnt_2', 'Title Two', 'listening', 'upper_intermediate', 'meeting', 'One detail first.', 'Summary Two', 'en');
+        ('cnt_1', 'Title One', 'reading', 'intro', 'daily', 'en', 'It''s okay.', 'Summary One'),
+        ('cnt_2', 'Title Two', 'listening', 'upper_intermediate', 'meeting', 'en', 'One detail first.', 'Summary Two');
     SQL
 
     records = CatalogOps::Importers::SqlSeedImporter.new(sql).import
@@ -79,6 +79,8 @@ class CatalogOpsTest < Minitest::Test
     assert_equal 2, records.length
     assert_equal "cnt_1", records.first.id
     assert_equal "It's okay.", records.first.raw_text
+    assert_equal "en", records.first.language
+    assert_equal "Summary One", records.first.summary_text
     assert_equal "meeting", records.last.topic
   end
 
