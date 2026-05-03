@@ -139,6 +139,28 @@ class CatalogOpsTest < Minitest::Test
     end
   end
 
+  def test_cli_can_build_all_bundle
+    Dir.mktmpdir do |dir|
+      output_dir = File.join(dir, "bundle")
+
+      CatalogOps::CLI.new(
+        [
+          "build-all",
+          SAMPLE_PATH,
+          output_dir,
+          "--package",
+          "memory",
+          "--function",
+          "generatedRubySeedCatalog"
+        ]
+      ).run
+
+      assert File.exist?(File.join(output_dir, "generated_seed.go"))
+      assert File.exist?(File.join(output_dir, "generated_seed.sql"))
+      assert File.exist?(File.join(output_dir, "catalog_stats.json"))
+    end
+  end
+
   def test_cli_can_merge_sql_directory
     Dir.mktmpdir do |dir|
       seed_dir = File.join(dir, "sql")
