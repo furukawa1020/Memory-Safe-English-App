@@ -36,6 +36,12 @@ The implementation is separated as `repository -> service -> handler`.
 - default: in-memory store
 - when `DATABASE_URL` is set: PostgreSQL store
 
+The in-memory content catalog now prefers the Ruby-generated seed file:
+
+- [generated_ruby_seed_catalog.go](./internal/store/memory/generated_ruby_seed_catalog.go)
+
+The small inline starter set in [store.go](./internal/store/memory/store.go) remains as a fallback starter layer.
+
 The PostgreSQL implementation is split by responsibility.
 
 - `postgres/users.go`: auth and user retrieval

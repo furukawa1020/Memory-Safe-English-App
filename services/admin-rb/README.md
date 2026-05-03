@@ -125,6 +125,12 @@ ruby bin/catalog_ops import-sql-dir ../../infra/postgres/init tmp/all_catalog.ym
 ruby bin/catalog_ops build-all tmp/all_catalog.yml tmp/build --package memory --function generatedRubySeedCatalog
 ```
 
+3. Go API の memory store に generated Go seed を反映
+
+```bash
+copy tmp\build\generated_seed.go ..\api\internal\store\memory\generated_ruby_seed_catalog.go
+```
+
 ## テスト
 
 ```bash
