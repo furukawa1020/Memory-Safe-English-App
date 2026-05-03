@@ -9,6 +9,7 @@
 - 件数や難度帯の集計
 - Go の in-memory seed ファイル生成
 - PostgreSQL 用 SQL seed 生成
+- 既存 SQL seed の YAML 化
 
 ## ディレクトリ
 
@@ -78,6 +79,12 @@ ruby bin/catalog_ops build-go data/sample_content_catalog.yml tmp/generated_seed
 
 ```bash
 ruby bin/catalog_ops build-sql data/sample_content_catalog.yml tmp/generated_seed.sql
+```
+
+### 既存 SQL seed を YAML へ変換
+
+```bash
+ruby bin/catalog_ops import-sql ../../infra/postgres/init/010_seed_catalog_bulk7.sql tmp/imported_catalog.yml
 ```
 
 ## テスト
