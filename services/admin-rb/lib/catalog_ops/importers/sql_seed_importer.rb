@@ -33,7 +33,9 @@ module CatalogOps
       private
 
       def extract_values_block(sql_text)
-        match = sql_text.match(/INSERT\s+INTO\s+contents\s*\([^)]+\)\s*VALUES\s*(.+?);/im)
+        match = sql_text.match(
+          /INSERT\s+INTO\s+contents\s*\([^)]+\)\s*VALUES\s*(.+?)(?:ON\s+CONFLICT|;)/im
+        )
         raise ArgumentError, "could not find INSERT INTO contents ... VALUES statement" unless match
 
         match[1]
