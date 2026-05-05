@@ -88,7 +88,7 @@ class _StartupGateState extends State<StartupGate> {
                             const SizedBox(height: 12),
                             if (bootstrap != null) ...[
                               if (widget.controller.restoredSession) ...[
-                                _InfoPanel(
+                                const _InfoPanel(
                                   title: 'Saved session',
                                   body: 'A previous session was restored and refreshed automatically.',
                                 ),
