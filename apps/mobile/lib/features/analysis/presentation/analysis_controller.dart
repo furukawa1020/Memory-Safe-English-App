@@ -9,6 +9,9 @@ class AnalysisController extends ChangeNotifier {
   AnalysisController(this._repository);
 
   final ContentRepository _repository;
+  String inputText =
+      'In this study, we propose a memory safe interface that reduces cognitive overload during English reading.';
+  int inputRevision = 0;
 
   bool isSubmitting = false;
   String? errorText;
@@ -24,11 +27,39 @@ class AnalysisController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> analyze(String text) async {
-    if (text.trim().isEmpty) {
+  void setInputText(String value) {
+    if (inputText == value) {
+      return;
+    }
+    inputText = value;
+    inputRevision++;
+    notifyListeners();
+  }
+
+  Future<void> openPreset({
+    required AnalysisMode nextMode,
+    required String text,
+    bool analyzeNow = true,
+  }) async {
+    mode = nextMode;
+    errorText = null;
+    setInputText(text);
+    if (analyzeNow) {
+      await analyze();
+    }
+  }
+
+  Future<void> analyze([String? text]) async {
+    final draft = (text ?? inputText).trim();
+    if (draft.isEmpty) {
       errorText = 'Enter some English text first.';
       notifyListeners();
       return;
+    }
+
+    if (text != null && text != inputText) {
+      inputText = text;
+      inputRevision++;
     }
 
     isSubmitting = true;
@@ -38,16 +69,16 @@ class AnalysisController extends ChangeNotifier {
     try {
       switch (mode) {
         case AnalysisMode.chunks:
-          chunkResult = await _repository.analyzeText(text);
+          chunkResult = await _repository.analyzeText(draft);
           break;
         case AnalysisMode.listening:
-          listeningResult = await _repository.fetchListeningPlan(text);
+          listeningResult = await _repository.fetchListeningPlan(draft);
           break;
         case AnalysisMode.speaking:
-          speakingResult = await _repository.fetchSpeakingPlan(text);
+          speakingResult = await _repository.fetchSpeakingPlan(draft);
           break;
         case AnalysisMode.adaptive:
-          adaptiveSessionResult = await _repository.fetchAdaptiveSession(text);
+          adaptiveSessionResult = await _repository.fetchAdaptiveSession(draft);
           break;
       }
     } catch (_) {
