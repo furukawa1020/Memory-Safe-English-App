@@ -1,30 +1,25 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:memory_safe_english_mobile/main.dart';
+import 'package:memory_safe_english_mobile/features/auth/model/auth_session.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  test('stored sessions need non-empty user and tokens', () {
+    const usable = AuthSession(
+      userId: 'usr_123',
+      email: 'user@example.com',
+      displayName: 'User',
+      accessToken: 'access-token',
+      refreshToken: 'refresh-token',
+    );
+    const unusable = AuthSession(
+      userId: '',
+      email: 'user@example.com',
+      displayName: 'User',
+      accessToken: '',
+      refreshToken: '',
+    );
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
-
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
-
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    expect(usable.isUsable, isTrue);
+    expect(unusable.isUsable, isFalse);
   });
 }
