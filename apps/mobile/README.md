@@ -136,3 +136,9 @@ mobile は Go API を直接叩かず、Rust proxy を入口に使います。
 
 - `android/` が無い場合でも `bootstrap-mobile.ps1` が自動で生成できます
 - 起動前に `dev-doctor.ps1` を通すと、足りないのが `Docker / Flutter / adb / emulator / AVD` のどれかすぐ分かります
+- 
+## Session persistence
+
+- Login, register, and guest sessions are stored in `flutter_secure_storage`.
+- On startup the app restores the saved session and attempts one refresh against `/auth/refresh`.
+- If the access token later expires during normal API calls, the client retries once after refresh.

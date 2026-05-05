@@ -47,4 +47,15 @@ class AuthRepository {
     );
     return AuthSession.fromJson(response);
   }
+
+  Future<AuthSession> refreshSession(String refreshToken) async {
+    final response = await _apiClient.post(
+      '/auth/refresh',
+      authenticated: false,
+      body: <String, dynamic>{
+        'refresh_token': refreshToken,
+      },
+    );
+    return AuthSession.fromJson(response);
+  }
 }

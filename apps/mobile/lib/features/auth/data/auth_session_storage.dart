@@ -18,11 +18,23 @@ class AuthSessionStorage {
       return null;
     }
 
-    final decoded = jsonDecode(raw);
-    if (decoded is! Map<String, dynamic>) {
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map<String, dynamic>) {
+        await clear();
+        return null;
+      }
+
+      final session = AuthSession.fromStorageJson(decoded);
+      if (!session.isUsable) {
+        await clear();
+        return null;
+      }
+      return session;
+    } catch (_) {
+      await clear();
       return null;
     }
-    return AuthSession.fromStorageJson(decoded);
   }
 
   Future<void> write(AuthSession session) {

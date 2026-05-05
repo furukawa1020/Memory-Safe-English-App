@@ -13,6 +13,11 @@ class AuthSession {
   final String accessToken;
   final String refreshToken;
 
+  bool get isUsable =>
+      userId.isNotEmpty &&
+      accessToken.isNotEmpty &&
+      refreshToken.isNotEmpty;
+
   factory AuthSession.fromJson(Map<String, dynamic> json) {
     final user = json['user'] as Map<String, dynamic>? ?? const <String, dynamic>{};
     final tokens = json['tokens'] as Map<String, dynamic>? ?? const <String, dynamic>{};
