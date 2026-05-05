@@ -42,6 +42,8 @@ The in-memory content catalog now prefers the Ruby-generated seed file:
 
 The inline fallback in [store.go](./internal/store/memory/store.go) is now intentionally minimal and only keeps records that are not yet covered by the Ruby-generated catalog bundle.
 
+Older handwritten seed files have been moved under [internal/store/memory/legacy](./internal/store/memory/legacy) so the active memory-store path stays easier to maintain.
+
 The PostgreSQL implementation is split by responsibility.
 
 - `postgres/users.go`: auth and user retrieval
