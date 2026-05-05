@@ -10,6 +10,8 @@ class ContentCatalogController extends ChangeNotifier {
   ContentCatalogController(this._repository);
 
   final ContentRepository _repository;
+  static const String defaultAdaptiveSeedText =
+      'The client approved the design draft, but the delivery schedule is still under review.';
 
   List<ContentItem> items = const [];
   List<ProblemItem> recommendedItems = const [];
@@ -37,7 +39,7 @@ class ContentCatalogController extends ChangeNotifier {
         limit: 4,
       );
       final adaptiveSessionFuture = _repository.fetchAdaptiveSession(
-        'The client approved the design draft, but the delivery schedule is still under review.',
+        defaultAdaptiveSeedText,
       );
       final dashboardFuture = _repository.fetchProblemDashboard();
       final snapshotsFuture = _repository.fetchProblemSnapshots(limit: 5);
