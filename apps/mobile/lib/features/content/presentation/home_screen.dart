@@ -40,20 +40,35 @@ class _HomeScreenState extends State<HomeScreen> {
     final pages = [
       _ContentHomeTab(
         controller: contentCatalogController,
-        onOpenListening: () {
-          analysisController.setMode(AnalysisMode.listening);
-          setState(() => _index = 1);
-        },
-        onOpenSpeaking: () {
-          analysisController.setMode(AnalysisMode.speaking);
-          setState(() => _index = 1);
-        },
-        onOpenAdaptive: () {
-          analysisController.setMode(AnalysisMode.adaptive);
-          setState(() => _index = 1);
-        },
+        onOpenListening: () => _openAnalysisPreset(
+          controller: analysisController,
+          mode: AnalysisMode.listening,
+          text: analysisController.inputText,
+          analyzeNow: false,
+        ),
+        onOpenSpeaking: () => _openAnalysisPreset(
+          controller: analysisController,
+          mode: AnalysisMode.speaking,
+          text: analysisController.inputText,
+          analyzeNow: false,
+        ),
+        onOpenAdaptive: () => _openAnalysisPreset(
+          controller: analysisController,
+          mode: AnalysisMode.adaptive,
+          text: ContentCatalogController.defaultAdaptiveSeedText,
+        ),
+        onOpenProblem: (item) =>
+            _openProblemPreset(controller: analysisController, item: item),
+        onOpenAdaptiveResult: (result) => _openAnalysisPreset(
+          controller: analysisController,
+          mode: AnalysisMode.adaptive,
+          text: ContentCatalogController.defaultAdaptiveSeedText,
+        ),
       ),
-      _AnalysisTab(controller: analysisController),
+      _AnalysisTab(
+        key: ValueKey(analysisController.inputRevision),
+        controller: analysisController,
+      ),
       _SettingsTab(sessionController: scope.sessionController),
     ];
 
@@ -70,6 +85,41 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
+
+  Future<void> _openAnalysisPreset({
+    required AnalysisController controller,
+    required AnalysisMode mode,
+    required String text,
+    bool analyzeNow = true,
+  }) async {
+    await controller.openPreset(
+      nextMode: mode,
+      text: text,
+      analyzeNow: analyzeNow,
+    );
+    if (!mounted) {
+      return;
+    }
+    setState(() => _index = 1);
+  }
+
+  Future<void> _openProblemPreset({
+    required AnalysisController controller,
+    required ProblemItem item,
+  }) async {
+    final nextMode = switch (item.mode) {
+      'listening' => AnalysisMode.listening,
+      'speaking' => AnalysisMode.speaking,
+      'rescue' => AnalysisMode.adaptive,
+      _ => AnalysisMode.chunks,
+    };
+
+    await _openAnalysisPreset(
+      controller: controller,
+      mode: nextMode,
+      text: item.prompt,
+    );
+  }
 }
 
 class _ContentHomeTab extends StatefulWidget {
@@ -78,12 +128,16 @@ class _ContentHomeTab extends StatefulWidget {
     required this.onOpenListening,
     required this.onOpenSpeaking,
     required this.onOpenAdaptive,
+    required this.onOpenProblem,
+    required this.onOpenAdaptiveResult,
   });
 
   final ContentCatalogController controller;
   final VoidCallback onOpenListening;
   final VoidCallback onOpenSpeaking;
   final VoidCallback onOpenAdaptive;
+  final ValueChanged<ProblemItem> onOpenProblem;
+  final ValueChanged<AdaptiveSessionResultItem> onOpenAdaptiveResult;
 
   @override
   State<_ContentHomeTab> createState() => _ContentHomeTabState();
@@ -122,7 +176,8 @@ class _ContentHomeTabState extends State<_ContentHomeTab> {
                 if (widget.controller.adaptiveSession != null) ...[
                   _AdaptiveSessionPanel(
                     result: widget.controller.adaptiveSession!,
-                    onOpenAdaptive: widget.onOpenAdaptive,
+                    onOpenAdaptive: () =>
+                        widget.onOpenAdaptiveResult(widget.controller.adaptiveSession!),
                   ),
                   const SizedBox(height: 18),
                 ],
@@ -158,6 +213,7 @@ class _ContentHomeTabState extends State<_ContentHomeTab> {
                   for (final item in widget.controller.recommendedItems) ...[
                     _ProblemTile(
                       item: item,
+                      onPractice: () => widget.onOpenProblem(item),
                       onSave: () => widget.controller.saveProblem(item),
                       onTogglePinned: () => widget.controller.togglePinned(item),
                       onRecordUsed: () => widget.controller.recordProblemUsage(
@@ -299,7 +355,7 @@ class _ContentHomeTabState extends State<_ContentHomeTab> {
 }
 
 class _AnalysisTab extends StatefulWidget {
-  const _AnalysisTab({required this.controller});
+  const _AnalysisTab({super.key, required this.controller});
 
   final AnalysisController controller;
 
@@ -308,9 +364,13 @@ class _AnalysisTab extends StatefulWidget {
 }
 
 class _AnalysisTabState extends State<_AnalysisTab> {
-  final _textController = TextEditingController(
-    text: 'In this study, we propose a memory safe interface that reduces cognitive overload during English reading.',
-  );
+  late final TextEditingController _textController;
+
+  @override
+  void initState() {
+    super.initState();
+    _textController = TextEditingController(text: widget.controller.inputText);
+  }
 
   @override
   void dispose() {
@@ -324,6 +384,14 @@ class _AnalysisTabState extends State<_AnalysisTab> {
       child: AnimatedBuilder(
         animation: widget.controller,
         builder: (context, _) {
+          if (_textController.text != widget.controller.inputText) {
+            _textController.value = TextEditingValue(
+              text: widget.controller.inputText,
+              selection: TextSelection.collapsed(
+                offset: widget.controller.inputText.length,
+              ),
+            );
+          }
           final chunkResult = widget.controller.chunkResult;
           final listeningResult = widget.controller.listeningResult;
           final speakingResult = widget.controller.speakingResult;
@@ -525,6 +593,7 @@ class _ContentTile extends StatelessWidget {
 class _ProblemTile extends StatelessWidget {
   const _ProblemTile({
     required this.item,
+    required this.onPractice,
     required this.onSave,
     required this.onTogglePinned,
     required this.onRecordUsed,
@@ -532,6 +601,7 @@ class _ProblemTile extends StatelessWidget {
   });
 
   final ProblemItem item;
+  final VoidCallback onPractice;
   final VoidCallback onSave;
   final VoidCallback onTogglePinned;
   final VoidCallback onRecordUsed;
@@ -593,6 +663,11 @@ class _ProblemTile extends StatelessWidget {
               spacing: 8,
               runSpacing: 8,
               children: [
+                FilledButton.tonalIcon(
+                  onPressed: onPractice,
+                  icon: const Icon(Icons.play_circle_outline),
+                  label: const Text('Practice'),
+                ),
                 if (!item.isSaved)
                   OutlinedButton.icon(
                     onPressed: onSave,
