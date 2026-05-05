@@ -87,6 +87,13 @@ class _StartupGateState extends State<StartupGate> {
                             ),
                             const SizedBox(height: 12),
                             if (bootstrap != null) ...[
+                              if (widget.controller.restoredSession) ...[
+                                _InfoPanel(
+                                  title: 'Saved session',
+                                  body: 'A previous session was restored and refreshed automatically.',
+                                ),
+                                const SizedBox(height: 10),
+                              ],
                               _InfoPanel(
                                 title: 'Recommended Android emulator URL',
                                 body: bootstrap.recommendedBaseUrls.androidEmulator,
