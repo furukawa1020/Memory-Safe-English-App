@@ -40,7 +40,7 @@ The in-memory content catalog now prefers the Ruby-generated seed file:
 
 - [generated_ruby_seed_catalog.go](./internal/store/memory/generated_ruby_seed_catalog.go)
 
-The small inline starter set in [store.go](./internal/store/memory/store.go) remains as a fallback starter layer.
+The inline fallback in [store.go](./internal/store/memory/store.go) is now intentionally minimal and only keeps records that are not yet covered by the Ruby-generated catalog bundle.
 
 The PostgreSQL implementation is split by responsibility.
 
