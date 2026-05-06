@@ -110,6 +110,7 @@ services/worker
 - `adaptive-session`
   `analytics-summary` と adaptive `practice-set` をまとめて返します。
   `recommended_entry_mode` と `session_plan_note` が付くので、UI 側でそのまま「今どこから始めるか」を出しやすいです。
+  さらに `startup_sequence` で、最初の数分にやる reading / listening / speaking / rescue の順序付きミニ手順を返します。
 
 ## `target_context`
 
