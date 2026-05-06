@@ -268,5 +268,7 @@ def test_adaptive_session_endpoint() -> None:
         assert response.status == HTTPStatus.OK
         assert payload["recommended_entry_mode"] == "listening"
         assert payload["session_plan_note"]
+        assert payload["startup_sequence"]
+        assert payload["startup_sequence"][0]["mode"] == "listening"
         assert payload["analytics_summary"]["next_focus"]
         assert payload["practice_set"]["suggested_order"][0] == "listening"
