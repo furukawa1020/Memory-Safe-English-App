@@ -391,6 +391,7 @@ class AdaptiveSessionResult:
     target_context: str
     recommended_entry_mode: str
     session_plan_note: str
+    startup_sequence: list["AdaptiveSessionStep"]
     analytics_summary: AnalyticsSummaryResult
     practice_set: PracticeSetResult
 
@@ -401,6 +402,20 @@ class AdaptiveSessionResult:
             "target_context": self.target_context,
             "recommended_entry_mode": self.recommended_entry_mode,
             "session_plan_note": self.session_plan_note,
+            "startup_sequence": [step.to_dict() for step in self.startup_sequence],
             "analytics_summary": self.analytics_summary.to_dict(),
             "practice_set": self.practice_set.to_dict(),
         }
+
+
+@dataclass(slots=True)
+class AdaptiveSessionStep:
+    step: int
+    mode: str
+    title: str
+    instruction: str
+    reason: str
+    estimated_minutes: int
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
