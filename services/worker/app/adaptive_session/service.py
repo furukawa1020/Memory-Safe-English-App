@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from app.analytics_summary import AnalyticsSummaryService
-from app.models import AdaptiveSessionResult, RESPONSE_VERSION
+from app.models import AdaptiveSessionResult, AdaptiveSessionStep, RESPONSE_VERSION
 from app.practice_set import PracticeSetService
 
 
@@ -49,6 +49,10 @@ class AdaptiveSessionService:
             next_focus=analytics_summary.next_focus,
             adaptive_reason=practice_set.adaptive_reason,
         )
+        startup_sequence = _build_startup_sequence(
+            recommended_entry_mode=recommended_entry_mode,
+            practice_set=practice_set,
+        )
 
         return AdaptiveSessionResult(
             version=RESPONSE_VERSION,
@@ -56,6 +60,7 @@ class AdaptiveSessionService:
             target_context=target_context,
             recommended_entry_mode=recommended_entry_mode,
             session_plan_note=session_plan_note,
+            startup_sequence=startup_sequence,
             analytics_summary=analytics_summary,
             practice_set=practice_set,
         )
@@ -73,3 +78,49 @@ def _build_session_plan_note(
         f"Primary focus: {next_focus}. "
         f"Reason: {adaptive_reason}"
     )
+
+
+def _build_startup_sequence(
+    *,
+    recommended_entry_mode: str,
+    practice_set,
+) -> list[AdaptiveSessionStep]:
+    sections_by_mode = {section.mode: section for section in practice_set.sections}
+    ordered_modes = [recommended_entry_mode]
+    ordered_modes.extend(
+        mode for mode in practice_set.suggested_order if mode not in ordered_modes
+    )
+
+    steps: list[AdaptiveSessionStep] = []
+    for mode in ordered_modes:
+        section = sections_by_mode.get(mode)
+        if section is None:
+            continue
+        first_task = section.tasks[0] if section.tasks else None
+        if first_task is None:
+            continue
+
+        steps.append(
+            AdaptiveSessionStep(
+                step=len(steps) + 1,
+                mode=mode,
+                title=section.goal,
+                instruction=first_task.prompt,
+                reason=section.why_this_works,
+                estimated_minutes=_estimate_minutes(mode),
+            )
+        )
+        if len(steps) >= 3:
+            break
+
+    return steps
+
+
+def _estimate_minutes(mode: str) -> int:
+    if mode == "reading":
+        return 4
+    if mode == "listening":
+        return 3
+    if mode == "speaking":
+        return 4
+    return 2
