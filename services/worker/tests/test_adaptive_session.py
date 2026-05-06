@@ -49,3 +49,6 @@ def test_adaptive_session_builds_summary_and_practice_set() -> None:
     assert result.practice_set.detected_weak_mode == "listening"
     assert result.practice_set.suggested_order[0] == "listening"
     assert "Primary focus:" in result.session_plan_note
+    assert result.startup_sequence
+    assert result.startup_sequence[0].mode == "listening"
+    assert result.startup_sequence[0].estimated_minutes >= 2
