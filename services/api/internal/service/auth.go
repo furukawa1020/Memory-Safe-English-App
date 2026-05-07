@@ -117,7 +117,7 @@ func (s AuthService) Guest(ctx context.Context) (AuthResult, error) {
 	if err != nil {
 		return AuthResult{}, err
 	}
-	result.NativeNotice = "guest_session"
+	result.NativeNotice = "Guest mode is active. This session stays signed in on this device, and you can create a full account later if you want a named profile."
 	return result, nil
 }
 
