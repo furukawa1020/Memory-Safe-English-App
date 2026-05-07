@@ -72,6 +72,33 @@ class _AuthScreenState extends State<AuthScreen> {
                                 'A calmer English-learning interface built to reduce memory load while reading and speaking.',
                                 style: Theme.of(context).textTheme.bodyMedium,
                               ),
+                              const SizedBox(height: 16),
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(14),
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .secondaryContainer,
+                                  borderRadius: BorderRadius.circular(18),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Quick guest start',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleSmall
+                                          ?.copyWith(fontWeight: FontWeight.w700),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    const Text(
+                                      'You can start without a password, stay signed in on this device, and decide later whether you want a full account.',
+                                    ),
+                                  ],
+                                ),
+                              ),
                               const SizedBox(height: 20),
                               SegmentedButton<AuthMode>(
                                 segments: const [
@@ -179,6 +206,11 @@ class _AuthScreenState extends State<AuthScreen> {
                                     child: Text('Try as guest'),
                                   ),
                                 ),
+                              ),
+                              const SizedBox(height: 10),
+                              Text(
+                                'Guest mode is best when you want to try the reader, adaptive session, and problem bank right away.',
+                                style: Theme.of(context).textTheme.bodySmall,
                               ),
                             ],
                           ),
