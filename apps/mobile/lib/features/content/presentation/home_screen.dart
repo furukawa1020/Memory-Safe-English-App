@@ -153,6 +153,7 @@ class _ContentHomeTabState extends State<_ContentHomeTab> {
   @override
   Widget build(BuildContext context) {
     final groupedSections = _buildContentSections(widget.controller.items);
+    final session = AppScope.of(context).sessionController.session;
     return SafeArea(
       child: AnimatedBuilder(
         animation: widget.controller,
@@ -166,6 +167,10 @@ class _ContentHomeTabState extends State<_ContentHomeTab> {
                   title: 'Chunk Reader',
                   subtitle: 'Keep the sentence stable by reading one meaning unit at a time instead of holding the whole line in memory.',
                 ),
+                if (session?.isGuest == true) ...[
+                  const SizedBox(height: 18),
+                  _GuestModeCard(notice: session!.guestNotice),
+                ],
                 const SizedBox(height: 18),
                 _PracticeDoorwaysPanel(
                   onOpenListening: widget.onOpenListening,
@@ -522,9 +527,42 @@ class _SettingsTab extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(session?.displayName ?? '', style: Theme.of(context).textTheme.titleLarge),
+                  Text(
+                    session?.visibleDisplayName ?? '',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
                   const SizedBox(height: 6),
-                  Text(session?.email ?? ''),
+                  Text(session?.visibleEmail ?? ''),
+                  if (session?.isGuest == true) ...[
+                    const SizedBox(height: 14),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.secondaryContainer,
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Guest mode is active',
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleSmall
+                                ?.copyWith(fontWeight: FontWeight.w700),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(session?.guestNotice ?? ''),
+                          const SizedBox(height: 8),
+                          Text(
+                            'When you want a named profile, just log out and create a regular account.',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 14),
                   FilledButton.tonal(
                     onPressed: sessionController.logout,
@@ -535,6 +573,41 @@ class _SettingsTab extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _GuestModeCard extends StatelessWidget {
+  const _GuestModeCard({required this.notice});
+
+  final String notice;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      color: Theme.of(context).colorScheme.secondaryContainer,
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Guest mode',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            Text(notice),
+            const SizedBox(height: 10),
+            Text(
+              'You can explore the adaptive session, problem bank, and reader now without setting up a password first.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ),
       ),
     );
   }
